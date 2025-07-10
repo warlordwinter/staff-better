@@ -22,21 +22,21 @@ const getStatusStyle = (status: string) => {
 };
 
 const JobTableRow: React.FC<{ job: Job }> = ({ job }) => (
-  <div className="grid grid-cols-[3rem_1.5fr_1.5fr_1fr_1fr] hover:bg-gray-50">
-    <div className="flex items-center justify-center h-10">
+  <tr className="hover:bg-gray-50 text-sm text-black border-b border-zinc-100">
+    <td className="h-10 text-center">
       <input type="checkbox" className="w-4 h-4" />
-    </div>
-    <div className="flex items-center px-4 h-10 text-sm text-black">{job.title}</div>
-    <div className="flex items-center px-4 h-10 gap-2">
-      <span className="text-blue-600 text-sm">{job.customerName}</span>
-    </div>
-    <div className="flex items-center px-4 h-10">
-      <span className={`px-2 py-0.5 rounded-sm text-xs font-bold uppercase ${getStatusStyle(job.status)}`}>
+    </td>
+    <td className="px-4">{job.title}</td>
+    <td className="px-4 text-blue-600">{job.customerName}</td>
+    <td className="px-4">
+      <span
+        className={`px-2 py-0.5 rounded-sm text-xs font-bold uppercase ${getStatusStyle(job.status)}`}
+      >
         {job.status}
       </span>
-    </div>
-    <div className="flex items-center px-4 h-10 text-sm text-black">{job.date}</div>
-  </div>
+    </td>
+    <td className="px-4">{job.date}</td>
+  </tr>
 );
 
 export default JobTableRow;

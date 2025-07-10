@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import JobTableHeader from './jobTableHeader';
-import JobTableHeadRow from './JobTableHeadRow';
+import JobTableHeadRow from './jobTableHeadRow';
 import JobTableRow from './jobTableRow';
 
 interface Job {
@@ -23,11 +23,10 @@ const JobTable = () => {
   ]);
 
   const handleAddJob = () => {
-    const newCustomer = 'John Worker';
     const newJob: Job = {
       id: crypto.randomUUID(),
       title: 'Warehouse Job',
-      customerName: newCustomer,
+      customerName: 'John Worker',
       status: 'active',
       date: new Date().toISOString().slice(0, 10),
     };
@@ -35,15 +34,18 @@ const JobTable = () => {
   };
 
   return (
-    <div className="flex flex-col gap-6 w-full max-w-4xl mx-auto m-24">
-    <JobTableHeader onFileSelect={(file) => console.log('Selected file:', file)} />
-
-      <div className="w-full rounded-lg bg-white overflow-hidden">
-        <JobTableHeadRow />
-        {jobs.map((job) => (
-          <JobTableRow key={job.id} job={job} />
-        ))}
-      </div>
+    <div className="flex flex-col gap-6 w-full max-w-6xl mx-auto px-4 mt-24 overflow-x-auto">
+      <JobTableHeader onFileSelect={(file) => console.log('Selected file:', file)} />
+      <table className="w-full table-fixed border-collapse bg-white rounded-lg overflow-hidden min-w-[800px]">
+        <thead>
+          <JobTableHeadRow />
+        </thead>
+        <tbody>
+          {jobs.map((job) => (
+            <JobTableRow key={job.id} job={job} />
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 };

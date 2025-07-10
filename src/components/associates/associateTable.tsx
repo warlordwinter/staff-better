@@ -3,7 +3,7 @@ import { associates } from "./data";
 import { AssociateTableHeader } from "./associateTableHeader";
 import { AssociateTableRow } from "./associateTableRow";
 import { AssociateTableTitle } from "./associateTableTitle";
-import { AddButton } from "./addButton";
+
 
 export default function AssociateTable() {
   return (
@@ -24,7 +24,6 @@ export default function AssociateTable() {
         </tbody>
       </table>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-end gap-2 mt-2 mb-2">
-        <AddButton />
       </div>
     </div>
   );
