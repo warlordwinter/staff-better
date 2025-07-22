@@ -5,6 +5,8 @@ export async function POST(req: NextRequest) {
   try {
     const { headers } = await req.json();
 
+    // console.log(headers);
+
     const prompt = `
         
 You are an assistant that helps match spreadsheet columns to a staffing agency database.
