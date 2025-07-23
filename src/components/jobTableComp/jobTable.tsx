@@ -1,34 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import JobTableHeader from './jobTableHeader';
 import JobTableHeadRow from './jobTableHeadRow';
 import JobTableRow from './jobTableRow';
 
 interface Job {
   id: string;
-  title: string;
-  customerName: string;
-  status: string;
-  date: string;
+  job_title: string;
+  customer_name: string;
+  job_status: string;
+  start_date: string;
 }
 
 const JobTable = () => {
-  const [jobs, setJobs] = useState<Job[]>([
-    {
-      id: '1',
-      title: 'Airport Job',
-      customerName: 'Sarah Eastern',
-      status: 'active',
-      date: '2023/09/17',
-    },
-  ]);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchJobs = async () => {
+      try {
+        const res = await fetch("/api/jobs");
+        const data = await res.json();
+        setJobs(data);
+      } catch (err) {
+        console.error("Failed to fetch jobs", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchJobs();
+  }, []);
+
+  
 
   const handleAddJob = () => {
     const newJob: Job = {
       id: crypto.randomUUID(),
-      title: 'Warehouse Job',
-      customerName: 'John Worker',
-      status: 'active',
-      date: new Date().toISOString().slice(0, 10),
+      job_title: 'Warehouse Job',
+      customer_name: 'John Worker',
+      job_status: 'active',
+      start_date: new Date().toISOString().slice(0, 10),
     };
     setJobs([...jobs, newJob]);
   };

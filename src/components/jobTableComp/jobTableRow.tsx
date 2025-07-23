@@ -2,14 +2,14 @@ import React from 'react';
 
 interface Job {
   id: string;
-  title: string;
-  customerName: string;
-  status: string;
-  date: string;
+  job_title: string;
+  customer_name: string;
+  job_status: string;
+  start_date: string;
 }
 
-const getStatusStyle = (status: string) => {
-  switch (status.toLowerCase()) {
+const getStatusStyle = (job_status: string) => {
+  switch (job_status.toLowerCase()) {
     case 'active':
       return 'bg-emerald-50 text-green-600';
     case 'past':
@@ -26,16 +26,16 @@ const JobTableRow: React.FC<{ job: Job }> = ({ job }) => (
     <td className="h-10 text-center">
       <input type="checkbox" className="w-4 h-4" />
     </td>
-    <td className="px-4">{job.title}</td>
-    <td className="px-4 text-blue-600">{job.customerName}</td>
+    <td className="px-4">{job.job_title}</td>
+    <td className="px-4 text-blue-600">{job.customer_name}</td>
     <td className="px-4">
       <span
-        className={`px-2 py-0.5 rounded-sm text-xs font-bold uppercase ${getStatusStyle(job.status)}`}
+        className={`px-2 py-0.5 rounded-sm text-xs font-bold uppercase ${getStatusStyle(job.job_status)}`}
       >
-        {job.status}
+        {job.job_status}
       </span>
     </td>
-    <td className="px-4">{job.date}</td>
+    <td className="px-4">{job.start_date}</td>
   </tr>
 );
 
