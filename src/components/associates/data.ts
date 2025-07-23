@@ -1,0 +1,38 @@
+export const associates = [
+  {
+    firstName: "Lili",
+    lastName: "Daniels",
+    reminders: 3,
+    workDate: "06 / 01 / 2021",
+    startTime: "10:00 AM",
+    phone: "+1(801)-364-7666",
+    email: "example@exampleasdf.com",
+  },
+  {
+    firstName: "Henrietta",
+    lastName: "Whitney",
+    reminders: 3,
+    workDate: "08 / 04 / 2022",
+    startTime: "10:00 AM",
+    phone: "+1(801)-321-4456",
+    email: "john@mailinator.com",
+  },
+  {
+    firstName: "Seth",
+    lastName: "McDaniel",
+    reminders: 5,
+    workDate: "",
+    startTime: "9:00 AM",
+    phone: "+1(385)-165-4625",
+    email: "mark@gmail.com",
+  },
+  {
+    firstName: "Edward",
+    lastName: "King",
+    reminders: 3,
+    workDate: "02 / 15 / 2020",
+    startTime: "7:00 AM",
+    phone: "+1(480)-608-5985",
+    email: "zuchman@gmail.com",
+  },
+];
