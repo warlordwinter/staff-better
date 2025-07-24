@@ -36,7 +36,6 @@ const TestUploadExcel = () => {
   };
 
   const handleUploadToSupabase = async () => {
-    console.log("Entering handleUploadToSupabase function");
     setUploading(true);
     setUploadResult(null);
 

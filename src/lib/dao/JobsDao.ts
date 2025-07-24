@@ -12,7 +12,7 @@ export async function insertJobs(
   const supabase = await createServerSupabaseClient();
   console.log("Jobs: ", jobs);
 
-  const { data, error } = await supabase.from("jobs").insert(jobs);
+  const { data, error } = await supabase.from("jobs").insert(jobs).select();
 
   if (error) {
     console.error("Supabase error (raw):", JSON.stringify(error, null, 2));
