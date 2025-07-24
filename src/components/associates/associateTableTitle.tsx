@@ -2,7 +2,11 @@ import React from "react";
 import Image from "next/image";
 import { AddButton } from "./addButton";
 
-export function AssociateTableTitle() {
+interface AssociateTableTitleProps {
+  onAdd: () => void;
+}
+
+export function AssociateTableTitle({ onAdd }: AssociateTableTitleProps) {
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 w-full">
       {/* Left side: icon + title */}
@@ -22,7 +26,9 @@ export function AssociateTableTitle() {
       </div>
 
       {/* Right side: Add Button */}
-      <AddButton />
+      <div onClick={onAdd}>
+        <AddButton />
+      </div>
     </div>
   );
 }

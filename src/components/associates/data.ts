@@ -7,6 +7,7 @@ export const associates = [
     startTime: "10:00 AM",
     phone: "+1(801)-364-7666",
     email: "example@exampleasdf.com",
+    confirmationStatus: "confirmed",
   },
   {
     firstName: "Henrietta",
@@ -16,6 +17,7 @@ export const associates = [
     startTime: "10:00 AM",
     phone: "+1(801)-321-4456",
     email: "john@mailinator.com",
+    confirmationStatus: "soft confirmed",
   },
   {
     firstName: "Seth",
@@ -25,6 +27,7 @@ export const associates = [
     startTime: "9:00 AM",
     phone: "+1(385)-165-4625",
     email: "mark@gmail.com",
+    confirmationStatus: "likely confirmed",
   },
   {
     firstName: "Edward",
@@ -34,5 +37,6 @@ export const associates = [
     startTime: "7:00 AM",
     phone: "+1(480)-608-5985",
     email: "zuchman@gmail.com",
+    confirmationStatus: "unconfirmed",
   },
 ];

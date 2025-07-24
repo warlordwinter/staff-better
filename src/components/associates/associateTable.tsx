@@ -26,9 +26,27 @@ export default function AssociateTable() {
     }
   };
 
+  // New function to handle adding an associate
+  const handleAdd = () => {
+    // Create a new empty associate object based on the row structure
+    const newAssociate = {
+      firstName: "",
+      lastName: "",
+      reminders: "",
+      workDate: "",
+      startTime: "",
+      phone: "",
+      email: "",
+      confirmationStatus: "unconfirmed"
+    };
+
+    setAssociatesData(prev => [...prev, newAssociate]);
+    console.log('Added new associate');
+  };
+
   return (
     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 overflow-x-auto">
-      <AssociateTableTitle />
+      <AssociateTableTitle onAdd={handleAdd} />
 
       <table className="w-full table-auto border-collapse mt-4">
         <thead>

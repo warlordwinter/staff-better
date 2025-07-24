@@ -7,6 +7,7 @@ export function AssociateTableHeader() {
     { title: "Start Time", className: "w-[100px] text-right" },
     { title: "Phone Number", className: "w-[140px]" },
     { title: "Email Address", className: "w-[240px]" },
+    { title: "Status", className: "w-[140px]" },
     { title: "", className: "w-[100px]" },
   ];
 

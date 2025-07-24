@@ -11,7 +11,8 @@ export function AssociateTableRow({ data, index, onSave, onDelete }: { data: any
     workDate: data.workDate || '',
     startTime: data.startTime || '',
     phone: data.phone || '',
-    email: data.email || ''
+    email: data.email || '',
+    confirmationStatus: data.confirmationStatus || 'unconfirmed'
   });
 
   const handleEdit = () => {
@@ -33,7 +34,8 @@ export function AssociateTableRow({ data, index, onSave, onDelete }: { data: any
       workDate: data.workDate || '',
       startTime: data.startTime || '',
       phone: data.phone || '',
-      email: data.email || ''
+      email: data.email || '',
+      confirmationStatus: data.confirmationStatus || 'unconfirmed'
     });
     setIsEditing(false);
   };
@@ -43,6 +45,23 @@ export function AssociateTableRow({ data, index, onSave, onDelete }: { data: any
       ...prev,
       [field]: value
     }));
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'unconfirmed':
+        return 'bg-gray-100 text-gray-800';
+      case 'soft confirmed':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'likely confirmed':
+        return 'bg-blue-100 text-blue-800';
+      case 'confirmed':
+        return 'bg-green-100 text-green-800';
+      case 'declined':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
   };
 
   return (
@@ -136,6 +155,26 @@ export function AssociateTableRow({ data, index, onSave, onDelete }: { data: any
           />
         ) : (
           data.email
+        )}
+      </TableCell>
+      
+      <TableCell className="w-[140px]">
+        {isEditing ? (
+          <select
+            value={editData.confirmationStatus}
+            onChange={(e) => handleInputChange('confirmationStatus', e.target.value)}
+            className="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+          >
+            <option value="unconfirmed">Unconfirmed</option>
+            <option value="soft confirmed">Soft Confirmed</option>
+            <option value="likely confirmed">Likely Confirmed</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="declined">Declined</option>
+          </select>
+        ) : (
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(data.confirmationStatus)}`}>
+            {data.confirmationStatus}
+          </span>
         )}
       </TableCell>
       
