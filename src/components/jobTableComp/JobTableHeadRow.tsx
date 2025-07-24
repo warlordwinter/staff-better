@@ -7,6 +7,7 @@ const JobTableHeadRow = () => (
     <th className="w-[1.5fr] px-4 text-left">Customer Name</th>
     <th className="w-[1fr] px-4 text-left">Status</th>
     <th className="w-[1fr] px-4 text-left">Date</th>
+    <th className="w-[4rem] px-2 text-center"></th>
   </tr>
 );
 

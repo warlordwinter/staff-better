@@ -36,15 +36,14 @@ const JobTableHeader: React.FC<Props> = ({ onFileSelect }) => {
             height={16}
             className="object-contain"
           />
-          </div>
+        </div>
       </button>
 
-      {/* Hidden file input */}
       <input
         type="file"
         ref={fileInputRef}
         onChange={handleFileChange}
-        accept= ".csv, application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        accept=".csv, application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         className="hidden"
       />
     </div>

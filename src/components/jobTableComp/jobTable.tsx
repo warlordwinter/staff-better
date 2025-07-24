@@ -18,7 +18,7 @@ const JobTable = () => {
       title: 'Airport Job',
       customerName: 'Sarah Eastern',
       status: 'active',
-      date: '2023/09/17',
+      date: '2023-09-17',
     },
   ]);
 
@@ -33,6 +33,16 @@ const JobTable = () => {
     setJobs([...jobs, newJob]);
   };
 
+  const handleUpdateJob = (id: string, updatedFields: Partial<Job>) => {
+    setJobs((prev) =>
+      prev.map((job) => (job.id === id ? { ...job, ...updatedFields } : job))
+    );
+  };
+
+  const handleDeleteJob = (id: string) => {
+    setJobs((prev) => prev.filter((job) => job.id !== id));
+  };
+
   return (
     <div className="flex flex-col gap-6 w-full max-w-6xl mx-auto px-4 mt-24 overflow-x-auto">
       <JobTableHeader onFileSelect={(file) => console.log('Selected file:', file)} />
@@ -42,7 +52,12 @@ const JobTable = () => {
         </thead>
         <tbody>
           {jobs.map((job) => (
-            <JobTableRow key={job.id} job={job} />
+            <JobTableRow
+              key={job.id}
+              job={job}
+              onUpdate={handleUpdateJob}
+              onDelete={handleDeleteJob}
+            />
           ))}
         </tbody>
       </table>
