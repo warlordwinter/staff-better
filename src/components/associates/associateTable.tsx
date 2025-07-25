@@ -5,10 +5,22 @@ import { AssociateTableHeader } from "./associateTableHeader";
 import { AssociateTableRow } from "./associateTableRow";
 import { AssociateTableTitle } from "./associateTableTitle";
 
-export default function AssociateTable() {
-  const [associatesData, setAssociatesData] = useState(associates);
+// Define the Associate interface
+interface Associate {
+  firstName: string;
+  lastName: string;
+  reminders: number;
+  workDate: string;
+  startTime: string;
+  phone: string;
+  email: string;
+  confirmationStatus: string;
+}
 
-  const handleSave = (index: number, updatedData: any) => {
+export default function AssociateTable() {
+  const [associatesData, setAssociatesData] = useState<Associate[]>(associates);
+
+  const handleSave = (index: number, updatedData: Associate) => {
     setAssociatesData(prev => 
       prev.map((associate, i) => 
         i === index ? updatedData : associate
@@ -29,10 +41,10 @@ export default function AssociateTable() {
   // New function to handle adding an associate
   const handleAdd = () => {
     // Create a new empty associate object based on the row structure
-    const newAssociate = {
+    const newAssociate: Associate = {
       firstName: "",
       lastName: "",
-      reminders: "",
+      reminders: 0, // Changed from Number("") to 0
       workDate: "",
       startTime: "",
       phone: "",

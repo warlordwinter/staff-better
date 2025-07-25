@@ -2,12 +2,32 @@ import React, { useState } from "react";
 import { AssociateDateDisplay } from "./associateTableCell";
 import Image from "next/image";
 
-export function AssociateTableRow({ data, index, onSave, onDelete }: { data: any; index: number; onSave?: (updatedData: any) => void; onDelete?: () => void }) {
+// Define the Associate interface
+interface Associate {
+  firstName: string;
+  lastName: string;
+  reminders: number;
+  workDate: string;
+  startTime: string;
+  phone: string;
+  email: string;
+  confirmationStatus: string;
+}
+
+// Define the props interface
+interface AssociateTableRowProps {
+  data: Associate;
+  index: number; // Keep this since it's used in the parent component
+  onSave?: (updatedData: Associate) => void;
+  onDelete?: () => void;
+}
+
+export function AssociateTableRow({ data, index, onSave, onDelete }: AssociateTableRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({
     firstName: data.firstName || '',
     lastName: data.lastName || '',
-    reminders: data.reminders || '',
+    reminders: data.reminders.toString() || '0', // Convert to string for input
     workDate: data.workDate || '',
     startTime: data.startTime || '',
     phone: data.phone || '',
@@ -21,7 +41,13 @@ export function AssociateTableRow({ data, index, onSave, onDelete }: { data: any
 
   const handleSave = () => {
     if (onSave) {
-      onSave({ ...data, ...editData });
+      // Convert reminders back to number when saving
+      const updatedData: Associate = {
+        ...data,
+        ...editData,
+        reminders: Number(editData.reminders) || 0
+      };
+      onSave(updatedData);
     }
     setIsEditing(false);
   };
@@ -30,7 +56,7 @@ export function AssociateTableRow({ data, index, onSave, onDelete }: { data: any
     setEditData({
       firstName: data.firstName || '',
       lastName: data.lastName || '',
-      reminders: data.reminders || '',
+      reminders: data.reminders.toString() || '0',
       workDate: data.workDate || '',
       startTime: data.startTime || '',
       phone: data.phone || '',
@@ -63,6 +89,10 @@ export function AssociateTableRow({ data, index, onSave, onDelete }: { data: any
         return 'bg-gray-100 text-gray-800';
     }
   };
+
+  // Suppress the ESLint warning for unused index since it's used in parent
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _index = index;
 
   return (
     <tr className="text-xs text-neutral-700">

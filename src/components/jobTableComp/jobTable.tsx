@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import JobTableHeader from './jobTableHeader';
 import JobTableHeadRow from './jobTableHeadRow';
 import JobTableRow from './jobTableRow';
-import ImportOptions from './importOptions';
 
 interface Job {
   id: string;

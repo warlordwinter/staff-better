@@ -1,16 +1,18 @@
 // components/Navbar.tsx
 import React from 'react';
+import Image from 'next/image';
 
 const Navbar = () => {
   return (
     <nav className="w-full px-5 py-2.5 bg-orange-500 flex justify-between items-center">
       {/* Left: Logo and Brand */}
       <div className="flex items-center gap-3">
-        <img
-          className="w-14 h-14 object-cover"
-          src="https://placehold.co/53x53"
-          alt="Logo"
-        />
+      <Image 
+      height={50}
+      width={50}
+      alt="Logo"
+      src={"/icons/mainLogo.svg"}
+      />
         <span className="text-white text-3xl font-semibold font-inter">Staff Better</span>
       </div>
 
