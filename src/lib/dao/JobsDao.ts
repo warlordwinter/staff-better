@@ -38,3 +38,46 @@ export async function getJobs() {
 
   return data;
 }
+
+// Update job
+export async function updateJob(
+  id: string,
+  updates: Partial<{
+    job_title: string;
+    customer_name: string;
+    job_status: string;
+    start_date: string;
+  }>
+) {
+  const supabase = await createServerSupabaseClient();
+
+  const { data, error } = await supabase
+    .from("jobs")
+    .update(updates)
+    .eq("id", id)
+    .select();
+
+  if (error) {
+    console.error("Supabase update error:", error);
+    throw new Error("Failed to update job");
+  }
+
+  return data;
+}
+
+// Delete job
+export async function deleteJob(id: string) {
+  const supabase = await createServerSupabaseClient();
+
+  const { error } = await supabase
+    .from("jobs")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    console.error("Supabase delete error:", error);
+    throw new Error("Failed to delete job");
+  }
+
+  return { success: true };
+}

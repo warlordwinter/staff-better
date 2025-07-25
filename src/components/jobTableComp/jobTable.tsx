@@ -24,28 +24,82 @@ const JobTable = () => {
     fetchJobs();
   }, []);
 
-  
-
-  const handleAddJob = () => {
-    const newJob: Job = {
-      id: crypto.randomUUID(),
+  const handleAddJob = async () => {
+    const newJob = {
       job_title: 'Warehouse Job',
       customer_name: 'John Worker',
       job_status: 'active',
       start_date: new Date().toISOString().slice(0, 10),
     };
-    setJobs([...jobs, newJob]);
+
+    try {
+      const res = await fetch('/api/jobs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newJob),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to create job');
+      }
+
+      const createdJob = await res.json();
+      setJobs([createdJob[0], ...jobs]);
+    } catch (error) {
+      console.error('Failed to add job:', error);
+      // You might want to show a toast notification here
+    }
   };
 
-  const handleUpdateJob = (id: string, updatedFields: Partial<Job>) => {
-    setJobs((prev) =>
-      prev.map((job) => (job.id === id ? { ...job, ...updatedFields } : job))
-    );
+  const handleUpdateJob = async (id: string, updatedFields: Partial<Job>) => {
+    try {
+      const res = await fetch(`/api/jobs/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedFields),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to update job');
+      }
+
+      const updatedJob = await res.json();
+      
+      // Update local state
+      setJobs((prev) =>
+        prev.map((job) => (job.id === id ? { ...job, ...updatedFields } : job))
+      );
+    } catch (error) {
+      console.error('Failed to update job:', error);
+      // You might want to show a toast notification here
+    }
   };
 
-  const handleDeleteJob = (id: string) => {
-    setJobs((prev) => prev.filter((job) => job.id !== id));
+  const handleDeleteJob = async (id: string) => {
+    try {
+      const res = await fetch(`/api/jobs/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to delete job');
+      }
+
+      // Update local state
+      setJobs((prev) => prev.filter((job) => job.id !== id));
+    } catch (error) {
+      console.error('Failed to delete job:', error);
+      // You might want to show a toast notification here
+    }
   };
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-6xl mx-auto px-4 mt-24 overflow-x-auto">

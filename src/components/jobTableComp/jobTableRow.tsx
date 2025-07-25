@@ -1,13 +1,6 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
-
-interface Job {
-  id: string;
-  title: string;
-  customerName: string;
-  status: string;
-  date: string;
-}
+import { Job } from '@/model/interfaces/job';
 
 interface Props {
   job: Job;
@@ -33,66 +26,80 @@ const JobTableRow: React.FC<Props> = ({ job, onUpdate, onDelete }) => {
   const [editedJob, setEditedJob] = useState(job);
 
   const handleEditClick = () => setIsEditing(true);
+  
   const handleSave = () => {
     onUpdate(job.id, editedJob);
     setIsEditing(false);
   };
+  
   const handleCancel = () => {
     setEditedJob(job);
     setIsEditing(false);
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setEditedJob((prev) => ({ ...prev, [name]: value }));
   };
 
   return (
     <tr className="hover:bg-gray-50 text-sm text-black border-b border-zinc-100 h-10">
-
       <td className="px-4">
         {isEditing ? (
           <input
-            name="title"
-            value={editedJob.title}
+            name="job_title"
+            value={editedJob.job_title}
             onChange={handleChange}
             className="border border-gray-300 rounded px-2 w-full"
           />
         ) : (
-          job.title
+          job.job_title
         )}
       </td>
 
       <td className="px-4 text-blue-600">
         {isEditing ? (
           <input
-            name="customerName"
-            value={editedJob.customerName}
+            name="customer_name"
+            value={editedJob.customer_name}
             onChange={handleChange}
             className="border border-gray-300 rounded px-2 w-full"
           />
         ) : (
-          job.customerName
+          job.customer_name
         )}
       </td>
 
       <td className="px-4">
-        <span className={`px-2 py-0.5 rounded-sm text-xs font-bold uppercase ${getStatusStyle(job.status)}`}>
-          {job.status}
-        </span>
+        {isEditing ? (
+          <select
+            name="job_status"
+            value={editedJob.job_status}
+            onChange={handleChange}
+            className="border border-gray-300 rounded px-2 w-full"
+          >
+            <option value="Active">Active</option>
+            <option value="Upcoming">Upcoming</option>
+            <option value="Past">Past</option>
+          </select>
+        ) : (
+          <span className={`px-2 py-0.5 rounded-sm text-xs font-bold uppercase ${getStatusStyle(job.job_status)}`}>
+            {job.job_status}
+          </span>
+        )}
       </td>
 
       <td className="px-4">
         {isEditing ? (
           <input
-            name="date"
+            name="start_date"
             type="date"
-            value={editedJob.date}
+            value={editedJob.start_date}
             onChange={handleChange}
             className="border border-gray-300 rounded px-2 w-full"
           />
         ) : (
-          job.date
+          job.start_date
         )}
       </td>
 
@@ -107,7 +114,7 @@ const JobTableRow: React.FC<Props> = ({ job, onUpdate, onDelete }) => {
             </button>
             <button
               onClick={handleCancel}
-              className="px-1.5 py-0.5 text-[11px] bg-gray-500 text-white rounded hover:bg-gray-600 focus:outline-none text-sm"
+              className="px-1.5 py-0.5 text-[11px] bg-gray-500 text-white rounded hover:bg-gray-600 focus:outline-none"
             >
               Cancel
             </button>
