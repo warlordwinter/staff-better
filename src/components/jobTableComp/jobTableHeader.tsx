@@ -1,15 +1,21 @@
-import React, { useRef } from 'react';
+'use client';
+
+import React, { useState, useRef } from 'react';
 import Image from 'next/image';
+import ImportOptions from './importOptions';
 
 interface Props {
   onFileSelect?: (file: File) => void;
+  onAddManually?: () => void;
 }
 
-const JobTableHeader: React.FC<Props> = ({ onFileSelect }) => {
+const JobTableHeader: React.FC<Props> = ({ onFileSelect, onAddManually }) => {
+  const [showOptions, setShowOptions] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleClick = () => {
+  const handleUploadCSV = () => {
     fileInputRef.current?.click();
+    setShowOptions(false);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -20,24 +26,40 @@ const JobTableHeader: React.FC<Props> = ({ onFileSelect }) => {
   };
 
   return (
-    <div className="flex justify-between items-center">
+    <div className="relative flex justify-between items-center">
       <h1 className="text-black text-5xl font-semibold font-['Inter']">Jobs</h1>
 
-      <button
-        onClick={handleClick}
-        className="px-3 py-2 bg-blue-600 rounded-xl inline-flex justify-center items-center gap-1 text-white cursor-pointer"
-      >
-        <span className="text-sm font-normal font-['Inter']">Add</span>
-        <div className="w-4 h-4 relative">
-          <Image
-            src="/icons/plus-w.svg"
-            alt="Upload"
-            width={16}
-            height={16}
-            className="object-contain"
-          />
-        </div>
-      </button>
+      <div className="relative">
+        <button
+          onClick={() => setShowOptions((prev) => !prev)}
+          className="px-3 py-2 bg-blue-600 rounded-xl inline-flex justify-center items-center gap-1 text-white cursor-pointer"
+        >
+          <span className="text-sm font-normal font-['Inter']">Add</span>
+          <div className="w-4 h-4 relative">
+            <Image
+              src="/icons/plus-w.svg"
+              alt="Upload"
+              width={16}
+              height={16}
+              className="object-contain"
+            />
+          </div>
+        </button>
+
+        {showOptions && (
+          <div className="absolute right-0 mt-2 z-10">
+            <ImportOptions
+              onUploadCSV={handleUploadCSV}
+              onAddManually={() => {
+                if (onAddManually) {
+                  onAddManually();
+                }
+                setShowOptions(false);
+              }}
+            />
+          </div>
+        )}
+      </div>
 
       <input
         type="file"
