@@ -1,12 +1,5 @@
 import React from 'react';
-
-interface Job {
-  id: string;
-  job_title: string;
-  customer_name: string;
-  job_status: string;
-  start_date: string;
-}
+import { Job } from '@/model/interfaces/job';
 
 const getStatusStyle = (job_status: string) => {
   switch (job_status.toLowerCase()) {

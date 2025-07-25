@@ -2,14 +2,7 @@ import React, { useState, useEffect } from 'react';
 import JobTableHeader from './jobTableHeader';
 import JobTableHeadRow from './jobTableHeadRow';
 import JobTableRow from './jobTableRow';
-
-interface Job {
-  id: string;
-  job_title: string;
-  customer_name: string;
-  job_status: string;
-  start_date: string;
-}
+import { Job } from '@/model/interfaces/job';
 
 const JobTable = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
