@@ -218,6 +218,7 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
         };
 
         // Create the associate first
+        console.log("Entering API for adding an associate");
         const associateRes = await fetch('/api/associates', {
           method: 'POST',
           headers: {
@@ -236,13 +237,13 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
         const newAssignment = {
           job_id: jobId,
           associate_id: createdAssociate[0].id,
-          confirmation_status: "unconfirmed",
+          confirmation_status: "Unconfirmed",
           work_date: new Date().toISOString().slice(0, 10),
-          start_time: "08:00",
+          start_time: "08:00:00",
           num_reminders: 0,
         };
 
-        const assignmentRes = await fetch(`/api/job-assignments/job/${jobId}`, {
+        const assignmentRes = await fetch(`/api/job-assignments/${jobId}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

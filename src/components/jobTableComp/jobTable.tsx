@@ -8,19 +8,19 @@ const JobTable = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchJobs = async () => {
-      try {
-        const res = await fetch("/api/jobs");
-        const data = await res.json();
-        setJobs(data);
-      } catch (err) {
-        console.error("Failed to fetch jobs", err);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchJobs = async () => {
+    try {
+      const res = await fetch("/api/jobs");
+      const data = await res.json();
+      setJobs(data);
+    } catch (err) {
+      console.error("Failed to fetch jobs", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchJobs();
   }, []);
 
@@ -97,13 +97,29 @@ const JobTable = () => {
     }
   };
 
+  const handleUploadComplete = async (result: { success: boolean; data?: any; error?: string; rowsProcessed?: number }) => {
+    if (result.success) {
+      console.log(`Successfully uploaded ${result.rowsProcessed} rows`);
+      // Refresh the jobs list to show the newly uploaded jobs
+      await fetchJobs();
+      // You might want to show a success toast notification here
+    } else {
+      console.error('Upload failed:', result.error);
+      // You might want to show an error toast notification here
+    }
+  };
+
   if (loading) {
     return <div>Loading...</div>;
   }
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-6xl mx-auto px-4 mt-24 overflow-x-auto">
-      <JobTableHeader onFileSelect={(file) => console.log('Selected file:', file)} onAddManually={handleAddJob} />
+      <JobTableHeader 
+        onFileSelect={(file) => console.log('Selected file:', file)} 
+        onAddManually={handleAddJob}
+        onUploadComplete={handleUploadComplete}
+      />
       <table className="w-full table-fixed border-collapse bg-white rounded-lg overflow-hidden min-w-[800px]">
         <thead>
           <JobTableHeadRow  />
