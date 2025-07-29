@@ -81,3 +81,21 @@ export async function deleteJob(id: string) {
 
   return { success: true };
 }
+
+// Get single job by ID
+export async function getJobById(id: string) {
+  const supabase = await createServerSupabaseClient();
+
+  const { data, error } = await supabase
+    .from("jobs")
+    .select("id, job_title, customer_name, job_status, start_date")
+    .eq("id", id)
+    .single();
+
+  if (error) {
+    console.error("Supabase fetch error:", error);
+    throw new Error("Failed to fetch job");
+  }
+
+  return data;
+}

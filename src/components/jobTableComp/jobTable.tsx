@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import JobTableHeader from './jobTableHeader';
 import JobTableHeadRow from './jobTableHeadRow';
 import JobTableRow from './jobTableRow';
-import { Job } from '@/model/interfaces/job';
+import { Job } from '@/model/interfaces/Job';
 
 const JobTable = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -28,7 +28,7 @@ const JobTable = () => {
     const newJob = {
       job_title: 'Warehouse Job',
       customer_name: 'John Worker',
-      job_status: 'active',
+      job_status: 'Active',
       start_date: new Date().toISOString().slice(0, 10),
     };
 

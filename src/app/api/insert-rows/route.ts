@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { insertAssociate } from "@/lib/dao/AssociatesDao";
+import { insertAssociates } from "@/lib/dao/AssociatesDao";
 import { insertJobs } from "@/lib/dao/JobsDao";
 import { insertJobsAssignments } from "@/lib/dao/JobsAssignmentsDao";
+import { formatTime } from "@/utils/dateUtils";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
     console.log("Sending to Supabase (Jobs):", jobData);
 
     // Insert data into both DAOs
-    const insertedAssociates = await insertAssociate(associateData);
+    const insertedAssociates = await insertAssociates(associateData);
     const insertedJobs = await insertJobs(jobData);
 
     // Create job assignments using the returned IDs
@@ -71,12 +72,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-
-const formatTime = (date: string | Date): string => {
-  const time = new Date(date);
-  const hours = time.getUTCHours().toString().padStart(2, "0");
-  const minutes = time.getUTCMinutes().toString().padStart(2, "0");
-  const seconds = time.getUTCSeconds().toString().padStart(2, "0");
-  return `${hours}:${minutes}:${seconds}`;
-};
 

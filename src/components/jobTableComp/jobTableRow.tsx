@@ -1,6 +1,9 @@
+"use client";
+
 import React, { useState } from 'react';
 import Image from 'next/image';
-import { Job } from '@/model/interfaces/job';
+import { Job } from '@/model/interfaces/Job';
+import { useRouter } from 'next/navigation';
 
 interface Props {
   job: Job;
@@ -24,15 +27,21 @@ const getStatusStyle = (status: string) => {
 const JobTableRow: React.FC<Props> = ({ job, onUpdate, onDelete }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedJob, setEditedJob] = useState(job);
+  const router = useRouter();
 
-  const handleEditClick = () => setIsEditing(true);
+  const handleEditClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent row click when editing
+    setIsEditing(true);
+  };
   
-  const handleSave = () => {
+  const handleSave = (e: React.MouseEvent) => {
+    e.stopPropagation();
     onUpdate(job.id, editedJob);
     setIsEditing(false);
   };
   
-  const handleCancel = () => {
+  const handleCancel = (e: React.MouseEvent) => {
+    e.stopPropagation();
     setEditedJob(job);
     setIsEditing(false);
   };
@@ -42,14 +51,31 @@ const JobTableRow: React.FC<Props> = ({ job, onUpdate, onDelete }) => {
     setEditedJob((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleRowClick = () => {
+    if (!isEditing) {
+      router.push(`/jobs/${job.id}/associates`);
+    }
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent row click when deleting
+    onDelete(job.id);
+  };
+
   return (
-    <tr className="hover:bg-gray-50 text-sm text-black border-b border-zinc-100 h-10">
+    <tr 
+      className={`text-sm text-black border-b border-zinc-100 h-10 ${
+        !isEditing ? 'hover:bg-gray-50 cursor-pointer' : ''
+      }`}
+      onClick={handleRowClick}
+    >
       <td className="px-4">
         {isEditing ? (
           <input
             name="job_title"
             value={editedJob.job_title}
             onChange={handleChange}
+            onClick={(e) => e.stopPropagation()}
             className="border border-gray-300 rounded px-2 w-full"
           />
         ) : (
@@ -63,6 +89,7 @@ const JobTableRow: React.FC<Props> = ({ job, onUpdate, onDelete }) => {
             name="customer_name"
             value={editedJob.customer_name}
             onChange={handleChange}
+            onClick={(e) => e.stopPropagation()}
             className="border border-gray-300 rounded px-2 w-full"
           />
         ) : (
@@ -76,6 +103,7 @@ const JobTableRow: React.FC<Props> = ({ job, onUpdate, onDelete }) => {
             name="job_status"
             value={editedJob.job_status}
             onChange={handleChange}
+            onClick={(e) => e.stopPropagation()}
             className="border border-gray-300 rounded px-2 w-full"
           >
             <option value="Active">Active</option>
@@ -96,6 +124,7 @@ const JobTableRow: React.FC<Props> = ({ job, onUpdate, onDelete }) => {
             type="date"
             value={editedJob.start_date}
             onChange={handleChange}
+            onClick={(e) => e.stopPropagation()}
             className="border border-gray-300 rounded px-2 w-full"
           />
         ) : (
@@ -130,7 +159,7 @@ const JobTableRow: React.FC<Props> = ({ job, onUpdate, onDelete }) => {
                 className="cursor-pointer"
               />
             </button>
-            <button onClick={() => onDelete(job.id)} title="Delete">
+            <button onClick={handleDeleteClick} title="Delete">
               <Image
                 src="/icons/trash.svg"
                 alt="Delete"

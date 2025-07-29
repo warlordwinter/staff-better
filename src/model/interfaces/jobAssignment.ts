@@ -1,4 +1,4 @@
-export interface jobAssignment {
+export interface JobAssignment {
     job_id: string;
     associate_id: string;
     confirmation_status: string;
