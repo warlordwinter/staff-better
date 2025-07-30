@@ -4,9 +4,23 @@ import { AssociateTableHeader } from "./associateTableHeader";
 import { AssociateTableRow } from "./associateTableRow";
 import { AssociateTableTitle } from "./associateTableTitle";
 import { Associate } from "@/model/interfaces/Associate";
-import { JobAssignment } from "@/model/interfaces/JobAssignment";
 import { Job } from "@/model/interfaces/Job";
-import { ConfirmationStatus } from "@/model/enums/ConfirmationStatus";
+
+interface JobAssignmentResponse {
+  confirmation_status: string;
+  num_reminders: number;
+  work_date: string;
+  start_time: string;
+  associates: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    work_date: string;
+    start_time: string;
+    phone_number: string;
+    email_address: string;
+  };
+}
 
 // Combined interface for display purposes
 interface AssociateDisplay extends Associate {
@@ -55,7 +69,7 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
           }
           
           // Transform the data to match display format
-          const displayData: AssociateDisplay[] = assignments.map((assignment: any) => {
+          const displayData: AssociateDisplay[] = assignments.map((assignment: JobAssignmentResponse) => {
             console.log('Processing assignment:', assignment);
             
             if (!assignment.associates) {

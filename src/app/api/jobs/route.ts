@@ -5,8 +5,9 @@ export async function GET() {
   try {
     const jobs = await getJobs();
     return NextResponse.json(jobs);
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
 
@@ -18,8 +19,9 @@ export async function POST(request: NextRequest) {
 
     const insertedJobs = await insertJobs(jobsToInsert);
     return NextResponse.json(insertedJobs, { status: 201 });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Failed to create job:", error);
-    return NextResponse.json({ error: "Failed to create job"}, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Failed to create job';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

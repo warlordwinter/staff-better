@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { AssociateDateDisplay } from "./associateTableCell";
 import Image from "next/image";
 import { Associate } from "@/model/interfaces/Associate";
-import { ConfirmationStatus } from "@/model/enums/ConfirmationStatus";
 
 // Extended interface for display purposes (includes job assignment fields)
 interface AssociateDisplay extends Associate {

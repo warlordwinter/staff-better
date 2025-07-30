@@ -3,6 +3,9 @@ import { insertAssociates } from "@/lib/dao/AssociatesDao";
 import { insertJobs } from "@/lib/dao/JobsDao";
 import { insertJobsAssignments } from "@/lib/dao/JobsAssignmentsDao";
 import { formatTime } from "@/utils/dateUtils";
+import { Associate } from "@/model/interfaces/Associate";
+import { Job } from "@/model/interfaces/Job";
+import { JobAssignment } from "@/model/interfaces/JobAssignment";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -10,7 +13,7 @@ export async function POST(req: NextRequest) {
 
   try {
     // Prepare associate data for insertion
-    const associateData = rows.map((r: any) => ({
+    const associateData = rows.map((r: Associate) => ({
       first_name: r.first_name,
       last_name: r.last_name,
       work_date: r.work_date,
@@ -20,7 +23,7 @@ export async function POST(req: NextRequest) {
     }));
 
     // Prepare job data for insertion
-    const jobData = rows.map((r: any, index: number) => ({
+    const jobData = rows.map((r: Job) => ({
       job_title: r.job_title,
       customer_name: r.customer_name,
       job_status: "Upcoming",  // or map accordingly if the status needs transformation
@@ -36,7 +39,7 @@ export async function POST(req: NextRequest) {
     const insertedJobs = await insertJobs(jobData);
 
     // Create job assignments using the returned IDs
-    const jobAssignmentsData = rows.map((r: any, index: number) => ({
+    const jobAssignmentsData = rows.map((r: JobAssignment, index: number) => ({
       job_id: insertedJobs[index].id,
       associate_id: insertedAssociates[index].id,
       confirmation_status: 'Unconfirmed' as const,
@@ -54,19 +57,24 @@ export async function POST(req: NextRequest) {
       jobAssignmentInsertion,
 
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     let parsedError = err;
 
-    try {
-      parsedError = JSON.parse(err.message);
-    } catch {}
+    if (err instanceof Error) {
+            try {
+                parsedError = JSON.parse(err.message);
+            } catch {
+                // If JSON parsing fails, use the original error
+                parsedError = { message: err.message };
+            }
+        }
 
     console.error("Insert failed:", parsedError);
 
     return NextResponse.json(
       {
         error: "Insert failed",
-        ...parsedError,
+        ...(typeof parsedError === 'object' && parsedError !== null ? parsedError : { message: String(parsedError) }),
       },
       { status: 500 }
     );

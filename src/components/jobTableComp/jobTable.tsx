@@ -3,6 +3,19 @@ import JobTableHeader from './jobTableHeader';
 import JobTableHeadRow from './jobTableHeadRow';
 import JobTableRow from './jobTableRow';
 import { Job } from '@/model/interfaces/Job';
+import { JobAssignment } from '@/model/interfaces/JobAssignment';
+import { Associate } from '@/model/interfaces/Associate';
+
+interface UploadResult {
+  success: boolean;
+  data?: {
+    associateInsertion: Associate[];
+    jobInsertion: Job[];
+    jobAssignmentInsertion?: JobAssignment[];
+  };
+  error?: string;
+  rowsProcessed?: number;
+}
 
 const JobTable = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -67,7 +80,7 @@ const JobTable = () => {
         throw new Error('Failed to update job');
       }
 
-      const updatedJob = await res.json();
+      // const updatedJob = await res.json();
       
       // Update local state
       setJobs((prev) =>
@@ -97,7 +110,7 @@ const JobTable = () => {
     }
   };
 
-  const handleUploadComplete = async (result: { success: boolean; data?: any; error?: string; rowsProcessed?: number }) => {
+  const handleUploadComplete = async (result: UploadResult) => {
     if (result.success) {
       console.log(`Successfully uploaded ${result.rowsProcessed} rows`);
       // Refresh the jobs list to show the newly uploaded jobs
