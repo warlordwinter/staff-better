@@ -272,7 +272,7 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
         // Add to local state
         const displayAssociate: AssociateDisplay = {
           ...createdAssociate[0],
-          confirmation_status: "unconfirmed",
+          confirmation_status: "Unconfirmed",
           num_reminders: 0,
           job_work_date: new Date().toISOString().slice(0, 10),
           job_start_time: "08:00",

@@ -141,3 +141,63 @@ export async function deleteJobAssignment(jobId: string, associateId: string) {
 
     return { success: true };
 }
+
+export async function getNumberOfReminders(jobId: string, associateId: string) {
+    const supabase = await createServerSupabaseClient();
+
+    const { data, error } = await supabase
+        .from("jobassignments")
+        .select('num_reminders')
+        .eq('job_id', jobId)
+        .eq('associate_id', associateId);
+
+    if (error) {
+        console.error("Error grabbing number of reminders remaining:", error);
+        throw new Error(JSON.stringify(error));
+    }
+
+    if (data && data.length > 0) {
+        return data[0].num_reminders;
+    }
+
+    return 0;
+}
+
+export async function getJobAssignment(jobId: string, associateId: string) {
+    const supabase = await createServerSupabaseClient();
+
+    const { data, error } = await supabase
+        .from("jobassignments")
+        .select('*')
+        .eq('job_id', jobId)
+        .eq('associate_id', associateId);
+
+    if (error) {
+        console.error("Error grabbing job assignment:", error);
+        throw new Error(JSON.stringify(error));
+    }
+
+    return data?.[0] || null;
+}
+
+/**
+ * This method gets all the job assignments that still need reminders
+ * 
+ * @returns jobassignment with needed reminders to be sent
+ */
+export async function getAssignmentsNeedingReminders() {
+    const supabase = await createServerSupabaseClient();
+
+    const { data, error } = await supabase
+        .from("jobassignments")
+        .select("*")
+        .gt("num_reminders", 0)
+        .neq("confirmation_status", "Confirmed");
+
+    if (error) {
+        console.error("Error fetching job assignments that need reminders:", error);
+        throw new Error(JSON.stringify(error));
+    }
+    
+    return data;
+}
