@@ -1,7 +1,7 @@
 // Core reminder business logic
 
 import { getJobAssignment, getNumberOfReminders, updateJobAssignment } from "../dao/JobsAssignmentsDao";
-import { getReminderAssignment } from "../dao/ReminderDao";
+import { getAssignmentsNotRecentlyReminded, getDayBeforeReminders, getMorningOfReminders, getReminderAssignment, getTwoDaysBeforeReminders } from "../dao/ReminderDao";
 import { formatPhoneNumber, sendSMS } from "../twilio/sms";
 import { SMSMessage, SMSResult } from "../twilio/types";
 import { JobAssignment } from "@/model/interfaces/JobAssignment";
@@ -146,6 +146,8 @@ export class ReminderService {
     const now = new Date();
     const tomorrow = new Date(now);
     tomorrow.setDate(tomorrow.getDate() + 1);
+    const dayAfterTomorrow = new Date(now);
+    dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
 
     // This is pseudocode - you'll need to implement the actual DAO queries
     // The logic should find assignments where:
@@ -156,26 +158,24 @@ export class ReminderService {
 
     const dueAssignments: ReminderAssignment[] = [];
 
-    const twoDaysBeforeReminders = null;
-    // Example query logic (implement with your DAOs):
-    /*
-    const dayBeforeReminders = await this.jobAssignmentsDAO.findAssignmentsForReminders({
-      workDate: tomorrow,
-      maxReminders: 3,
-      reminderType: 'day_before'
-    });
+    try {
+        // Get day-before reminders (for work happening tomorrow)
+        const dayBeforeReminders = await getDayBeforeReminders(tomorrow, 3);
 
-    const morningOfReminders = await this.jobAssignmentsDAO.findAssignmentsForReminders({
-      workDate: now,
-      startTimeBefore: addHours(now, 2),
-      maxReminders: 3,
-      reminderType: 'morning_of'
-    });
+        // Get morning-of reminders (for work happening today, starting in 1-2 hours)
+        const morningOfReminders = await getMorningOfReminders(3, 2);
 
-    dueAssignments.push(...dayBeforeReminders, ...morningOfReminders);
-    */
+        // Get two-days-before reminders (for work happening day after tomorrow)
+        const twoDaysBeforeReminders = await getTwoDaysBeforeReminders(dayAfterTomorrow, 3);
 
-    return dueAssignments;
+        dueAssignments.push(...dayBeforeReminders, ...morningOfReminders, ...twoDaysBeforeReminders);
+
+        // Optional: Filter out assignments that were reminded recently
+        return await getAssignmentsNotRecentlyReminded(dueAssignments, 4);
+    } catch (error) {
+        console.error('Error finding due reminders:', error);
+        return [];
+    }
   }
 
   /**
@@ -289,6 +289,8 @@ export class ReminderService {
 
   /**
    * Get reminder statistics
+   * 
+   * NOT IMPLEMENTED
    */
   async getReminderStats(startDate: Date, endDate: Date) {
     // Query database for reminder statistics in date range
