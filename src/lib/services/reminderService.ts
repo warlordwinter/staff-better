@@ -4,7 +4,6 @@ import { getJobAssignment, getNumberOfReminders, updateJobAssignment } from "../
 import { getAssignmentsNotRecentlyReminded, getDayBeforeReminders, getMorningOfReminders, getReminderAssignment, getTwoDaysBeforeReminders } from "../dao/ReminderDao";
 import { formatPhoneNumber, sendSMS } from "../twilio/sms";
 import { SMSMessage, SMSResult } from "../twilio/types";
-import { JobAssignment } from "@/model/interfaces/JobAssignment";
 
 export interface ReminderAssignment {
   job_id: string;
