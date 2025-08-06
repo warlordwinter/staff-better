@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import Navbar from "@/components/navBar";
+import Navbar from "@/components/ui/navBar";
 import AssociateTable from "@/components/associates/associateTable";
 
 export default function TestJobs() {

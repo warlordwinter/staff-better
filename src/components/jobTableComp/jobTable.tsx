@@ -5,6 +5,7 @@ import JobTableRow from './jobTableRow';
 import { Job } from '@/model/interfaces/Job';
 import { JobAssignment } from '@/model/interfaces/JobAssignment';
 import { Associate } from '@/model/interfaces/Associate';
+import LoadingSpinner from '../ui/loadingSpinner';
 
 interface UploadResult {
   success: boolean;
@@ -39,8 +40,8 @@ const JobTable = () => {
 
   const handleAddJob = async () => {
     const newJob = {
-      job_title: 'Warehouse Job',
-      customer_name: 'John Worker',
+      job_title: ' Generic Warehouse Job',
+      customer_name: 'Generic Company Name',
       job_status: 'Active',
       start_date: new Date().toISOString().slice(0, 10),
     };
@@ -93,6 +94,10 @@ const JobTable = () => {
   };
 
   const handleDeleteJob = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this job?')) {
+      return;
+    }
+
     try {
       const res = await fetch(`/api/jobs/${id}`, {
         method: 'DELETE',
@@ -123,7 +128,7 @@ const JobTable = () => {
   };
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <LoadingSpinner />;
   }
 
   return (

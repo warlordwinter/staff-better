@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import ImportOptions from './importOptions';
 import { useExcelUpload } from '@/hooks/useExcelUpload';
@@ -14,8 +14,26 @@ interface Props {
 const JobTableHeader: React.FC<Props> = ({ onFileSelect, onAddManually, onUploadComplete }) => {
   const [showOptions, setShowOptions] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   
   const { uploadExcelFile, isUploading, progress, reset } = useExcelUpload();
+
+  // Add click outside detection
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowOptions(false);
+      }
+    };
+
+    if (showOptions) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showOptions]);
 
   const handleUploadCSV = () => {
     fileInputRef.current?.click();
@@ -67,7 +85,7 @@ const JobTableHeader: React.FC<Props> = ({ onFileSelect, onAddManually, onUpload
     <div className="relative flex justify-between items-center">
       <h1 className="text-black text-5xl font-semibold font-['Inter']">Jobs</h1>
 
-      <div className="relative">
+      <div className="relative" ref={dropdownRef}>
         <button
           onClick={() => setShowOptions((prev) => !prev)}
           className="px-3 py-2 bg-blue-600 rounded-xl inline-flex justify-center items-center gap-1 text-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"

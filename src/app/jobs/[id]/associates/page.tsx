@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import Navbar from "@/components/navBar";
+import Navbar from "@/components/ui/navBar";
 import AssociateTable from "@/components/associates/associateTable";
 import { Job } from "@/model/interfaces/Job";
+import LoadingSpinner from "@/components/ui/loadingSpinner";
 
 export default function JobAssociates() {
   const params = useParams();
@@ -38,9 +39,7 @@ export default function JobAssociates() {
     return (
       <div>
         <Navbar />
-        <div className="flex justify-center items-center min-h-screen">
-          <div>Loading...</div>
-        </div>
+          <LoadingSpinner />
       </div>
     );
   }
