@@ -18,11 +18,16 @@ export default function Hero() {
 
           {/* Button aligned left, Learn More centered under button */}
           <div className="w-full md:w-80 flex flex-col items-start">
-            <button className="h-14 md:h-16 w-full px-6 py-3 bg-blue-600 rounded-full text-white text-lg md:text-2xl font-bold tracking-widest hover:bg-blue-700 transition">
-              Book a Demo
-            </button>
             <a
-              href="#"
+              href="https://calendly.com/john-henry-gilbert-1/30min"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="h-14 md:h-16 w-full px-6 py-3 bg-blue-600 rounded-full text-white text-lg md:text-2xl font-bold tracking-widest hover:bg-blue-700 transition flex items-center justify-center"
+            >
+              Book a Demo
+            </a>
+            <a
+              href="#learn-more"
               className="text-blue-600 text-sm md:text-lg font-medium tracking-wide mt-1 text-center self-center"
             >
               Learn More

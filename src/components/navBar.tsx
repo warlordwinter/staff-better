@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 
 const Navbar = () => {
@@ -40,10 +41,10 @@ const Navbar = () => {
     <nav className="w-full px-5 py-3 bg-[#F59144]">
       <div className="flex justify-between items-center">
         {/* Logo + Brand */}
-        <div className="flex items-center gap-5 cursor-pointer">
+        <Link href="/landingpage" className="flex items-center gap-5 cursor-pointer">
           <Image height={50} width={50} alt="Logo" src="/icons/logo.svg" />
           <span className="text-white text-2xl sm:text-3xl font-semibold font-inter">Staff Better</span>
-        </div>
+        </Link>
 
         {/* Hamburger Icon */}
         <button
@@ -63,10 +64,10 @@ const Navbar = () => {
         <div className="hidden sm:flex items-center gap-6">
           {isLoggedIn ? (
             <>
-              <a href="#" className="text-white text-lg hover:underline">
+              <a href="/jobs" className="text-white text-lg hover:underline">
                 Jobs
               </a>
-              <a href="#" className="text-white text-lg hover:underline">
+              <a href="/groups" className="text-white text-lg hover:underline">
                 Groups
               </a>
               <div className="relative" ref={dropdownRef}>
@@ -102,22 +103,22 @@ const Navbar = () => {
             </>
           ) : (
             <>
-              <a href="#" className="text-white text-lg hover:underline">
+              <a href="/get-started" className="text-white text-lg hover:underline">
                 Get Started
               </a>
-              <a href="#" className="text-white text-lg hover:underline">
+              <a href="/blogs" className="text-white text-lg hover:underline">
                 Blogs
               </a>
               <button
                 type="button"
-                onClick={() => window.location.href = '/login'}
+                onClick={() => (window.location.href = '/login')}
                 className="w-24 h-9 px-4 bg-[#F59144] rounded-md border border-[#FFD9B3] text-white text-base font-normal font-inter leading-tight flex justify-center items-center hover:brightness-105 transition"
               >
                 Log In
               </button>
               <button
                 type="button"
-                onClick={() => window.location.href = '/login'}
+                onClick={() => (window.location.href = '/login')}
                 className="w-24 h-9 px-4 bg-white rounded-md border border-[#FFD9B3] text-base font-normal font-inter leading-tight flex justify-center items-center transition"
                 style={{ color: '#F59144' }}
               >
@@ -133,10 +134,10 @@ const Navbar = () => {
         <div className="sm:hidden flex flex-col mt-4 gap-3">
           {isLoggedIn ? (
             <>
-              <a href="#" className="text-white text-lg hover:underline">
+              <a href="/jobs" className="text-white text-lg hover:underline">
                 Jobs
               </a>
-              <a href="#" className="text-white text-lg hover:underline">
+              <a href="/groups" className="text-white text-lg hover:underline">
                 Groups
               </a>
               <div className="flex items-center gap-3">
@@ -150,22 +151,22 @@ const Navbar = () => {
             </>
           ) : (
             <>
-              <a href="#" className="text-white text-lg hover:underline">
+              <a href="/get-started" className="text-white text-lg hover:underline">
                 Get Started
               </a>
-              <a href="#" className="text-white text-lg hover:underline">
+              <a href="/blogs" className="text-white text-lg hover:underline">
                 Blogs
               </a>
               <button
                 type="button"
-                onClick={() => window.location.href = '/login'}
+                onClick={() => (window.location.href = '/login')}
                 className="w-full h-9 px-4 bg-[#F59144] rounded-md border border-[#FFD9B3] text-white text-base font-normal font-inter leading-tight flex justify-center items-center hover:brightness-105 transition"
               >
                 Log In
               </button>
               <button
                 type="button"
-                onClick={() => window.location.href = '/login'}
+                onClick={() => (window.location.href = '/login')}
                 className="w-full h-9 px-4 bg-white rounded-md border border-[#FFD9B3] text-base font-normal font-inter leading-tight flex justify-center items-center transition"
                 style={{ color: '#F59144' }}
               >

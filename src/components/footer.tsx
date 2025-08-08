@@ -1,6 +1,7 @@
 'use client';
 
 import { FaLinkedin, FaFacebook, FaTwitter } from 'react-icons/fa';
+import Link from 'next/link';
 
 export default function Footer() {
   return (
@@ -15,9 +16,9 @@ export default function Footer() {
 
         {/* Legal Links */}
         <div className="flex gap-6 text-base">
-          <a href="#" className="hover:underline">Terms</a>
-          <a href="#" className="hover:underline">Privacy</a>
-          <a href="#" className="hover:underline">Cookies</a>
+          <Link href="/legal/terms" className="hover:underline">Terms</Link>
+          <Link href="/legal/privacy" className="hover:underline">Privacy</Link>
+          <Link href="/legal/cookies" className="hover:underline">Cookies</Link>
         </div>
 
         {/* Social Media */}
