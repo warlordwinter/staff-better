@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/supabaseClient';
 import { User } from '@supabase/supabase-js';
-
 export interface AuthState {
   user: User | null;
   loading: boolean;
