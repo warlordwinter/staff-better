@@ -58,7 +58,7 @@ export default function JobAssociates() {
   return (
     <div>
       <Navbar />
-      <AssociateTable jobId={jobId} job={job} />
+      <AssociateTable jobId={jobId} job={job}/>
     </div>
   );
 }

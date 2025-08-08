@@ -1,13 +1,40 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
+import { useAuth } from '@/hooks/useAuth';
 
 const Navbar = () => {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const { user, loading, signInWithAzure, signOut } = useAuth();
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // 🔐 Change this to reflect actual auth state in your app
-  const isLoggedIn = true;
+  const isLoggedIn = !!user;
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setProfileDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      setProfileDropdownOpen(false);
+      setMenuOpen(false);
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+  };
 
   return (
     <nav className="w-full px-5 py-3 bg-[#F59144]">
@@ -34,39 +61,65 @@ const Navbar = () => {
 
         {/* Desktop Nav */}
         <div className="hidden sm:flex items-center gap-6">
-          <a href="#" className="text-white text-lg hover:underline">
-            Jobs
-          </a>
-
           {isLoggedIn ? (
             <>
               <a href="#" className="text-white text-lg hover:underline">
+                Jobs
+              </a>
+              <a href="#" className="text-white text-lg hover:underline">
                 Groups
               </a>
-              <Image
-                src="/images/profile.svg"
-                alt="Profile"
-                width={36}
-                height={36}
-                className="rounded-full cursor-pointer"
-              />
+              <div className="relative" ref={dropdownRef}>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+                    className="flex items-center gap-2 text-white hover:text-gray-200 transition-colors"
+                  >
+                    <Image
+                      src="/images/profile.svg"
+                      alt="Profile"
+                      width={36}
+                      height={36}
+                      className="rounded-full"
+                    />
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                </div>
+                {/* Profile Dropdown */}
+                {profileDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-32 bg-white rounded-md shadow-lg py-1 z-50">
+                    <button
+                      onClick={handleSignOut}
+                      className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                    >
+                      Sign Out
+                    </button>
+                  </div>
+                )}
+              </div>
             </>
           ) : (
             <>
               <a href="#" className="text-white text-lg hover:underline">
+                Get Started
+              </a>
+              <a href="#" className="text-white text-lg hover:underline">
                 Blogs
               </a>
-
               <button
                 type="button"
-                className="w-24 h-9 px-4 bg-[#F59144] rounded-md outline outline-2 outline-offset-[-2px] outline-pink-50 text-white text-base font-bold font-inter leading-tight flex justify-center items-center hover:brightness-105 transition"
+                onClick={() => window.location.href = '/login'}
+                className="w-24 h-9 px-4 bg-[#F59144] rounded-md border border-[#FFD9B3] text-white text-base font-normal font-inter leading-tight flex justify-center items-center hover:brightness-105 transition"
               >
                 Log In
               </button>
-
               <button
                 type="button"
-                className="w-24 h-9 px-4 bg-white rounded-md outline outline-2 outline-offset-[-2px] outline-orange-400 text-orange-400 text-base font-bold font-inter leading-tight flex justify-center items-center hover:bg-orange-50 transition"
+                onClick={() => window.location.href = '/login'}
+                className="w-24 h-9 px-4 bg-white rounded-md border border-[#FFD9B3] text-base font-normal font-inter leading-tight flex justify-center items-center transition"
+                style={{ color: '#F59144' }}
               >
                 Sign Up
               </button>
@@ -78,39 +131,43 @@ const Navbar = () => {
       {/* Mobile Nav */}
       {menuOpen && (
         <div className="sm:hidden flex flex-col mt-4 gap-3">
-          <a href="#" className="text-white text-lg hover:underline">
-            Jobs
-          </a>
-
           {isLoggedIn ? (
             <>
               <a href="#" className="text-white text-lg hover:underline">
+                Jobs
+              </a>
+              <a href="#" className="text-white text-lg hover:underline">
                 Groups
               </a>
-              <div className="flex justify-start">
-                <Image
-                  src="/images/profile.svg"
-                  alt="Profile"
-                  width={36}
-                  height={36}
-                  className="rounded-full"
-                />
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleSignOut}
+                  className="text-white text-sm hover:underline"
+                >
+                  Sign Out
+                </button>
               </div>
             </>
           ) : (
             <>
               <a href="#" className="text-white text-lg hover:underline">
+                Get Started
+              </a>
+              <a href="#" className="text-white text-lg hover:underline">
                 Blogs
               </a>
               <button
                 type="button"
-                className="w-full h-9 px-4 bg-[#F59144] rounded-md outline outline-2 outline-offset-[-2px] outline-pink-50 text-white text-base font-bold font-inter leading-tight flex justify-center items-center hover:brightness-105 transition"
+                onClick={() => window.location.href = '/login'}
+                className="w-full h-9 px-4 bg-[#F59144] rounded-md border border-[#FFD9B3] text-white text-base font-normal font-inter leading-tight flex justify-center items-center hover:brightness-105 transition"
               >
                 Log In
               </button>
               <button
                 type="button"
-                className="w-full h-9 px-4 bg-white rounded-md outline outline-2 outline-offset-[-2px] outline-orange-400 text-orange-400 text-base font-bold font-inter leading-tight flex justify-center items-center hover:bg-orange-50 transition"
+                onClick={() => window.location.href = '/login'}
+                className="w-full h-9 px-4 bg-white rounded-md border border-[#FFD9B3] text-base font-normal font-inter leading-tight flex justify-center items-center transition"
+                style={{ color: '#F59144' }}
               >
                 Sign Up
               </button>

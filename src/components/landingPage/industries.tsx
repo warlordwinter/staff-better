@@ -20,7 +20,8 @@ export default function Industries() {
         {industries.map((industry) => (
             <div
             key={industry.name}
-            className="bg-orange-400 rounded-xl flex flex-col items-center px-7 py-14 h-72 justify-center hover:shadow-2xl hover:scale-105 transform transition duration-300"
+            className="rounded-xl flex flex-col items-center px-7 py-14 h-72 justify-center hover:shadow-2xl hover:scale-105 transform transition duration-300"
+        style={{ backgroundColor: '#F59144' }}
             >
             {/* Icon */}
             <div className="w-24 h-24 flex justify-center items-center mb-6">
