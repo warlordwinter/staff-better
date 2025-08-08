@@ -5,7 +5,7 @@ export async function insertJobsAssignments(
     jobsAssignments: {
         job_id: string;
         associate_id: string;
-        confirmation_status: 'unconfirmed' | 'soft confirmed' | 'likely confirmed' | 'confirmed' | 'declined';
+        confirmation_status: 'Unconfirmed' | 'Soft Confirmed' | 'Likely Confirmed' | 'Confirmed' | 'Declined';
         work_date: string;
         start_time: string;
         num_reminders?: number;
@@ -98,7 +98,7 @@ export async function updateJobAssignment(
         work_date?: string;
         start_time?: string;
         num_reminders?: number;
-        last_confirmation_time?: string;
+        last_reminder_time?: string;
     }
 ) {
     const supabase = await createServerSupabaseClient();

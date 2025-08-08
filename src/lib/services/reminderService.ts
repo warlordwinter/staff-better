@@ -1,7 +1,16 @@
 // Core reminder business logic
 
-import { getJobAssignment, getNumberOfReminders, updateJobAssignment } from "../dao/JobsAssignmentsDao";
-import { getAssignmentsNotRecentlyReminded, getDayBeforeReminders, getMorningOfReminders, getReminderAssignment, getTwoDaysBeforeReminders } from "../dao/ReminderDao";
+import {
+  getNumberOfReminders,
+  updateJobAssignment,
+} from "../dao/JobsAssignmentsDao";
+import {
+  getAssignmentsNotRecentlyReminded,
+  getDayBeforeReminders,
+  getMorningOfReminders,
+  getReminderAssignment,
+  getTwoDaysBeforeReminders,
+} from "../dao/ReminderDao";
 import { formatPhoneNumber, sendSMS } from "../twilio/sms";
 import { SMSMessage, SMSResult } from "../twilio/types";
 
@@ -156,24 +165,36 @@ export class ReminderService {
     // 4. Haven't been reminded recently
 
     const dueAssignments: ReminderAssignment[] = [];
+    console.log("Finding due reminders");
 
     try {
-        // Get day-before reminders (for work happening tomorrow)
-        const dayBeforeReminders = await getDayBeforeReminders(tomorrow, 3);
+      // Get day-before reminders (for work happening tomorrow)
+      const dayBeforeReminders = await getDayBeforeReminders(tomorrow);
+      console.log("Day Before reminders from dao:", dayBeforeReminders);
 
-        // Get morning-of reminders (for work happening today, starting in 1-2 hours)
-        const morningOfReminders = await getMorningOfReminders(3, 2);
+      // Get morning-of reminders (for work happening today, starting in 1-2 hours)
+      const morningOfReminders = await getMorningOfReminders(2);
+      console.log("Morning of reminders from dao:", morningOfReminders);
 
-        // Get two-days-before reminders (for work happening day after tomorrow)
-        const twoDaysBeforeReminders = await getTwoDaysBeforeReminders(dayAfterTomorrow, 3);
+      // Get two-days-before reminders (for work happening day after tomorrow)
+      const twoDaysBeforeReminders = await getTwoDaysBeforeReminders(
+        dayAfterTomorrow
+      );
+      console.log("Two days before reminders", twoDaysBeforeReminders);
 
-        dueAssignments.push(...dayBeforeReminders, ...morningOfReminders, ...twoDaysBeforeReminders);
+      dueAssignments.push(
+        ...dayBeforeReminders,
+        ...morningOfReminders,
+        ...twoDaysBeforeReminders
+      );
 
-        // Optional: Filter out assignments that were reminded recently
-        return await getAssignmentsNotRecentlyReminded(dueAssignments, 4);
+      console.log("All due assignments", dueAssignments);
+
+      // Optional: Filter out assignments that were reminded recently
+      return await getAssignmentsNotRecentlyReminded(dueAssignments, 4);
     } catch (error) {
-        console.error('Error finding due reminders:', error);
-        return [];
+      console.error("Error finding due reminders:", error);
+      return [];
     }
   }
 
@@ -181,14 +202,35 @@ export class ReminderService {
    * Determine what type of reminder to send based on timing
    * Examples for a job at Monday 9:00 AM:
    * - Two days before: Saturday (36-60 hours before)
-   * - Day before: Sunday (12-36 hours before) 
+   * - Day before: Sunday (12-36 hours before)
    * - Morning of: Monday morning (2-6 hours before)
    * - Hour before: Monday ~8 AM (0.5-2 hours before)
    */
   private determineReminderType(assignment: ReminderAssignment): ReminderType {
     const now = new Date();
-    const workDateTime = this.combineDateTime(assignment.work_date, assignment.start_time);
-    const hoursDifference = (workDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+    const workDateTime = this.combineDateTime(
+      assignment.work_date,
+      assignment.start_time
+    );
+    const hoursDifference =
+      (workDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+    console.log("=== DEBUGGING DATETIME ===");
+    console.log("Current time (now):", now.toISOString());
+    console.log("Current time (local):", now.toString());
+    console.log("Work date from DB:", assignment.work_date);
+    console.log("Start time from DB:", assignment.start_time);
+    console.log("Combined work datetime (UTC):", workDateTime.toISOString());
+    console.log("Combined work datetime (local):", workDateTime.toString());
+    console.log("Hours difference:", hoursDifference);
+    console.log("========================");
+
+    console.log(
+      "Assignment for determinng reminder type",
+      assignment.job_title
+    );
+
+    console.log("Assignment's hour difference", hoursDifference);
 
     if (hoursDifference >= 36 && hoursDifference < 60) {
       // Two days before: 36-60 hours (1.5-2.5 days)
@@ -212,31 +254,41 @@ export class ReminderService {
    * Generate reminder message text based on assignment and reminder type
    */
   private generateReminderMessage(
-    assignment: ReminderAssignment, 
+    assignment: ReminderAssignment,
     reminderType: ReminderType
   ): string {
-    const { associate_first_name, job_title, customer_name, work_date, start_time } = assignment;
-    const workDateStr = work_date.toLocaleDateString();
+    const {
+      associate_first_name,
+      job_title,
+      customer_name,
+      work_date,
+      start_time,
+    } = assignment;
+    console.log("Work date:", work_date);
+    const workDateStr = work_date.toLocaleDateString("en-US", {
+      timeZone: "UTC",
+    });
+    console.log("Work Date String:", workDateStr);
     const timeStr = this.formatTime(start_time);
 
     const baseInfo = `${job_title} for ${customer_name} on ${workDateStr} at ${timeStr}`;
 
     switch (reminderType) {
       case ReminderType.TWO_DAYS_BEFORE:
-        return `Hi ${associate_first_name}!\n\nReminder: You have ${baseInfo} in 2 days.\n\nPlease confirm you'll be there. Reply CONFIRM or call us.`;
-      
+        return `Hi ${associate_first_name}!\n\nReminder: You have ${baseInfo} in 2 days.\n\nPlease confirm you'll be there.\n\nReply CONFIRM or call us.`;
+
       case ReminderType.DAY_BEFORE:
-        return `Hi ${associate_first_name}!\n\nReminder: You have ${baseInfo} tomorrow.\n\nPlease confirm you'll be there. Reply CONFIRM or call us.`;
-      
+        return `Hi ${associate_first_name}!\n\nReminder: You have ${baseInfo} tomorrow.\n\nPlease confirm you'll be there.\n\nReply CONFIRM or call us.`;
+
       case ReminderType.MORNING_OF:
         return `Good morning ${associate_first_name}!\n\nDon't forget your ${baseInfo} today.\n\nSee you there!`;
-      
+
       case ReminderType.HOUR_BEFORE:
         return `Hi ${associate_first_name}!\n\nYour ${baseInfo} starts in about an hour.\n\nHope you're ready!`;
-      
+
       case ReminderType.FOLLOW_UP:
-        return `Hi ${associate_first_name}!\n\nJust checking - are you on your way to ${baseInfo}? Let us know if you need anything!`;
-      
+        return `Hi ${associate_first_name}!\n\nJust checking - are you on your way to ${baseInfo}?\n\nLet us know if you need anything!`;
+
       default:
         return `Hi ${associate_first_name}!\n\nReminder about your ${baseInfo}.`;
     }
@@ -246,25 +298,29 @@ export class ReminderService {
    * Update reminder status in the database after sending
    */
   private async updateReminderStatus(
-  job_id: string,
-  associate_id: string
-): Promise<void> {
-  try {
-    const currentReminders: number = await getNumberOfReminders(job_id, associate_id);
+    job_id: string,
+    associate_id: string
+  ): Promise<void> {
+    try {
+      const currentReminders: number = await getNumberOfReminders(
+        job_id,
+        associate_id
+      );
 
-    if (currentReminders > 0) {
-      await updateJobAssignment(job_id, associate_id, {
-        num_reminders: currentReminders - 1, // Decrease the reminder count
-        last_confirmation_time: new Date().toISOString(),
-      });
-      console.log(`Updated reminder status for job ${job_id}, associate ${associate_id}`);
+      if (currentReminders > 0) {
+        await updateJobAssignment(job_id, associate_id, {
+          num_reminders: currentReminders - 1, // Decrease the reminder count
+          last_reminder_time: new Date().toISOString(), // Changed from last_confirmation_time
+        });
+        console.log(
+          `Updated reminder status for job ${job_id}, associate ${associate_id}`
+        );
+      }
+    } catch (error) {
+      console.error("Error updating reminder status:", error);
+      // Don't throw - we don't want to fail the whole process if DB update fails
     }
-  } catch (error) {
-    console.error("Error updating reminder status:", error);
-    // Don't throw - we don't want to fail the whole process if DB update fails
   }
-}
-
 
   /**
    * Send a test reminder to a specific assignment
@@ -277,18 +333,24 @@ export class ReminderService {
     // const assignment = await this.getAssignmentDetails(jobId, associateId);
     // return await this.sendReminderToAssociate(assignment, ReminderType.DAY_BEFORE);
 
-    const assignment: ReminderAssignment | null = await getReminderAssignment(jobId, associateId);
+    const assignment: ReminderAssignment | null = await getReminderAssignment(
+      jobId,
+      associateId
+    );
 
     if (!assignment) {
-        throw new Error("Reminder Assignment is null");
+      throw new Error("Reminder Assignment is null");
     }
 
-    return await this.sendReminderToAssociate(assignment, ReminderType.DAY_BEFORE);
+    return await this.sendReminderToAssociate(
+      assignment,
+      ReminderType.DAY_BEFORE
+    );
   }
 
   /**
    * Get reminder statistics
-   * 
+   *
    * NOT IMPLEMENTED
    */
   async getReminderStats(startDate: Date, endDate: Date) {
@@ -305,9 +367,14 @@ export class ReminderService {
 
   // Helper methods
   private combineDateTime(date: Date, timeString: string): Date {
-    const dateTime = new Date(date);
+    const year = date.getUTCFullYear();
+    const month = date.getUTCMonth();
+    const day = date.getUTCDate();
+
     const [hours, minutes] = timeString.split(":").map(Number);
-    dateTime.setHours(hours, minutes, 0, 0);
+
+    // Create the datetime in LOCAL timezone (not UTC)
+    const dateTime = new Date(year, month, day, hours, minutes, 0, 0);
     return dateTime;
   }
 

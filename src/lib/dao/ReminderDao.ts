@@ -19,6 +19,8 @@ export async function getReminderAssignment(
             start_time,
             num_reminders,
             last_confirmation_time,
+            last_reminder_time,
+            confirmation_status,
             associates:associate_id (
                 first_name,
                 last_name,
@@ -43,11 +45,6 @@ export async function getReminderAssignment(
     return null;
   }
 
-  // console.log("Raw data from Supabase:", JSON.stringify(data, null, 2));
-  // console.log("Associates array:", data.associates);
-  // console.log("Jobs array:", data.jobs);
-
-  // Handle arrays - take the first (and should be only) element
   const associate = data.associates as unknown as {
     first_name: string;
     last_name: string;
@@ -80,6 +77,10 @@ export async function getReminderAssignment(
     last_confirmation_time: data.last_confirmation_time
       ? new Date(data.last_confirmation_time)
       : undefined,
+    last_reminder_time: data.last_reminder_time
+      ? new Date(data.last_reminder_time)
+      : undefined,
+    confirmation_status: data.confirmation_status,
   };
 }
 
@@ -97,6 +98,7 @@ export async function getAllUpcomingReminders(): Promise<ReminderAssignment[]> {
             start_time,
             num_reminders,
             last_confirmation_time,
+            last_reminder_time,
             associates:associate_id (
                 first_name,
                 last_name,
@@ -166,6 +168,8 @@ export async function getAssignmentsByDate(
             start_time,
             num_reminders,
             last_confirmation_time,
+            last_reminder_time,
+            confirmation_status,
             associates:associate_id (
                 first_name,
                 last_name,
@@ -220,7 +224,6 @@ export async function getAssignmentsByDate(
 
 export async function getDayBeforeReminders(
   targetDate: Date,
-  maxReminders: number = 3
 ): Promise<ReminderAssignment[]> {
   const supabase = await createServerSupabaseClient();
 
@@ -236,6 +239,8 @@ export async function getDayBeforeReminders(
             start_time,
             num_reminders,
             last_confirmation_time,
+            last_reminder_time,
+            confirmation_status,
             associates:associate_id (
                 first_name,
                 last_name,
@@ -248,7 +253,7 @@ export async function getDayBeforeReminders(
             `
     )
     .eq("work_date", dateString)
-    .lt("num_reminders", maxReminders)
+    .gt("num_reminders", 0)
     .order("start_time", { ascending: true });
 
   if (error) {
@@ -264,7 +269,7 @@ export async function getDayBeforeReminders(
 }
 
 // Get assignments that need two-days-before reminders
-export async function getTwoDaysBeforeReminders(targetDate: Date, maxReminders: number = 3): Promise<ReminderAssignment[]> {
+export async function getTwoDaysBeforeReminders(targetDate: Date): Promise<ReminderAssignment[]> {
     const supabase = await createServerSupabaseClient();
     const dateString = targetDate.toISOString().split('T')[0]; // Convert to YYYY-MM-DD
 
@@ -277,6 +282,8 @@ export async function getTwoDaysBeforeReminders(targetDate: Date, maxReminders: 
             start_time,
             num_reminders,
             last_confirmation_time,
+            last_reminder_time,
+            confirmation_status,
             associates:associate_id (
                 first_name,
                 last_name,
@@ -288,7 +295,7 @@ export async function getTwoDaysBeforeReminders(targetDate: Date, maxReminders: 
             )
         `)
         .eq('work_date', dateString)
-        .lt('num_reminders', maxReminders) // Haven't exceeded max reminders
+        .gt('num_reminders', 0)
         .order('start_time', { ascending: true });
 
     if (error) {
@@ -303,28 +310,48 @@ export async function getTwoDaysBeforeReminders(targetDate: Date, maxReminders: 
     return transformReminderData(data);
 }
 
-// Get assignments that haven't been reminded recently (optional filter)
+// Get's and filters out assignments that have already had a recent reminder text
 export async function getAssignmentsNotRecentlyReminded(
     assignments: ReminderAssignment[], 
     minHoursSinceLastReminder: number = 4
 ): Promise<ReminderAssignment[]> {
+    const now = new Date();
     const cutoffTime = new Date();
     cutoffTime.setHours(cutoffTime.getHours() - minHoursSinceLastReminder);
+    
+    const twentyFourHoursAgo = new Date();
+    twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
 
     return assignments.filter(assignment => {
-        // If no last confirmation time, they haven't been reminded recently
-        if (!assignment.last_confirmation_time) {
+        // Skip if confirmation status is Confirmed or Declined
+        if (assignment.confirmation_status === 'Confirmed' || 
+            assignment.confirmation_status === 'Declined') {
+            return false;
+        }
+
+        // If no last reminder time, they haven't been reminded recently
+        if (!assignment.last_reminder_time) {
             return true;
         }
 
-        // Check if last reminder was before our cutoff time
-        return assignment.last_confirmation_time < cutoffTime;
+        // Check if it's the day of the job
+        const workDate = new Date(assignment.work_date);
+        const today = new Date();
+        const isJobToday = workDate.toDateString() === today.toDateString();
+
+        // If it's the day of the job, only use the minHoursSinceLastReminder filter
+        if (isJobToday) {
+            return assignment.last_reminder_time < cutoffTime;
+        }
+
+        // For other days, use the 24-hour filter unless it's the day of
+        return assignment.last_reminder_time < twentyFourHoursAgo;
     });
 }
 
 
 // Get assignments that need morning-of reminders (work date is today, start time is within next 1-2 hours)
-export async function getMorningOfReminders(maxReminders: number = 3, hoursAhead: number = 2): Promise<ReminderAssignment[]> {
+export async function getMorningOfReminders(hoursAhead: number = 2): Promise<ReminderAssignment[]> {
     const supabase = await createServerSupabaseClient();
     const now = new Date();
     const todayString = now.toISOString().split('T')[0];
@@ -342,6 +369,8 @@ export async function getMorningOfReminders(maxReminders: number = 3, hoursAhead
             start_time,
             num_reminders,
             last_confirmation_time,
+            last_reminder_time,
+            confirmation_status,
             associates:associate_id (
                 first_name,
                 last_name,
@@ -355,7 +384,7 @@ export async function getMorningOfReminders(maxReminders: number = 3, hoursAhead
         .eq('work_date', todayString)
         .gte('start_time', currentTime) // Start time is after now
         .lte('start_time', futureTime)  // Start time is within the next X hours
-        .lt('num_reminders', maxReminders) // Haven't exceeded max reminders
+        .gt('num_reminders', 0)
         .order('start_time', { ascending: true });
 
     if (error) {
@@ -373,7 +402,6 @@ export async function getMorningOfReminders(maxReminders: number = 3, hoursAhead
 // Helper function to transform the data (reused across functions)
 function transformReminderData(data: any[]): ReminderAssignment[] {
   return data.map((item) => {
-    // Handle both array and object cases for associates/jobs
     const associateData = item.associates as any;
     const jobData = item.jobs as any;
 
@@ -402,6 +430,10 @@ function transformReminderData(data: any[]): ReminderAssignment[] {
       last_confirmation_time: item.last_confirmation_time
         ? new Date(item.last_confirmation_time)
         : undefined,
+      last_reminder_time: item.last_reminder_time
+        ? new Date(item.last_reminder_time)
+        : undefined,
+      confirmation_status: item.confirmation_status,
     };
   });
 }

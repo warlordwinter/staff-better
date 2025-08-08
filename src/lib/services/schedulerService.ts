@@ -29,7 +29,7 @@ export class SchedulerService {
     reminderService: ReminderService,
     config: ScheduleConfig = {
       enabled: true,
-      intervalMinutes: 15, // Check every 15 minutes
+      intervalMinutes: 3, // Check every 15 minutes
       maxRetries: 3,
       retryDelayMinutes: 5,
     }
