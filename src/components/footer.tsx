@@ -11,7 +11,7 @@ export default function Footer() {
       {/* Footer Content */}
       <div className="w-3/4 flex flex-col md:flex-row justify-between items-center gap-6">
         {/* Brand */}
-        <div className="text-3xl font-black text-orange-500 tracking-tight">Staff Better</div>
+        <div className="text-3xl font-black tracking-tight" style={{ color: '#F59144' }}>Staff Better</div>
 
         {/* Legal Links */}
         <div className="flex gap-6 text-base">

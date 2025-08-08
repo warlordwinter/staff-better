@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Navbar from "@/components/navBar";
 import AssociateTable from "@/components/associates/associateTable";
 import { Job } from "@/model/interfaces/Job";
+import Footer from "@/components/footer";
 
 export default function JobAssociates() {
   const params = useParams();
@@ -59,7 +60,7 @@ export default function JobAssociates() {
   return (
     <div>
       <Navbar />
-      <AssociateTable jobId={jobId} job={job} />
+      <AssociateTable jobId={jobId} job={job}/>
     </div>
   );
 }

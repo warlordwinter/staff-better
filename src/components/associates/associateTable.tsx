@@ -319,7 +319,7 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
 
   if (error) {
     return (
-      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 h-screen">
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
           Error: {error}
         </div>
