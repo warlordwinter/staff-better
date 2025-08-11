@@ -23,13 +23,17 @@ describe("SchedulerService", () => {
     jest.useFakeTimers();
     jest.clearAllMocks();
 
-    // Create mock reminder service
+    // Create a proper mock that satisfies all ReminderService methods
     mockReminderService = {
       processScheduledReminders: jest.fn(),
       sendReminderToAssociate: jest.fn(),
       sendTestReminder: jest.fn(),
       getReminderStats: jest.fn(),
-    } as any;
+      findDueReminders: jest.fn(),
+      determineReminderType: jest.fn(),
+      generateReminderMessage: jest.fn(),
+      updateReminderStatus: jest.fn(),
+    } as unknown as jest.Mocked<ReminderService>;
 
     // Create scheduler with short intervals for testing
     const testConfig: ScheduleConfig = {
@@ -375,11 +379,14 @@ describe("SchedulerService", () => {
     it("should reset stats correctly", () => {
       schedulerService.start();
 
-      // Manually set some stats to test reset
+      // Manually set some stats to test reset using bracket notation to bypass TypeScript
       const stats = schedulerService.getStats();
-      (schedulerService as any).stats.totalRuns = 5;
-      (schedulerService as any).stats.successfulRuns = 3;
-      (schedulerService as any).stats.failedRuns = 2;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (schedulerService as any)['stats'].totalRuns = 5;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (schedulerService as any)['stats'].successfulRuns = 3;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (schedulerService as any)['stats'].failedRuns = 2;
 
       schedulerService.resetStats();
 

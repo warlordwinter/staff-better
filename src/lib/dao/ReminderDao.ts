@@ -2,6 +2,36 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { ReminderAssignment } from "@/model/interfaces/ReminderAssignment";
 
+// Add this helper near the top of the file (below imports is fine)
+type Confirmation =
+  | "Unconfirmed"
+  | "Soft Confirmed"
+  | "Likely Confirmed"
+  | "Confirmed"
+  | "Declined";
+
+function toConfirmationStatus(
+  value: string | null | undefined
+): Confirmation | undefined {
+  if (!value) return undefined;
+  switch (value.trim().toLowerCase()) {
+    case "unconfirmed":
+      return "Unconfirmed";
+    case "soft confirmed":
+      return "Soft Confirmed";
+    case "likely confirmed":
+      return "Likely Confirmed";
+    case "confirmed":
+      return "Confirmed";
+    case "declined":
+      return "Declined";
+    default:
+      // Unknown string -> treat as undefined (or throw if you prefer)
+      return undefined;
+  }
+}
+
+
 // Get reminder assignment with all related data
 export async function getReminderAssignment(
   jobId: string,
@@ -80,7 +110,7 @@ export async function getReminderAssignment(
     last_reminder_time: data.last_reminder_time
       ? new Date(data.last_reminder_time)
       : undefined,
-    confirmation_status: data.confirmation_status,
+    confirmation_status: toConfirmationStatus(data.confirmation_status),
   };
 }
 
@@ -315,7 +345,7 @@ export async function getAssignmentsNotRecentlyReminded(
     assignments: ReminderAssignment[], 
     minHoursSinceLastReminder: number = 4
 ): Promise<ReminderAssignment[]> {
-    const now = new Date();
+    // const now = new Date();
     const cutoffTime = new Date();
     cutoffTime.setHours(cutoffTime.getHours() - minHoursSinceLastReminder);
     
@@ -399,16 +429,26 @@ export async function getMorningOfReminders(hoursAhead: number = 2): Promise<Rem
     return transformReminderData(data);
 }
 
-// Helper function to transform the data (reused across functions)
-function transformReminderData(data: any[]): ReminderAssignment[] {
-  return data.map((item) => {
-    const associateData = item.associates as any;
-    const jobData = item.jobs as any;
+type RawReminderRow = {
+  job_id: string;
+  associate_id: string;
+  work_date: string;                     // YYYY-MM-DD
+  start_time: string;                    // HH:MM:SS
+  num_reminders: number;
+  last_confirmation_time?: string | null;
+  last_reminder_time?: string | null;
+  confirmation_status?: string | null;
+  // When selecting relations like `associates:associate_id (...)` and `jobs:job_id (...)`
+  // Supabase returns arrays in multi-row selects.
+  associates: { first_name: string; last_name: string; phone_number: string }[] | null;
+  jobs: { job_title: string; customer_name: string }[] | null;
+};
 
-    const associate = Array.isArray(associateData)
-      ? associateData[0]
-      : associateData;
-    const job = Array.isArray(jobData) ? jobData[0] : jobData;
+// Helper function to transform the data (reused across functions)
+function transformReminderData(data: RawReminderRow[]): ReminderAssignment[] {
+  return data.map((item) => {
+    const associate = Array.isArray(item.associates) ? item.associates[0] : item.associates;
+    const job = Array.isArray(item.jobs) ? item.jobs[0] : item.jobs;
 
     if (!associate || !job) {
       throw new Error(
@@ -433,7 +473,7 @@ function transformReminderData(data: any[]): ReminderAssignment[] {
       last_reminder_time: item.last_reminder_time
         ? new Date(item.last_reminder_time)
         : undefined,
-      confirmation_status: item.confirmation_status,
+      confirmation_status: toConfirmationStatus(item.confirmation_status),
     };
   });
 }

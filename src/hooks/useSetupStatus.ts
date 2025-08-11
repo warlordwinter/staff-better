@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './useAuth';
 
 export const useSetupStatus = () => {
@@ -8,17 +8,9 @@ export const useSetupStatus = () => {
   const [hasCompletedSetup, setHasCompletedSetup] = useState<boolean | null>(null);
   const [checkingSetup, setCheckingSetup] = useState(false);
 
-  useEffect(() => {
-    if (user && !loading) {
-      checkSetupStatus();
-    } else if (!user) {
-      setHasCompletedSetup(null);
-    }
-  }, [user, loading]);
-
-  const checkSetupStatus = async () => {
+  const checkSetupStatus = useCallback(async () => {
     if (!user) return;
-    
+
     setCheckingSetup(true);
     try {
       const response = await fetch('/api/user-setup');
@@ -34,7 +26,15 @@ export const useSetupStatus = () => {
     } finally {
       setCheckingSetup(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (user && !loading) {
+      checkSetupStatus();
+    } else if (!user) {
+      setHasCompletedSetup(null);
+    }
+  }, [user, loading, checkSetupStatus]); // ✅ Now dependency is stable
 
   const markSetupComplete = async () => {
     try {
@@ -61,4 +61,4 @@ export const useSetupStatus = () => {
     checkSetupStatus,
     markSetupComplete,
   };
-}; 
+};

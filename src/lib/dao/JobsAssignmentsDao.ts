@@ -99,6 +99,7 @@ export async function updateJobAssignment(
         start_time?: string;
         num_reminders?: number;
         last_reminder_time?: string;
+        last_confirmation_time?: string;
     }
 ) {
     const supabase = await createServerSupabaseClient();
@@ -107,7 +108,7 @@ export async function updateJobAssignment(
     console.log("Job Assignment updates:", updates);
 
     const cleanedUpdates = Object.fromEntries(
-        Object.entries(updates).filter(([_, value]) => value !== "")
+        Object.entries(updates).filter(([, value]) => value !== "")
     );
     
     const { data, error } = await supabase

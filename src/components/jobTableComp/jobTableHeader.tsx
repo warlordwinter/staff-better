@@ -8,8 +8,14 @@ import { useExcelUpload } from '@/hooks/useExcelUpload';
 interface Props {
   onFileSelect?: (file: File) => void;
   onAddManually?: () => void;
-  onUploadComplete?: (result: { success: boolean; data?: any; error?: string; rowsProcessed?: number }) => void;
+  onUploadComplete?: (result: { 
+    success: boolean; 
+    data?: unknown; 
+    error?: string; 
+    rowsProcessed?: number;
+  }) => void;
 }
+
 
 const JobTableHeader: React.FC<Props> = ({ onFileSelect, onAddManually, onUploadComplete }) => {
   const [showOptions, setShowOptions] = useState(false);

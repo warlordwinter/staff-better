@@ -4,12 +4,11 @@ import {
   ReminderService,
   ReminderType,
   ReminderAssignment,
-  ReminderResult,
 } from "@/lib/services/reminderService";
 import * as JobsAssignmentsDao from "@/lib/dao/JobsAssignmentsDao";
 import * as ReminderDao from "@/lib/dao/ReminderDao";
 import * as SMS from "@/lib/twilio/sms";
-import { SMSResult, SMSSuccess, SMSError } from "@/lib/twilio/types";
+import { SMSSuccess, SMSError } from "@/lib/twilio/types";
 
 // Mock all external dependencies
 jest.mock("@/lib/dao/JobsAssignmentsDao");

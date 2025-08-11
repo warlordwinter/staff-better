@@ -275,13 +275,13 @@ export class ReminderService {
 
     switch (reminderType) {
       case ReminderType.TWO_DAYS_BEFORE:
-        return `Hi ${associate_first_name}!\n\nReminder: You have ${baseInfo} in 2 days.\n\nPlease confirm you'll be there.\n\nReply CONFIRM or call us.`;
+        return `Hi ${associate_first_name}!\n\nReminder: You have ${baseInfo} in 2 days.\n\nPlease confirm you'll be there.\n\nReply C to confirm or call us.\n\nReplay HELP for help, STOP to opt out.`;
 
       case ReminderType.DAY_BEFORE:
-        return `Hi ${associate_first_name}!\n\nReminder: You have ${baseInfo} tomorrow.\n\nPlease confirm you'll be there.\n\nReply CONFIRM or call us.`;
+        return `Hi ${associate_first_name}!\n\nReminder: You have ${baseInfo} tomorrow.\n\nPlease confirm you'll be there.\n\nReply C to confirm or call us.\n\nReplay HELP for help, STOP to opt out.`;
 
       case ReminderType.MORNING_OF:
-        return `Good morning ${associate_first_name}!\n\nDon't forget your ${baseInfo} today.\n\nSee you there!`;
+        return `Good morning ${associate_first_name}!\n\nDon't forget your ${baseInfo} today.\n\nPlease confirm that you will be able to make it, if not please inform us ASAP!\n\nReply C to confirm or call us.\n\nReplay HELP for help, STOP to opt out.`;
 
       case ReminderType.HOUR_BEFORE:
         return `Hi ${associate_first_name}!\n\nYour ${baseInfo} starts in about an hour.\n\nHope you're ready!`;
@@ -353,10 +353,9 @@ export class ReminderService {
    *
    * NOT IMPLEMENTED
    */
-  async getReminderStats(startDate: Date, endDate: Date) {
-    // Query database for reminder statistics in date range
-    // Return metrics like: total sent, success rate, etc.
-
+  // Keep the params but indicate they’re intentionally unused
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async getReminderStats(_startDate: Date, _endDate: Date) {
     return {
       totalSent: 0,
       successful: 0,

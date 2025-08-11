@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 // Check if user has completed setup
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const supabase = await createServerSupabaseClient();
     
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 }
 
 // Mark user as having completed setup
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     const supabase = await createServerSupabaseClient();
     

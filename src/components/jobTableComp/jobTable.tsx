@@ -7,6 +7,15 @@ import { JobAssignment } from '@/model/interfaces/JobAssignment';
 import { Associate } from '@/model/interfaces/Associate';
 import LoadingSpinner from '../ui/loadingSpinner';
 
+// Use a type that matches what JobTableHeader expects
+interface ExpectedUploadResult {
+  success: boolean;
+  data?: unknown;
+  error?: string;
+  rowsProcessed?: number;
+}
+
+// Your specific type for internal use
 interface UploadResult {
   success: boolean;
   data?: {
@@ -115,11 +124,19 @@ const JobTable = () => {
     }
   };
 
-  const handleUploadComplete = async (result: UploadResult) => {
+  const handleUploadComplete = (result: ExpectedUploadResult) => {
     if (result.success) {
       console.log(`Successfully uploaded ${result.rowsProcessed} rows`);
+      
+      // Type guard to safely access the specific data structure
+      if (result.data && typeof result.data === 'object' && result.data !== null) {
+        const uploadData = result.data as UploadResult['data'];
+        // Now you can safely access uploadData.associateInsertion, etc.
+        console.log('Upload data:', uploadData);
+      }
+      
       // Refresh the jobs list to show the newly uploaded jobs
-      await fetchJobs();
+      fetchJobs();
       // You might want to show a success toast notification here
     } else {
       console.error('Upload failed:', result.error);

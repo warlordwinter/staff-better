@@ -9,13 +9,13 @@ const TestUploadExcel = () => {
   const [loading, setLoading] = useState(false);
   const [excelRows, setExcelRows] = useState<Record<string, string>[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [uploadResult, setUploadResult] = useState<any>(null);
+  const [uploadResult, setUploadResult] = useState<unknown>(null);
 
   // Reminder Service Test State
   const [jobId, setJobId] = useState("");
   const [associateId, setAssociateId] = useState("");
   const [reminderTesting, setReminderTesting] = useState(false);
-  const [reminderResult, setReminderResult] = useState<any>(null);
+  const [reminderResult, setReminderResult] = useState<unknown>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -155,7 +155,7 @@ const TestUploadExcel = () => {
           </div>
         )}
 
-        {uploadResult && (
+        {uploadResult !== null && (
           <div style={{ marginTop: "1rem" }}>
             <h4>Upload Result:</h4>
             <pre>{JSON.stringify(uploadResult, null, 2)}</pre>
@@ -219,7 +219,7 @@ const TestUploadExcel = () => {
           {reminderTesting ? "Sending Test Reminder..." : "Send Test Reminder"}
         </button>
 
-        {reminderResult && (
+        {reminderResult !== null && (
           <div style={{ marginTop: "1rem" }}>
             <h4>Reminder Test Result:</h4>
             <pre style={{ 

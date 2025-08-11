@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/supabaseClient';
 import { User } from '@supabase/supabase-js';
 
@@ -17,29 +17,33 @@ export const useAuth = () => {
     error: null,
   });
 
-  const supabase = createClient();
+  // Create the Supabase client once and keep it stable
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     // Get initial user
     const getInitialUser = async () => {
       try {
-        const { data: { user }, error } = await supabase.auth.getUser();
-        
+        const {
+          data: { user },
+          error,
+        } = await supabase.auth.getUser();
+
         if (error) {
-          setAuthState(prev => ({ ...prev, error: error.message, loading: false }));
+          setAuthState((prev) => ({ ...prev, error: error.message, loading: false }));
           return;
         }
 
-        setAuthState(prev => ({ 
-          ...prev, 
-          user: user ?? null, 
-          loading: false 
+        setAuthState((prev) => ({
+          ...prev,
+          user: user ?? null,
+          loading: false,
         }));
-      } catch (error) {
-        setAuthState(prev => ({ 
-          ...prev, 
-          error: 'Failed to get user', 
-          loading: false 
+      } catch {
+        setAuthState((prev) => ({
+          ...prev,
+          error: 'Failed to get user',
+          loading: false,
         }));
       }
     };
@@ -47,24 +51,24 @@ export const useAuth = () => {
     getInitialUser();
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setAuthState(prev => ({ 
-          ...prev, 
-          user: session?.user ?? null,
-          loading: false 
-        }));
-      }
-    );
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthState((prev) => ({
+        ...prev,
+        user: session?.user ?? null,
+        loading: false,
+      }));
+    });
 
     return () => subscription.unsubscribe();
-  }, []); // Remove supabase.auth dependency to prevent unnecessary re-renders
+  }, [supabase]); // ✅ include supabase so the hook passes exhaustive-deps
 
   const signInWithAzure = async () => {
     try {
-      setAuthState(prev => ({ ...prev, loading: true, error: null }));
-      
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      setAuthState((prev) => ({ ...prev, loading: true, error: null }));
+
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'azure',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
@@ -73,48 +77,48 @@ export const useAuth = () => {
       });
 
       if (error) {
-        setAuthState(prev => ({ 
-          ...prev, 
-          error: error.message, 
-          loading: false 
+        setAuthState((prev) => ({
+          ...prev,
+          error: error.message,
+          loading: false,
         }));
       }
-    } catch (error) {
-      setAuthState(prev => ({ 
-        ...prev, 
-        error: 'Failed to sign in with Azure', 
-        loading: false 
+    } catch {
+      setAuthState((prev) => ({
+        ...prev,
+        error: 'Failed to sign in with Azure',
+        loading: false,
       }));
     }
   };
 
   const signOut = async () => {
     try {
-      setAuthState(prev => ({ ...prev, loading: true, error: null }));
-      
+      setAuthState((prev) => ({ ...prev, loading: true, error: null }));
+
       const { error } = await supabase.auth.signOut();
-      
+
       if (error) {
-        setAuthState(prev => ({ 
-          ...prev, 
-          error: error.message, 
-          loading: false 
+        setAuthState((prev) => ({
+          ...prev,
+          error: error.message,
+          loading: false,
         }));
       }
-    } catch (error) {
-      setAuthState(prev => ({ 
-        ...prev, 
-        error: 'Failed to sign out', 
-        loading: false 
+    } catch {
+      setAuthState((prev) => ({
+        ...prev,
+        error: 'Failed to sign out',
+        loading: false,
       }));
     }
   };
 
   const signInWithGoogle = async () => {
     try {
-      setAuthState(prev => ({ ...prev, loading: true, error: null }));
-      
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      setAuthState((prev) => ({ ...prev, loading: true, error: null }));
+
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
@@ -122,17 +126,17 @@ export const useAuth = () => {
       });
 
       if (error) {
-        setAuthState(prev => ({ 
-          ...prev, 
-          error: error.message, 
-          loading: false 
+        setAuthState((prev) => ({
+          ...prev,
+          error: error.message,
+          loading: false,
         }));
       }
-    } catch (error) {
-      setAuthState(prev => ({ 
-        ...prev, 
-        error: 'Failed to sign in with Google', 
-        loading: false 
+    } catch {
+      setAuthState((prev) => ({
+        ...prev,
+        error: 'Failed to sign in with Google',
+        loading: false,
       }));
     }
   };
@@ -143,4 +147,4 @@ export const useAuth = () => {
     signInWithGoogle,
     signOut,
   };
-}; 
+};

@@ -4,7 +4,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import Image from 'next/image';
-import { createClient } from '@/lib/supabase/supabaseClient';
 
 export default function LoginPage() {
   const { user, loading, signInWithAzure, signInWithGoogle } = useAuth();

@@ -1,5 +1,5 @@
-import Navbar from '@/components/navBar';
-import Footer from '@/components/footer';
+import Navbar from '@/components/ui/navBar';
+import Footer from '@/components/ui/footer';
 
 export default function GetStartedPage() {
   return (

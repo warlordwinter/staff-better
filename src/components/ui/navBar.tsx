@@ -7,7 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 const Navbar = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
-  const { user, loading, signInWithAzure, signOut } = useAuth();
+  const { user, signOut } = useAuth();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const isLoggedIn = !!user;
