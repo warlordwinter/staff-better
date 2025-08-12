@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { AssociateDateDisplay } from "./associateTableCell";
 import Image from "next/image";
 import { Associate } from "@/model/interfaces/Associate";
+import { formatPhoneForDisplay, formatPhoneToE164, isValidE164 } from "@/utils/phoneUtils"; // Add imports
 
 // Extended interface for display purposes (includes job assignment fields)
 interface AssociateDisplay extends Associate {
@@ -27,6 +28,7 @@ export function AssociateTableRow({
   showJobAssignmentColumns = false 
 }: AssociateTableRowProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const [phoneError, setPhoneError] = useState(''); // Add phone validation state
   const [editData, setEditData] = useState({
     first_name: data.first_name || '',
     last_name: data.last_name || '',
@@ -42,9 +44,21 @@ export function AssociateTableRow({
 
   const handleEdit = () => {
     setIsEditing(true);
+    setPhoneError(''); // Clear any existing phone errors
   };
 
   const handleSave = () => {
+    // Validate phone number before saving
+    if (editData.phone_number.trim()) {
+      try {
+        formatPhoneToE164(editData.phone_number); // Just validate, don't store yet
+        setPhoneError('');
+      } catch (error) {
+        setPhoneError('Please enter a valid phone number');
+        return; // Don't save if phone is invalid
+      }
+    }
+
     if (onSave) {
       const updatedData: AssociateDisplay = {
         ...data,
@@ -52,7 +66,7 @@ export function AssociateTableRow({
         last_name: editData.last_name,
         work_date: editData.work_date,
         start_time: editData.start_time,
-        phone_number: editData.phone_number,
+        phone_number: editData.phone_number, // DAO will handle the formatting
         email_address: editData.email_address,
         num_reminders: Number(editData.num_reminders) || 0,
         confirmation_status: editData.confirmation_status,
@@ -62,6 +76,7 @@ export function AssociateTableRow({
       onSave(updatedData);
     }
     setIsEditing(false);
+    setPhoneError('');
   };
 
   const handleCancel = () => {
@@ -78,6 +93,7 @@ export function AssociateTableRow({
       job_start_time: data.job_start_time || data.start_time || '',
     });
     setIsEditing(false);
+    setPhoneError('');
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -85,6 +101,20 @@ export function AssociateTableRow({
       ...prev,
       [field]: value
     }));
+
+    // Real-time phone validation
+    if (field === 'phone_number') {
+      if (value.trim() === '') {
+        setPhoneError('');
+      } else {
+        try {
+          formatPhoneToE164(value);
+          setPhoneError('');
+        } catch (error) {
+          setPhoneError('Invalid phone format');
+        }
+      }
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -189,14 +219,26 @@ export function AssociateTableRow({
       
       <TableCell className="w-[140px]">
         {isEditing ? (
-          <input
-            type="tel"
-            value={editData.phone_number}
-            onChange={(e) => handleInputChange('phone_number', e.target.value)}
-            className="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-          />
+          <div className="relative">
+            <input
+              type="tel"
+              value={editData.phone_number}
+              onChange={(e) => handleInputChange('phone_number', e.target.value)}
+              className={`w-full px-1 py-1 text-xs border rounded focus:outline-none focus:border-blue-500 ${
+                phoneError ? 'border-red-500' : 'border-gray-300'
+              }`}
+              placeholder="(555) 123-4567"
+              pattern="[0-9]*"
+            />
+            {phoneError && (
+              <div className="absolute text-xs text-red-500 mt-1 whitespace-nowrap">
+                {phoneError}
+              </div>
+            )}
+          </div>
         ) : (
-          data.phone_number
+          // Display formatted phone number for better readability
+          formatPhoneForDisplay(data.phone_number)
         )}
       </TableCell>
       
@@ -240,7 +282,12 @@ export function AssociateTableRow({
           <div className="flex gap-1">
             <button
               onClick={handleSave}
-              className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 focus:outline-none"
+              disabled={!!phoneError} // Disable save if phone error
+              className={`px-2 py-1 text-xs text-white rounded focus:outline-none ${
+                phoneError 
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-green-500 hover:bg-green-600'
+              }`}
             >
               Save
             </button>

@@ -202,3 +202,29 @@ export async function getAssignmentsNeedingReminders() {
     
     return data;
 }
+
+export async function getActiveAssignmentsFromDatabase(today: Date, daysFromNow: Date, associateId: string) {
+    const supabase = await createServerSupabaseClient();
+
+    const { data, error } = await supabase
+        .from("jobassignments")
+        .select("job_id, associate_id, work_date, start_time, confirmation_status")
+        .eq("associate_id", associateId)
+        .gte("work_date", today)
+        .lte("work_date", daysFromNow)
+        .neq("confirmation_status", "Declined")
+        .order("work_date", { ascending: true })
+        .order("start_time", { ascending: true});
+
+    if (error) {
+        console.error("Error fetching active assignment:", error);
+        throw new Error(`Failed to fetch active assignments: ${error.message}`);
+    }
+
+    if (!data || data.length === 0) {
+        console.log(`No active assignments found for associate: ${associateId}`);
+        return [];
+    }
+
+    return data;
+}

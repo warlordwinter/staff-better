@@ -1,5 +1,6 @@
 import { Associate } from "@/model/interfaces/Associate";
 import { createServerSupabaseClient } from "../supabase/server";
+import { formatPhoneToE164, normalizePhoneForLookup } from "@/utils/phoneUtils";
 
 // Get all associates
 export async function getAssociates() {
@@ -31,9 +32,28 @@ export async function insertAssociates(
 ) {
   const supabase = await createServerSupabaseClient();
 
+  // Format phone numbers before insertion
+  const formattedAssociates = associates.map(associate => {
+    let formattedPhone = associate.phone_number;
+    
+    if (associate.phone_number && associate.phone_number.trim()) {
+      try {
+        formattedPhone = formatPhoneToE164(associate.phone_number);
+      } catch (error) {
+        console.warn(`Could not format phone number during insert: ${associate.phone_number}`, error);
+        // Keep original if formatting fails
+      }
+    }
+
+    return {
+      ...associate,
+      phone_number: formattedPhone
+    };
+  });
+
   const { data, error } = await supabase
     .from("associates")
-    .insert(associates)
+    .insert(formattedAssociates)
     .select();
 
   if (error) {
@@ -70,6 +90,17 @@ export async function updateAssociate(
     Object.entries(updates).filter(([, value]) => value !== "")
   );
 
+  // Format phone number if it's being updated
+  if (cleanedUpdates.phone_number) {
+    try {
+      cleanedUpdates.phone_number = formatPhoneToE164(cleanedUpdates.phone_number);
+      console.log(`Phone formatted for update: ${updates.phone_number} → ${cleanedUpdates.phone_number}`);
+    } catch (error) {
+      console.warn(`Could not format phone number during update: ${updates.phone_number}`, error);
+      // Keep original if formatting fails
+    }
+  }
+
   console.log("Cleaned Updates:", cleanedUpdates);
 
   const { data, error } = await supabase
@@ -104,30 +135,47 @@ export async function deleteAssociate(id: string) {
 }
 
 /**
- * Find associate by phone number
+ * Find associate by phone number with normalization
  */
 export async function getAssociateByPhone(phoneNumber: string): Promise<Associate | null> {
   const supabase = await createServerSupabaseClient();
+  
+  // Normalize the incoming phone number to E.164 format
+  const normalizedPhone = normalizePhoneForLookup(phoneNumber);
+  console.log(`Looking up phone: ${phoneNumber} → normalized: ${normalizedPhone}`);
 
-  const { data, error } = await supabase
+  // First, try exact match with normalized number
+  let { data, error } = await supabase
     .from("associates")
     .select("id, first_name, last_name, work_date, start_time, phone_number, email_address, sms_opt_out")
-    .eq("phone_number", phoneNumber)
+    .eq("phone_number", normalizedPhone)
     .single();
 
-    if (error) {
-    // Handle the specific case where no associate is found
+  // If no exact match and the phone numbers are different, try the original
+  if (error && error.code === 'PGRST116' && normalizedPhone !== phoneNumber) {
+    console.log(`No match for normalized phone, trying original: ${phoneNumber}`);
+    
+    const result = await supabase
+      .from("associates")
+      .select("id, first_name, last_name, work_date, start_time, phone_number, email_address, sms_opt_out")
+      .eq("phone_number", phoneNumber)
+      .single();
+    
+    data = result.data;
+    error = result.error;
+  }
+
+  if (error) {
     if (error.code === 'PGRST116') {
-      console.log(`No associate found for phone number: ${phoneNumber}`);
+      console.log(`No associate found for phone number: ${phoneNumber} (normalized: ${normalizedPhone})`);
       return null;
     }
     
-    // Log and throw for actual errors
     console.error("Supabase getting associate by phone number error:", error);
     throw new Error("Failed to retrieve Associate by phone number");
   }
 
-    return data as Associate;
+  return data as Associate;
 }
 
 export async function optOutAssociate(associateId: string): Promise<void> {

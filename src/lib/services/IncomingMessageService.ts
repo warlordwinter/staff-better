@@ -1,6 +1,9 @@
 // Service for handling incoming SMS messages from associates
 
-import { updateJobAssignment } from "../dao/JobsAssignmentsDao";
+import {
+  getActiveAssignmentsFromDatabase,
+  updateJobAssignment,
+} from "../dao/JobsAssignmentsDao";
 import { getAssociateByPhone, optOutAssociate } from "../dao/AssociatesDao";
 import { sendSMS } from "../twilio/sms";
 import { SMSMessage } from "../twilio/types";
@@ -19,9 +22,9 @@ export interface IncomingMessageResult {
 
 export enum MessageAction {
   CONFIRMATION = "confirmation",
-  HELP_REQUEST = "help_request", 
+  HELP_REQUEST = "help_request",
   OPT_OUT = "opt_out",
-  UNKNOWN = "unknown"
+  UNKNOWN = "unknown",
 }
 
 export interface ActiveAssignment {
@@ -33,25 +36,23 @@ export interface ActiveAssignment {
 }
 
 export class IncomingMessageService {
-  
   /**
    * Main method to process incoming SMS messages
    * This should be called by your Twilio webhook endpoint
    */
   async processIncomingMessage(
-    fromNumber: string, 
+    fromNumber: string,
     messageBody: string
   ): Promise<IncomingMessageResult> {
-    
     try {
       console.log(`Processing message from ${fromNumber}: "${messageBody}"`);
-      
+
       // Normalize the phone number format
       const normalizedPhone = this.normalizePhoneNumber(fromNumber);
-      
+
       // Find the associate by phone number
       const associate = await getAssociateByPhone(normalizedPhone);
-      
+
       if (!associate) {
         console.log(`No associate found for phone number: ${normalizedPhone}`);
         return {
@@ -59,32 +60,31 @@ export class IncomingMessageService {
           action: MessageAction.UNKNOWN,
           phone_number: normalizedPhone,
           message: messageBody,
-          error: "Associate not found"
+          error: "Associate not found",
         };
       }
-      
+
       // Determine the action based on message content
       const action = this.parseMessageAction(messageBody);
-      
+
       // Process the action
       const result = await this.processMessageAction(
-        associate, 
-        action, 
+        associate,
+        action,
         messageBody,
         normalizedPhone
       );
-      
+
       return result;
-      
     } catch (error) {
       console.error("Error processing incoming message:", error);
-      
+
       return {
         success: false,
         action: MessageAction.UNKNOWN,
         phone_number: fromNumber,
         message: messageBody,
-        error: error instanceof Error ? error.message : "Unknown error"
+        error: error instanceof Error ? error.message : "Unknown error",
       };
     }
   }
@@ -94,22 +94,22 @@ export class IncomingMessageService {
    */
   private parseMessageAction(messageBody: string): MessageAction {
     const normalizedMessage = messageBody.trim().toLowerCase();
-    
+
     // Check for confirmation keywords
     if (this.isConfirmationMessage(normalizedMessage)) {
       return MessageAction.CONFIRMATION;
     }
-    
+
     // Check for help request
     if (normalizedMessage === "help") {
       return MessageAction.HELP_REQUEST;
     }
-    
+
     // Check for opt-out request
     if (normalizedMessage === "stop" || normalizedMessage === "unsubscribe") {
       return MessageAction.OPT_OUT;
     }
-    
+
     return MessageAction.UNKNOWN;
   }
 
@@ -118,12 +118,21 @@ export class IncomingMessageService {
    */
   private isConfirmationMessage(message: string): boolean {
     const confirmationKeywords = [
-      "c", "confirm", "confirmed", "yes", "y", "ok", "okay", 
-      "sure", "will be there", "i'll be there", "ill be there"
+      "c",
+      "confirm",
+      "confirmed",
+      "yes",
+      "y",
+      "ok",
+      "okay",
+      "sure",
+      "will be there",
+      "i'll be there",
+      "ill be there",
     ];
-    
-    return confirmationKeywords.some(keyword => 
-      message.includes(keyword) || message === keyword
+
+    return confirmationKeywords.some(
+      (keyword) => message.includes(keyword) || message === keyword
     );
   }
 
@@ -136,20 +145,31 @@ export class IncomingMessageService {
     originalMessage: string,
     phoneNumber: string
   ): Promise<IncomingMessageResult> {
-    
     switch (action) {
       case MessageAction.CONFIRMATION:
-        return await this.handleConfirmation(associate, phoneNumber, originalMessage);
-        
+        return await this.handleConfirmation(
+          associate,
+          phoneNumber,
+          originalMessage
+        );
+
       case MessageAction.HELP_REQUEST:
-        return await this.handleHelpRequest(associate, phoneNumber, originalMessage);
-        
+        return await this.handleHelpRequest(
+          associate,
+          phoneNumber,
+          originalMessage
+        );
+
       case MessageAction.OPT_OUT:
         return await this.handleOptOut(associate, phoneNumber, originalMessage);
-        
+
       case MessageAction.UNKNOWN:
       default:
-        return await this.handleUnknownMessage(associate, phoneNumber, originalMessage);
+        return await this.handleUnknownMessage(
+          associate,
+          phoneNumber,
+          originalMessage
+        );
     }
   }
 
@@ -161,56 +181,55 @@ export class IncomingMessageService {
     phoneNumber: string,
     originalMessage: string
   ): Promise<IncomingMessageResult> {
-    
     try {
       // Get the associate's active/upcoming assignments
       const activeAssignments = await this.getActiveAssignments(associate.id);
-      
+
       if (activeAssignments.length === 0) {
         // No active assignments to confirm
-        const response = `Hi ${associate.first_name}! We don't have any upcoming assignments for you to confirm right now. If you think this is an error, please call us.`;
-        
+        const response = `Hi ${associate.first_name}!\n\nWe don't have any upcoming assignments for you to confirm right now.\n\nIf you think this is an error, please call us.`;
+
         await this.sendResponse(phoneNumber, response);
-        
+
         return {
           success: true,
           action: MessageAction.CONFIRMATION,
           associate_id: associate.id,
           phone_number: phoneNumber,
           message: originalMessage,
-          response_sent: response
+          response_sent: response,
         };
       }
-      
+
       // Update confirmation status for all active assignments
       let updatedCount = 0;
       for (const assignment of activeAssignments) {
         const newStatus = this.determineConfirmationStatus(assignment);
-        
+
         await updateJobAssignment(assignment.job_id, assignment.associate_id, {
           confirmation_status: newStatus,
-          last_confirmation_time: new Date().toISOString()
+          last_confirmation_time: new Date().toISOString(),
         });
-        
+
         updatedCount++;
       }
-      
+
       // Send confirmation response
-      const response = updatedCount === 1 
-        ? `Thanks ${associate.first_name}! Your assignment is confirmed. We'll see you there!`
-        : `Thanks ${associate.first_name}! Your ${updatedCount} assignments are confirmed. We'll see you there!`;
-      
+      const response =
+        updatedCount === 1
+          ? `Thanks ${associate.first_name}!\n\nYour assignment is confirmed.\n\nWe'll see you there!`
+          : `Thanks ${associate.first_name}!\n\nYour ${updatedCount} assignments are confirmed.\n\nWe'll see you there!`;
+
       await this.sendResponse(phoneNumber, response);
-      
+
       return {
         success: true,
         action: MessageAction.CONFIRMATION,
         associate_id: associate.id,
         phone_number: phoneNumber,
         message: originalMessage,
-        response_sent: response
+        response_sent: response,
       };
-      
     } catch (error) {
       console.error("Error handling confirmation:", error);
       throw error;
@@ -225,22 +244,22 @@ export class IncomingMessageService {
     phoneNumber: string,
     originalMessage: string
   ): Promise<IncomingMessageResult> {
-    
-    const helpMessage = `Hi ${associate.first_name}! Here's how to use our text system:\n\n` +
+    const helpMessage =
+      `Hi ${associate.first_name}!\n\nHere's how to use our text system:\n\n` +
       `• Reply "C" or "Confirm" to confirm your assignment\n` +
       `• Reply "HELP" for this message\n` +
       `• Reply "STOP" to stop receiving texts\n\n` +
       `Questions? Call us at [YOUR_PHONE_NUMBER]`;
-    
+
     await this.sendResponse(phoneNumber, helpMessage);
-    
+
     return {
       success: true,
       action: MessageAction.HELP_REQUEST,
       associate_id: associate.id,
       phone_number: phoneNumber,
       message: originalMessage,
-      response_sent: helpMessage
+      response_sent: helpMessage,
     };
   }
 
@@ -252,25 +271,24 @@ export class IncomingMessageService {
     phoneNumber: string,
     originalMessage: string
   ): Promise<IncomingMessageResult> {
-    
     try {
       // Update associate to opt them out of SMS
       await optOutAssociate(associate.id);
-      
-      const optOutMessage = `${associate.first_name}, you have been unsubscribed from our text reminders. ` +
+
+      const optOutMessage =
+        `${associate.first_name}, you have been unsubscribed from our text reminders. ` +
         `You can still receive calls about your assignments. To re-subscribe, please call us.`;
-      
+
       await this.sendResponse(phoneNumber, optOutMessage);
-      
+
       return {
         success: true,
         action: MessageAction.OPT_OUT,
         associate_id: associate.id,
         phone_number: phoneNumber,
         message: originalMessage,
-        response_sent: optOutMessage
+        response_sent: optOutMessage,
       };
-      
     } catch (error) {
       console.error("Error handling opt-out:", error);
       throw error;
@@ -285,30 +303,36 @@ export class IncomingMessageService {
     phoneNumber: string,
     originalMessage: string
   ): Promise<IncomingMessageResult> {
-    
-    const unknownMessage = `Hi ${associate.first_name}! I didn't understand that message. ` +
+    const unknownMessage =
+      `Hi ${associate.first_name}!\n\nI didn't understand that message.\n\n` +
       `Reply "C" to confirm, "HELP" for help, or call us directly.`;
-    
+
     await this.sendResponse(phoneNumber, unknownMessage);
-    
+
     return {
       success: true,
       action: MessageAction.UNKNOWN,
       associate_id: associate.id,
       phone_number: phoneNumber,
       message: originalMessage,
-      response_sent: unknownMessage
+      response_sent: unknownMessage,
     };
   }
 
   /**
    * Determine the appropriate confirmation status based on timing
    */
-  private determineConfirmationStatus(assignment: ActiveAssignment): ConfirmationStatus {
+  private determineConfirmationStatus(
+    assignment: ActiveAssignment
+  ): ConfirmationStatus {
     const now = new Date();
-    const workDateTime = this.combineDateTime(assignment.work_date, assignment.start_time);
-    const hoursDifference = (workDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-    
+    const workDateTime = this.combineDateTime(
+      assignment.work_date,
+      assignment.start_time
+    );
+    const hoursDifference =
+      (workDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+
     // If it's the day of the work (within 6 hours), mark as "Confirmed"
     // Otherwise, mark as "Soft Confirmed" or "Likely Confirmed"
     if (hoursDifference <= 6 && hoursDifference > 0) {
@@ -323,19 +347,22 @@ export class IncomingMessageService {
   /**
    * Send a response SMS to the associate
    */
-  private async sendResponse(phoneNumber: string, message: string): Promise<void> {
+  private async sendResponse(
+    phoneNumber: string,
+    message: string
+  ): Promise<void> {
     const smsMessage: SMSMessage = {
       to: phoneNumber,
-      body: message
+      body: message,
     };
-    
+
     const result = await sendSMS(smsMessage);
-    
+
     if (!result.success) {
       console.error(`Failed to send response to ${phoneNumber}:`, result.error);
       throw new Error(`Failed to send SMS response: ${result.error}`);
     }
-    
+
     console.log(`Response sent to ${phoneNumber}: "${message}"`);
   }
 
@@ -343,33 +370,83 @@ export class IncomingMessageService {
    * Get active/upcoming assignments for an associate
    * This would need to be implemented in your DAO layer
    */
-  private async getActiveAssignments(associateId: string): Promise<ActiveAssignment[]> {
+  private async getActiveAssignments(
+    associateId: string
+  ): Promise<ActiveAssignment[]> {
     // This is pseudocode - you'll need to implement this in your DAO
     // Should return assignments where:
     // 1. work_date >= today
     // 2. confirmation_status is not 'Declined'
     // 3. Maybe within next 7 days to avoid confirming very future assignments
-    
-    // For now, returning empty array - you'll need to implement this
+
+    const today = new Date();
+    const todayString = today.toISOString().split("T")[0]; // YYYY-MM-DD format
+
+    const sevenDaysFromNow = new Date();
+    sevenDaysFromNow.setDate(today.getDate() + 7);
+    const sevenDaysString = sevenDaysFromNow.toISOString().split("T")[0];
+
     console.log(`Getting active assignments for associate: ${associateId}`);
-    return [];
+    console.log(`Date range: ${todayString} to ${sevenDaysString}`);
+
+    const assignments = await getActiveAssignmentsFromDatabase(
+      today,
+      sevenDaysFromNow,
+      associateId
+    );
+
+    // Transform the data to match the ActiveAssignment interface
+    const activeAssignments: ActiveAssignment[] = assignments.map(
+      (assignment) => ({
+        job_id: assignment.job_id,
+        associate_id: assignment.associate_id,
+        work_date: new Date(assignment.work_date),
+        start_time: assignment.start_time,
+        confirmation_status: this.mapConfirmationStatus(
+          assignment.confirmation_status
+        ),
+      })
+    );
+
+    console.log(`Getting active assignments for associate: ${associateId}`);
+    return activeAssignments;
   }
 
   // Helper methods
+  private mapConfirmationStatus(status: string): ConfirmationStatus {
+    switch (status?.toLowerCase()) {
+      case "unconfirmed":
+        return ConfirmationStatus.Unconfirmed;
+      case "soft confirmed":
+        return ConfirmationStatus.SoftConfirmed;
+      case "likely confirmed":
+        return ConfirmationStatus.LikelyConfirmed;
+      case "confirmed":
+        return ConfirmationStatus.Confirmed;
+      case "declined":
+        return ConfirmationStatus.Declined;
+      default:
+        console.warn(
+          `Unknown confirmation status: ${status}, defaulting to Unconfirmed`
+        );
+        return ConfirmationStatus.Unconfirmed;
+    }
+  }
+
   private normalizePhoneNumber(phoneNumber: string): string {
     // Remove all non-digit characters
-    const digitsOnly = phoneNumber.replace(/\D/g, '');
-    
+    const digitsOnly = phoneNumber.replace(/\D/g, "");
+
     // If it starts with 1 and is 11 digits, remove the 1
-    if (digitsOnly.length === 11 && digitsOnly.startsWith('1')) {
-      return '+1' + digitsOnly.substring(1);
+    if (digitsOnly.length === 11 && digitsOnly.startsWith("1")) {
+      return "+1" + digitsOnly.substring(1);
     }
-    
+
     // If it's 10 digits, add +1
     if (digitsOnly.length === 10) {
-      return '+1' + digitsOnly;
+      return "+1" + digitsOnly;
     }
-    
+
     // Otherwise, assume it's already properly formatted
     return phoneNumber;
   }
@@ -378,9 +455,9 @@ export class IncomingMessageService {
     const year = date.getUTCFullYear();
     const month = date.getUTCMonth();
     const day = date.getUTCDate();
-    
+
     const [hours, minutes] = timeString.split(":").map(Number);
-    
+
     return new Date(year, month, day, hours, minutes, 0, 0);
   }
 }
