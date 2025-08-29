@@ -9,7 +9,6 @@ import { sendSMS } from "../twilio/sms";
 import { SMSMessage } from "../twilio/types";
 import { ConfirmationStatus } from "@/model/enums/ConfirmationStatus";
 import { Associate } from "@/model/interfaces/Associate";
-import { AGENCY_TZ, eventUTC, dateISOInTZ, addDaysISO } from "@/utils/timeServer";
 
 export interface IncomingMessageResult {
   success: boolean;
