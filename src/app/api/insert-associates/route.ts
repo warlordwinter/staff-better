@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { insertAssociates } from "@/lib/dao/AssociatesDao";
 import { Associate } from "@/model/interfaces/Associate";
 import { formatPhoneToE164 } from "@/utils/phoneUtils";
-import { formatTime } from "@/utils/dateUtils";
 
 export async function POST(req: NextRequest) {
     const body = await req.json();
@@ -27,7 +26,7 @@ export async function POST(req: NextRequest) {
                 first_name: r.first_name,
                 last_name: r.last_name,
                 work_date: r.work_date,
-                start_time: formatTime(r.start_time),
+                start_time: r.start_time,
                 phone_number: formattedPhone,
                 email_address: r.email_address,
               };

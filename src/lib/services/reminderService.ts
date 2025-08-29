@@ -1,5 +1,6 @@
 // Core reminder business logic
 
+import { convertUTCTimeToLocal } from "@/utils/timezoneUtils";
 import {
   getNumberOfReminders,
   updateJobAssignment,
@@ -269,7 +270,9 @@ export class ReminderService {
       timeZone: "UTC",
     });
     console.log("Work Date String:", workDateStr);
-    const timeStr = this.formatTime(start_time);
+
+    const localTime = convertUTCTimeToLocal(start_time, work_date);
+    const timeStr = this.formatTime(localTime);
 
     const baseInfo = `${job_title} for ${customer_name} on ${workDateStr} at ${timeStr}`;
 
@@ -369,12 +372,10 @@ export class ReminderService {
     const year = date.getUTCFullYear();
     const month = date.getUTCMonth();
     const day = date.getUTCDate();
-
     const [hours, minutes] = timeString.split(":").map(Number);
 
-    // Create the datetime in LOCAL timezone (not UTC)
-    const dateTime = new Date(year, month, day, hours, minutes, 0, 0);
-    return dateTime;
+    // Create UTC datetime since timeString is UTC from database
+    return new Date(Date.UTC(year, month, day, hours, minutes, 0, 0));
   }
 
   private formatTime(timeString: string): string {

@@ -1,15 +1,16 @@
+'use client';
 import React, { useState } from "react";
 import { AssociateDateDisplay } from "./associateTableCell";
 import Image from "next/image";
 import { Associate } from "@/model/interfaces/Associate";
-import { formatPhoneForDisplay, formatPhoneToE164, isValidE164 } from "@/utils/phoneUtils"; // Add imports
+import { formatPhoneForDisplay, formatPhoneToE164 } from "@/utils/phoneUtils";
+import { to12HourDisplay } from "@/utils/timezoneUtils";
 
-// Extended interface for display purposes (includes job assignment fields)
 interface AssociateDisplay extends Associate {
   confirmation_status?: string;
   num_reminders?: number;
   job_work_date?: string;
-  job_start_time?: string;
+  job_start_time?: string; // local time for display/editing
 }
 
 interface AssociateTableRowProps {
@@ -20,42 +21,42 @@ interface AssociateTableRowProps {
   showJobAssignmentColumns?: boolean;
 }
 
-export function AssociateTableRow({ 
-  data, 
-  index, 
-  onSave, 
-  onDelete, 
-  showJobAssignmentColumns = false 
+export function AssociateTableRow({
+  data,
+  index,
+  onSave,
+  onDelete,
+  showJobAssignmentColumns = false,
 }: AssociateTableRowProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [phoneError, setPhoneError] = useState(''); // Add phone validation state
+  const [phoneError, setPhoneError] = useState("");
+
   const [editData, setEditData] = useState({
-    first_name: data.first_name || '',
-    last_name: data.last_name || '',
+    first_name: data.first_name || "",
+    last_name: data.last_name || "",
     num_reminders: (data.num_reminders || 0).toString(),
-    work_date: data.work_date || '',
-    start_time: data.start_time || '',
-    phone_number: data.phone_number || '',
-    email_address: data.email_address || '',
-    confirmation_status: data.confirmation_status || 'Unconfirmed',
-    job_work_date: data.job_work_date || data.work_date || '',
-    job_start_time: data.job_start_time || data.start_time || '',
+    work_date: data.work_date || "",
+    start_time: data.start_time || "", // local time for display
+    phone_number: data.phone_number || "",
+    email_address: data.email_address || "",
+    confirmation_status: data.confirmation_status || "Unconfirmed",
+    job_work_date: data.job_work_date || data.work_date || "",
+    job_start_time: data.job_start_time || data.start_time || "", // local time for display
   });
 
   const handleEdit = () => {
     setIsEditing(true);
-    setPhoneError(''); // Clear any existing phone errors
+    setPhoneError("");
   };
 
   const handleSave = () => {
-    // Validate phone number before saving
     if (editData.phone_number.trim()) {
       try {
-        formatPhoneToE164(editData.phone_number); // Just validate, don't store yet
-        setPhoneError('');
-      } catch (error) {
-        setPhoneError('Please enter a valid phone number');
-        return; // Don't save if phone is invalid
+        formatPhoneToE164(editData.phone_number);
+        setPhoneError("");
+      } catch {
+        setPhoneError("Please enter a valid phone number");
+        return;
       }
     }
 
@@ -65,53 +66,50 @@ export function AssociateTableRow({
         first_name: editData.first_name,
         last_name: editData.last_name,
         work_date: editData.work_date,
-        start_time: editData.start_time,
-        phone_number: editData.phone_number, // DAO will handle the formatting
+        start_time: editData.start_time, // local; parent converts to UTC
+        phone_number: editData.phone_number,
         email_address: editData.email_address,
         num_reminders: Number(editData.num_reminders) || 0,
         confirmation_status: editData.confirmation_status,
         job_work_date: editData.job_work_date,
-        job_start_time: editData.job_start_time,
+        job_start_time: editData.job_start_time, // local; parent converts to UTC
       };
       onSave(updatedData);
     }
+
     setIsEditing(false);
-    setPhoneError('');
+    setPhoneError("");
   };
 
   const handleCancel = () => {
     setEditData({
-      first_name: data.first_name || '',
-      last_name: data.last_name || '',
+      first_name: data.first_name || "",
+      last_name: data.last_name || "",
       num_reminders: (data.num_reminders || 0).toString(),
-      work_date: data.work_date || '',
-      start_time: data.start_time || '',
-      phone_number: data.phone_number || '',
-      email_address: data.email_address || '',
-      confirmation_status: data.confirmation_status || 'Unconfirmed',
-      job_work_date: data.job_work_date || data.work_date || '',
-      job_start_time: data.job_start_time || data.start_time || '',
+      work_date: data.work_date || "",
+      start_time: data.start_time || "", // keep local time for display
+      phone_number: data.phone_number || "",
+      email_address: data.email_address || "",
+      confirmation_status: data.confirmation_status || "Unconfirmed",
+      job_work_date: data.job_work_date || data.work_date || "",
+      job_start_time: data.job_start_time || data.start_time || "", // keep local time
     });
     setIsEditing(false);
-    setPhoneError('');
+    setPhoneError("");
   };
 
   const handleInputChange = (field: string, value: string) => {
-    setEditData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setEditData((prev) => ({ ...prev, [field]: value }));
 
-    // Real-time phone validation
-    if (field === 'phone_number') {
-      if (value.trim() === '') {
-        setPhoneError('');
+    if (field === "phone_number") {
+      if (value.trim() === "") {
+        setPhoneError("");
       } else {
         try {
           formatPhoneToE164(value);
-          setPhoneError('');
-        } catch (error) {
-          setPhoneError('Invalid phone format');
+          setPhoneError("");
+        } catch {
+          setPhoneError("Invalid phone format");
         }
       }
     }
@@ -119,20 +117,24 @@ export function AssociateTableRow({
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Unconfirmed':
-        return 'bg-gray-100 text-gray-800';
-      case 'Soft Confirmed':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'Likely Confirmed':
-        return 'bg-blue-100 text-blue-800';
-      case 'Confirmed':
-        return 'bg-green-100 text-green-800';
-      case 'Declined':
-        return 'bg-red-100 text-red-800';
+      case "Unconfirmed":
+        return "bg-gray-100 text-gray-800";
+      case "Soft Confirmed":
+        return "bg-yellow-100 text-yellow-800";
+      case "Likely Confirmed":
+        return "bg-blue-100 text-blue-800";
+      case "Confirmed":
+        return "bg-green-100 text-green-800";
+      case "Declined":
+        return "bg-red-100 text-red-800";
       default:
-        return 'bg-gray-100 text-gray-800';
+        return "bg-gray-100 text-gray-800";
     }
   };
+
+  const displayTime = (time: string) => (
+    <span className="font-medium">{to12HourDisplay(time) || ""}</span>
+  );
 
   // Suppress the ESLint warning for unused index since it's used in parent
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -145,87 +147,108 @@ export function AssociateTableRow({
           <input
             type="text"
             value={editData.first_name}
-            onChange={(e) => handleInputChange('first_name', e.target.value)}
+            onChange={(e) => handleInputChange("first_name", e.target.value)}
             className="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-blue-500"
           />
         ) : (
           data.first_name
         )}
       </TableCell>
-      
+
       <TableCell className="w-[120px]">
         {isEditing ? (
           <input
             type="text"
             value={editData.last_name}
-            onChange={(e) => handleInputChange('last_name', e.target.value)}
+            onChange={(e) => handleInputChange("last_name", e.target.value)}
             className="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-blue-500"
           />
         ) : (
           data.last_name
         )}
       </TableCell>
-      
+
       {showJobAssignmentColumns && (
         <TableCell className="w-[50px]">
           {isEditing ? (
             <input
               type="number"
               value={editData.num_reminders}
-              onChange={(e) => handleInputChange('num_reminders', e.target.value)}
+              onChange={(e) => handleInputChange("num_reminders", e.target.value)}
               className="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-              min="0"
+              min={0}
             />
           ) : (
             data.num_reminders || 0
           )}
         </TableCell>
       )}
-      
+
       <TableCell className="w-[180px]">
         {isEditing ? (
           <input
             type="date"
             value={showJobAssignmentColumns ? editData.job_work_date : editData.work_date}
-            onChange={(e) => handleInputChange(
-              showJobAssignmentColumns ? 'job_work_date' : 'work_date', 
-              e.target.value
-            )}
+            onChange={(e) =>
+              handleInputChange(
+                showJobAssignmentColumns ? "job_work_date" : "work_date",
+                e.target.value
+              )
+            }
             className="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-blue-500"
           />
         ) : (
-          <AssociateDateDisplay 
-            value={showJobAssignmentColumns ? data.job_work_date || data.work_date : data.work_date} 
-            isFilled={!!(showJobAssignmentColumns ? data.job_work_date || data.work_date : data.work_date)} 
+          <AssociateDateDisplay
+            value={
+              showJobAssignmentColumns
+                ? data.job_work_date || data.work_date
+                : data.work_date
+            }
+            isFilled={
+              !!(
+                showJobAssignmentColumns
+                  ? data.job_work_date || data.work_date
+                  : data.work_date
+              )
+            }
           />
         )}
       </TableCell>
-      
-      <TableCell className="w-[100px] text-right">
+
+      <TableCell className="w-[140px] text-right">
         {isEditing ? (
-          <input
-            type="time"
-            value={showJobAssignmentColumns ? editData.job_start_time : editData.start_time}
-            onChange={(e) => handleInputChange(
-              showJobAssignmentColumns ? 'job_start_time' : 'start_time', 
-              e.target.value
-            )}
-            className="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-          />
+          <div className="flex flex-col">
+            <input
+              type="time"
+              value={showJobAssignmentColumns ? editData.job_start_time : editData.start_time}
+              onChange={(e) =>
+                handleInputChange(
+                  showJobAssignmentColumns ? "job_start_time" : "start_time",
+                  e.target.value
+                )
+              }
+              className="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+            />
+            {/* Intentionally no timezone label */}
+          </div>
         ) : (
-          showJobAssignmentColumns ? data.job_start_time || data.start_time : data.start_time
+          displayTime(
+            showJobAssignmentColumns
+              ? data.job_start_time || data.start_time
+              : data.start_time
+          )
         )}
       </TableCell>
-      
+
       <TableCell className="w-[140px]">
         {isEditing ? (
           <div className="relative">
             <input
               type="tel"
               value={editData.phone_number}
-              onChange={(e) => handleInputChange('phone_number', e.target.value)}
+              onChange={(e) => handleInputChange("phone_number", e.target.value)}
               className={`w-full px-1 py-1 text-xs border rounded focus:outline-none focus:border-blue-500 ${
-                phoneError ? 'border-red-500' : 'border-gray-300'
+                phoneError ? "border-red-500" : "border-gray-300"
               }`}
               placeholder="(555) 123-4567"
               pattern="[0-9]*"
@@ -237,30 +260,29 @@ export function AssociateTableRow({
             )}
           </div>
         ) : (
-          // Display formatted phone number for better readability
           formatPhoneForDisplay(data.phone_number)
         )}
       </TableCell>
-      
+
       <TableCell className="w-[240px]">
         {isEditing ? (
           <input
             type="email"
             value={editData.email_address}
-            onChange={(e) => handleInputChange('email_address', e.target.value)}
+            onChange={(e) => handleInputChange("email_address", e.target.value)}
             className="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-blue-500"
           />
         ) : (
           data.email_address
         )}
       </TableCell>
-      
+
       {showJobAssignmentColumns && (
         <TableCell className="w-[140px]">
           {isEditing ? (
             <select
               value={editData.confirmation_status}
-              onChange={(e) => handleInputChange('confirmation_status', e.target.value)}
+              onChange={(e) => handleInputChange("confirmation_status", e.target.value)}
               className="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-blue-500"
             >
               <option value="Unconfirmed">Unconfirmed</option>
@@ -270,23 +292,25 @@ export function AssociateTableRow({
               <option value="Declined">Declined</option>
             </select>
           ) : (
-            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(data.confirmation_status || 'Unconfirmed')}`}>
-              {data.confirmation_status || 'Unconfirmed'}
+            <span
+              className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
+                data.confirmation_status || "Unconfirmed"
+              )}`}
+            >
+              {data.confirmation_status || "Unconfirmed"}
             </span>
           )}
         </TableCell>
       )}
-      
+
       <TableCell className="w-[100px]">
         {isEditing ? (
           <div className="flex gap-1">
             <button
               onClick={handleSave}
-              disabled={!!phoneError} // Disable save if phone error
+              disabled={!!phoneError}
               className={`px-2 py-1 text-xs text-white rounded focus:outline-none ${
-                phoneError 
-                  ? 'bg-gray-400 cursor-not-allowed' 
-                  : 'bg-green-500 hover:bg-green-600'
+                phoneError ? "bg-gray-400 cursor-not-allowed" : "bg-green-500 hover:bg-green-600"
               }`}
             >
               Save
@@ -330,11 +354,7 @@ function TableCell({
 }) {
   return (
     <td className={`px-3 py-2 border border-gray-100 truncate ${className}`}>
-      {typeof children === "string" || typeof children === "number" ? (
-        <span>{children}</span>
-      ) : (
-        children
-      )}
+      {typeof children === "string" || typeof children === "number" ? <span>{children}</span> : children}
     </td>
   );
 }

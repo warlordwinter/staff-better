@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
         first_name: r.first_name,
         last_name: r.last_name,
         work_date: r.work_date,
-        start_time: formatTime(r.start_time),
+        start_time: r.start_time,
         phone_number: formattedPhone,
         email_address: r.email_address,
       };
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
       confirmation_status: 'Unconfirmed' as const,
       last_confirmation_time: null,
       work_date: r.work_date,
-      start_time: formatTime(r.start_time),
+      start_time: r.start_time,
     }));
 
     const jobAssignmentInsertion = await insertJobsAssignments(jobAssignmentsData);

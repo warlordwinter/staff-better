@@ -9,6 +9,7 @@ import { sendSMS } from "../twilio/sms";
 import { SMSMessage } from "../twilio/types";
 import { ConfirmationStatus } from "@/model/enums/ConfirmationStatus";
 import { Associate } from "@/model/interfaces/Associate";
+import { AGENCY_TZ, eventUTC, dateISOInTZ, addDaysISO } from "@/utils/timeServer";
 
 export interface IncomingMessageResult {
   success: boolean;
@@ -68,14 +69,12 @@ export class IncomingMessageService {
       const action = this.parseMessageAction(messageBody);
 
       // Process the action
-      const result = await this.processMessageAction(
+      return await this.processMessageAction(
         associate,
         action,
         messageBody,
         normalizedPhone
       );
-
-      return result;
     } catch (error) {
       console.error("Error processing incoming message:", error);
 
@@ -333,6 +332,11 @@ export class IncomingMessageService {
     const hoursDifference =
       (workDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
 
+    console.log("Work Date Time:", workDateTime);
+    console.log("Now Time:", now);
+
+    console.log("Calculating the hours difference to determine confirmation message:", hoursDifference);
+
     // If it's the day of the work (within 6 hours), mark as "Confirmed"
     // Otherwise, mark as "Soft Confirmed" or "Likely Confirmed"
     if (hoursDifference <= 6 && hoursDifference > 0) {
@@ -390,8 +394,8 @@ export class IncomingMessageService {
     console.log(`Date range: ${todayString} to ${sevenDaysString}`);
 
     const assignments = await getActiveAssignmentsFromDatabase(
-      today,
-      sevenDaysFromNow,
+      todayString,
+      sevenDaysString,
       associateId
     );
 
@@ -409,6 +413,7 @@ export class IncomingMessageService {
     );
 
     console.log(`Getting active assignments for associate: ${associateId}`);
+    console.log("Active Assignments:", activeAssignments);
     return activeAssignments;
   }
 

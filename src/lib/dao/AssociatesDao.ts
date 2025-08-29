@@ -2,7 +2,7 @@ import { Associate } from "@/model/interfaces/Associate";
 import { createServerSupabaseClient } from "../supabase/server";
 import { formatPhoneToE164, normalizePhoneForLookup } from "@/utils/phoneUtils";
 
-// Get all associates
+// Get all associates - returns UTC times from database
 export async function getAssociates() {
   const supabase = await createServerSupabaseClient();
 
@@ -16,23 +16,24 @@ export async function getAssociates() {
     throw new Error("Failed to fetch associates");
   }
 
+  // Return raw UTC data - no timezone conversion here
   return data;
 }
 
-// Insert associates
+// Insert associates - expects UTC times from API layer
 export async function insertAssociates(
   associates: {
     first_name: string;
     last_name: string;
     work_date: string;
-    start_time: string;
+    start_time: string; // Should already be in UTC format from API layer
     phone_number: string;
     email_address: string;
   }[]
 ) {
   const supabase = await createServerSupabaseClient();
 
-  // Format phone numbers before insertion
+  // Format phone numbers before insertion - no time conversion here
   const formattedAssociates = associates.map(associate => {
     let formattedPhone = associate.phone_number;
     
@@ -47,7 +48,8 @@ export async function insertAssociates(
 
     return {
       ...associate,
-      phone_number: formattedPhone
+      phone_number: formattedPhone,
+      // start_time is already UTC from API layer, so no conversion needed
     };
   });
 
@@ -64,27 +66,19 @@ export async function insertAssociates(
   return data;
 }
 
-// Update associate
+// Update associate - expects UTC times from API layer
 export async function updateAssociate(
   id: string,
   updates: Partial<{
     first_name: string;
     last_name: string;
     work_date: string;
-    start_time: string;
+    start_time: string; // Should already be in UTC format from API layer
     phone_number: string;
     email_address: string;
   }>
 ) {
   const supabase = await createServerSupabaseClient();
-
-  // Change start time to right format
-  // const transformedUpdates = {
-  //   ...updates,
-  //   ...(updates.start_time && {
-  //     start_time: formatTime(updates.start_time),
-  //   }),
-  // };
 
   const cleanedUpdates = Object.fromEntries(
     Object.entries(updates).filter(([, value]) => value !== "")
@@ -136,6 +130,7 @@ export async function deleteAssociate(id: string) {
 
 /**
  * Find associate by phone number with normalization
+ * Returns UTC times from database
  */
 export async function getAssociateByPhone(phoneNumber: string): Promise<Associate | null> {
   const supabase = await createServerSupabaseClient();
@@ -175,6 +170,7 @@ export async function getAssociateByPhone(phoneNumber: string): Promise<Associat
     throw new Error("Failed to retrieve Associate by phone number");
   }
 
+  // Return raw UTC data - timezone conversion will happen in components
   return data as Associate;
 }
 
