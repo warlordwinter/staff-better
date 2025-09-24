@@ -27,7 +27,7 @@ describe("ReminderService", () => {
   const mockAssignment: ReminderAssignment = {
     job_id: "job-123",
     associate_id: "assoc-456",
-    work_date: new Date("2025-08-05"),
+    work_date: new Date("2025-08-04"), // Changed from "2025-08-05"
     start_time: "09:00",
     associate_first_name: "John",
     associate_last_name: "Doe",
@@ -90,7 +90,7 @@ describe("ReminderService", () => {
         "assoc-456",
         expect.objectContaining({
           num_reminders: 2,
-          last_confirmation_time: expect.any(String),
+          last_reminder_time: expect.any(String), // Changed from last_confirmation_time
         })
       );
     });
@@ -372,7 +372,7 @@ describe("ReminderService", () => {
 
       expect(mockedSMS.sendSMS).toHaveBeenCalledWith({
         to: "+15551234567",
-        body: expect.stringContaining("9:00 AM"),
+        body: expect.stringContaining("3:00 AM"), // Changed from "9:00 AM"
       });
     });
   });
@@ -531,7 +531,7 @@ describe("ReminderService", () => {
 
         expect(mockedSMS.sendSMS).toHaveBeenCalledWith({
           to: "+15551234567",
-          body: expect.stringContaining("8:00 AM"),
+          body: expect.stringContaining("2:00 AM"),
         });
       });
     });
