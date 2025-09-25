@@ -1,0 +1,43 @@
+name: Reminder Cron Job
+
+on:
+  schedule:
+    # Run every 15 minutes
+    - cron: "*/15 * * * *"
+  # Allow manual triggering
+  workflow_dispatch:
+
+jobs:
+  trigger-reminders:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Reminder System
+        id: trigger
+        run: |
+          response=$(curl -X POST ${{ secrets.REMINDER_ENDPOINT_URL }} \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            --fail-with-body \
+            --write-out "HTTPSTATUS:%{http_code}")
+
+          http_code=$(echo $response | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+          body=$(echo $response | sed -e 's/HTTPSTATUS:.*//g')
+
+          echo "HTTP Status: $http_code"
+          echo "Response: $body"
+
+          if [ $http_code -eq 200 ]; then
+            echo "success=true" >> $GITHUB_OUTPUT
+          else
+            echo "success=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: Log completion
+        if: steps.trigger.outputs.success == 'true'
+        run: echo "Reminder cron job completed successfully at $(date)"
+
+      - name: Log failure
+        if: steps.trigger.outputs.success == 'false'
+        run: echo "Reminder cron job failed at $(date)"
