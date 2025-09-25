@@ -5,7 +5,7 @@ import { useState } from "react";
 export default function TestTwilioPage() {
   const [jobId, setJobId] = useState("");
   const [associateId, setAssociateId] = useState("");
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
 
   const sendTestReminder = async () => {
@@ -26,7 +26,7 @@ export default function TestTwilioPage() {
 
       const data = await response.json();
       setResult(data);
-    } catch (error) {
+    } catch {
       setResult({ error: "Failed to send test reminder" });
     } finally {
       setLoading(false);

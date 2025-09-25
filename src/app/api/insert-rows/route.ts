@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { insertAssociates } from "@/lib/dao/AssociatesDao";
 import { insertJobs } from "@/lib/dao/JobsDao";
 import { insertJobsAssignments } from "@/lib/dao/JobsAssignmentsDao";
-import { formatTime } from "@/utils/dateUtils";
-import { formatPhoneToE164 } from "@/utils/phoneUtils"; // Add this import
+import { formatPhoneToE164 } from "@/utils/phoneUtils";
 import { Associate } from "@/model/interfaces/Associate";
 import { Job } from "@/model/interfaces/Job";
 import { JobAssignment } from "@/model/interfaces/JobAssignment";
@@ -16,14 +15,17 @@ export async function POST(req: NextRequest) {
     // Prepare associate data for insertion with phone formatting
     const associateData = rows.map((r: Associate) => {
       let formattedPhone = r.phone_number;
-      
+
       // Format phone number to E.164 if provided
       if (r.phone_number && r.phone_number.trim()) {
         try {
           formattedPhone = formatPhoneToE164(r.phone_number);
           console.log(`Phone formatted: ${r.phone_number} → ${formattedPhone}`);
         } catch (error) {
-          console.warn(`Could not format phone number "${r.phone_number}":`, error);
+          console.warn(
+            `Could not format phone number "${r.phone_number}":`,
+            error
+          );
           // Keep original if formatting fails - you might want to handle this differently
         }
       }
@@ -42,7 +44,7 @@ export async function POST(req: NextRequest) {
     const jobData = rows.map((r: Job) => ({
       job_title: r.job_title,
       customer_name: r.customer_name,
-      job_status: "Upcoming",  // or map accordingly if the status needs transformation
+      job_status: "Upcoming", // or map accordingly if the status needs transformation
       start_date: r.start_date,
     }));
 
@@ -58,13 +60,15 @@ export async function POST(req: NextRequest) {
     const jobAssignmentsData = rows.map((r: JobAssignment, index: number) => ({
       job_id: insertedJobs[index].id,
       associate_id: insertedAssociates[index].id,
-      confirmation_status: 'Unconfirmed' as const,
+      confirmation_status: "Unconfirmed" as const,
       last_confirmation_time: null,
       work_date: r.work_date,
       start_time: r.start_time,
     }));
 
-    const jobAssignmentInsertion = await insertJobsAssignments(jobAssignmentsData);
+    const jobAssignmentInsertion = await insertJobsAssignments(
+      jobAssignmentsData
+    );
 
     // Return the results of both insertions
     return NextResponse.json({
@@ -89,7 +93,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         error: "Insert failed",
-        ...(typeof parsedError === 'object' && parsedError !== null ? parsedError : { message: String(parsedError) }),
+        ...(typeof parsedError === "object" && parsedError !== null
+          ? parsedError
+          : { message: String(parsedError) }),
       },
       { status: 500 }
     );
