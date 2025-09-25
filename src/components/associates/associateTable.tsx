@@ -1,4 +1,4 @@
-'use client';
+"use client";
 import React, { useState, useEffect } from "react";
 import { AssociateTableHeader } from "./associateTableHeader";
 import { AssociateTableRow } from "./associateTableRow";
@@ -34,6 +34,7 @@ interface AssociateDisplay extends Associate {
   num_reminders?: number;
   job_work_date?: string;
   job_start_time?: string; // Local time for display
+  isNew?: boolean; // Track if this is a new unsaved associate
 }
 
 interface AssociateTableProps {
@@ -45,6 +46,7 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
   const [associatesData, setAssociatesData] = useState<AssociateDisplay[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [newlyAddedIds, setNewlyAddedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const fetchData = async () => {
@@ -73,7 +75,10 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
           const displayData: AssociateDisplay[] = assignments
             .map((assignment: JobAssignmentResponse) => {
               if (!assignment.associates) {
-                console.error("No associates data found in assignment:", assignment);
+                console.error(
+                  "No associates data found in assignment:",
+                  assignment
+                );
                 return null;
               }
 
@@ -125,7 +130,9 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
         }
       } catch (error) {
         console.error("Failed to fetch data:", error);
-        setError(error instanceof Error ? error.message : "Failed to fetch data");
+        setError(
+          error instanceof Error ? error.message : "Failed to fetch data"
+        );
       } finally {
         setLoading(false);
       }
@@ -137,6 +144,7 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
   const handleSave = async (index: number, updatedData: AssociateDisplay) => {
     try {
       const associate = associatesData[index];
+      const isNewAssociate = associate.isNew;
 
       // Convert local times to UTC before sending to API
       const utcAssociateTime = convertLocalTimeToUTC(
@@ -144,60 +152,117 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
         updatedData.work_date
       );
 
-      // Update the associate
-      const associateUpdates = {
-        first_name: updatedData.first_name,
-        last_name: updatedData.last_name,
-        work_date: updatedData.work_date,
-        start_time: utcAssociateTime, // UTC for API
-        phone_number: updatedData.phone_number,
-        email_address: updatedData.email_address,
-      };
+      let savedAssociate;
 
-      const associateRes = await fetch(`/api/associates/${associate.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(associateUpdates),
-      });
-      if (!associateRes.ok) throw new Error("Failed to update associate");
+      if (isNewAssociate) {
+        // Create new associate in database
+        const associateRes = await fetch("/api/associates", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            first_name: updatedData.first_name,
+            last_name: updatedData.last_name,
+            work_date: updatedData.work_date,
+            start_time: utcAssociateTime, // UTC for API
+            phone_number: updatedData.phone_number,
+            email_address: updatedData.email_address,
+          }),
+        });
+        if (!associateRes.ok) throw new Error("Failed to create associate");
+        const createdAssociate = await associateRes.json();
+        savedAssociate = createdAssociate[0];
 
-      // Update job assignment if present
-      if (
-        jobId &&
-        (updatedData.confirmation_status !== undefined ||
-          updatedData.num_reminders !== undefined ||
-          updatedData.job_work_date ||
-          updatedData.job_start_time)
-      ) {
-        const utcJobTime = convertLocalTimeToUTC(
-          updatedData.job_start_time || updatedData.start_time,
-          updatedData.job_work_date || updatedData.work_date
-        );
+        // Create job assignment if in job context
+        if (jobId) {
+          const utcJobTime = convertLocalTimeToUTC(
+            updatedData.job_start_time || updatedData.start_time,
+            updatedData.job_work_date || updatedData.work_date
+          );
 
-        const assignmentUpdates = {
-          confirmation_status: updatedData.confirmation_status,
-          num_reminders: updatedData.num_reminders,
-          work_date: updatedData.job_work_date || updatedData.work_date,
-          start_time: utcJobTime, // UTC for API
+          const assignmentRes = await fetch(`/api/job-assignments/${jobId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              job_id: jobId,
+              associate_id: savedAssociate.id,
+              confirmation_status:
+                updatedData.confirmation_status || "Unconfirmed",
+              work_date: updatedData.job_work_date || updatedData.work_date,
+              start_time: utcJobTime, // UTC for API
+              num_reminders: updatedData.num_reminders || 0,
+            }),
+          });
+          if (!assignmentRes.ok)
+            throw new Error("Failed to create job assignment");
+        }
+      } else {
+        // Update existing associate
+        const associateUpdates = {
+          first_name: updatedData.first_name,
+          last_name: updatedData.last_name,
+          work_date: updatedData.work_date,
+          start_time: utcAssociateTime, // UTC for API
+          phone_number: updatedData.phone_number,
+          email_address: updatedData.email_address,
         };
 
-        const assignmentRes = await fetch(
-          `/api/job-assignments/${jobId}/${associate.id}`,
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(assignmentUpdates),
-          }
-        );
-        if (!assignmentRes.ok) throw new Error("Failed to update job assignment");
+        const associateRes = await fetch(`/api/associates/${associate.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(associateUpdates),
+        });
+        if (!associateRes.ok) throw new Error("Failed to update associate");
+
+        // Update job assignment if present
+        if (
+          jobId &&
+          (updatedData.confirmation_status !== undefined ||
+            updatedData.num_reminders !== undefined ||
+            updatedData.job_work_date ||
+            updatedData.job_start_time)
+        ) {
+          const utcJobTime = convertLocalTimeToUTC(
+            updatedData.job_start_time || updatedData.start_time,
+            updatedData.job_work_date || updatedData.work_date
+          );
+
+          const assignmentUpdates = {
+            confirmation_status: updatedData.confirmation_status,
+            num_reminders: updatedData.num_reminders,
+            work_date: updatedData.job_work_date || updatedData.work_date,
+            start_time: utcJobTime, // UTC for API
+          };
+
+          const assignmentRes = await fetch(
+            `/api/job-assignments/${jobId}/${associate.id}`,
+            {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(assignmentUpdates),
+            }
+          );
+          if (!assignmentRes.ok)
+            throw new Error("Failed to update job assignment");
+        }
       }
 
-      // Update local state (keep local times for display)
+      // Update local state with saved data (keep local times for display)
+      const finalData = isNewAssociate
+        ? { ...savedAssociate, ...updatedData, isNew: false }
+        : { ...associate, ...updatedData };
+
       setAssociatesData((prev) =>
-        prev.map((a, i) => (i === index ? { ...a, ...updatedData } : a))
+        prev.map((a, i) => (i === index ? finalData : a))
       );
 
-      console.log("Updated data at index", index, ":", updatedData);
+      // Remove from newly added list since it's been saved
+      setNewlyAddedIds((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(associate.id);
+        return newSet;
+      });
+
+      console.log("Saved data at index", index, ":", updatedData);
     } catch (error) {
       console.error("Failed to save:", error);
       setError("Failed to save changes");
@@ -205,15 +270,33 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
   };
 
   const handleDelete = async (index: number) => {
-    if (!window.confirm("Are you sure you want to delete this associate?")) return;
+    const associate = associatesData[index];
+    const isNewAssociate = associate.isNew;
+
+    if (isNewAssociate) {
+      // For new associates, just remove from local state
+      setAssociatesData((prev) => prev.filter((_, i) => i !== index));
+      setNewlyAddedIds((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(associate.id);
+        return newSet;
+      });
+      console.log("Removed new associate at index:", index);
+      return;
+    }
+
+    // For existing associates, confirm deletion and delete from database
+    if (!window.confirm("Are you sure you want to delete this associate?"))
+      return;
 
     try {
-      const associate = associatesData[index];
-
       if (jobId) {
-        const res = await fetch(`/api/job-assignments/${jobId}/${associate.id}`, {
-          method: "DELETE",
-        });
+        const res = await fetch(
+          `/api/job-assignments/${jobId}/${associate.id}`,
+          {
+            method: "DELETE",
+          }
+        );
         if (!res.ok) throw new Error("Failed to delete job assignment");
       }
 
@@ -230,89 +313,39 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
     }
   };
 
-  const handleAdd = async () => {
-    try {
-      const localTime = "08:00"; // default local
-      const workDate = new Date();
-      const yyyy = workDate.getFullYear();
-      const mm = String(workDate.getMonth() + 1).padStart(2, "0");
-      const dd = String(workDate.getDate()).padStart(2, "0");
-      const workDateISO = `${yyyy}-${mm}-${dd}`;
+  const handleAdd = () => {
+    const localTime = "08:00"; // default local
+    const workDate = new Date();
+    const yyyy = workDate.getFullYear();
+    const mm = String(workDate.getMonth() + 1).padStart(2, "0");
+    const dd = String(workDate.getDate()).padStart(2, "0");
+    const workDateISO = `${yyyy}-${mm}-${dd}`;
 
-      const utcTime = convertLocalTimeToUTC(localTime, workDateISO);
+    // Create a temporary local-only associate
+    const tempId = `temp-${Date.now()}`; // Generate temporary ID
+    const newAssociate: AssociateDisplay = {
+      id: tempId,
+      first_name: "",
+      last_name: "",
+      work_date: workDateISO,
+      start_time: localTime,
+      phone_number: "",
+      email_address: "",
+      isNew: true, // Mark as new unsaved associate
+      // Job assignment fields if in job context
+      ...(jobId && {
+        confirmation_status: "Unconfirmed",
+        num_reminders: 0,
+        job_work_date: workDateISO,
+        job_start_time: localTime,
+      }),
+    };
 
-      if (jobId) {
-        // create associate
-        console.log("Entering API for adding an associate");
-        const associateRes = await fetch("/api/associates", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            first_name: "",
-            last_name: "",
-            work_date: workDateISO,
-            start_time: utcTime, // UTC
-            phone_number: "",
-            email_address: "",
-          }),
-        });
-        if (!associateRes.ok) throw new Error("Failed to create associate");
-        const createdAssociate = await associateRes.json();
+    // Add to local state and mark for editing
+    setAssociatesData((prev) => [...prev, newAssociate]);
+    setNewlyAddedIds((prev) => new Set([...prev, tempId]));
 
-        // create job assignment
-        const assignmentRes = await fetch(`/api/job-assignments/${jobId}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            job_id: jobId,
-            associate_id: createdAssociate[0].id,
-            confirmation_status: "Unconfirmed",
-            work_date: workDateISO,
-            start_time: utcTime, // UTC
-            num_reminders: 0,
-          }),
-        });
-        if (!assignmentRes.ok) throw new Error("Failed to create job assignment");
-
-        // add to local state using LOCAL times for display
-        const displayAssociate: AssociateDisplay = {
-          ...createdAssociate[0],
-          start_time: localTime,
-          confirmation_status: "Unconfirmed",
-          num_reminders: 0,
-          job_work_date: workDateISO,
-          job_start_time: localTime,
-        };
-        setAssociatesData((prev) => [...prev, displayAssociate]);
-      } else {
-        // just create associate
-        const res = await fetch("/api/associates", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            first_name: "",
-            last_name: "",
-            work_date: workDateISO,
-            start_time: utcTime, // UTC
-            phone_number: "",
-            email_address: "",
-          }),
-        });
-        if (!res.ok) throw new Error("Failed to create associate");
-        const createdAssociate = await res.json();
-
-        const displayAssociate = {
-          ...createdAssociate[0],
-          start_time: localTime, // local for display
-        };
-        setAssociatesData((prev) => [...prev, displayAssociate]);
-      }
-
-      console.log("Added new associate");
-    } catch (error) {
-      console.error("Failed to add associate:", error);
-      setError("Failed to add associate");
-    }
+    console.log("Added new associate for editing");
   };
 
   if (loading) return <LoadingSpinner />;
@@ -332,7 +365,9 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
       <AssociateTableTitle job={job} onAdd={handleAdd} />
       {associatesData.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
-          {jobId ? "No associates assigned to this job yet." : "No associates found."}
+          {jobId
+            ? "No associates assigned to this job yet."
+            : "No associates found."}
           <br />
           <button
             onClick={handleAdd}
@@ -356,6 +391,7 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
                   onSave={(updatedData) => handleSave(index, updatedData)}
                   onDelete={() => handleDelete(index)}
                   showJobAssignmentColumns={!!jobId}
+                  isEditing={newlyAddedIds.has(associate.id)}
                 />
               ))}
             </tbody>

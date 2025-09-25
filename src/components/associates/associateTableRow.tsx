@@ -1,4 +1,4 @@
-'use client';
+"use client";
 import React, { useState } from "react";
 import { AssociateDateDisplay } from "./associateTableCell";
 import Image from "next/image";
@@ -11,6 +11,7 @@ interface AssociateDisplay extends Associate {
   num_reminders?: number;
   job_work_date?: string;
   job_start_time?: string; // local time for display/editing
+  isNew?: boolean; // Track if this is a new unsaved associate
 }
 
 interface AssociateTableRowProps {
@@ -19,6 +20,7 @@ interface AssociateTableRowProps {
   onSave?: (updatedData: AssociateDisplay) => void;
   onDelete?: () => void;
   showJobAssignmentColumns?: boolean;
+  isEditing?: boolean; // External control of editing state
 }
 
 export function AssociateTableRow({
@@ -27,8 +29,10 @@ export function AssociateTableRow({
   onSave,
   onDelete,
   showJobAssignmentColumns = false,
+  isEditing: externalIsEditing = false,
 }: AssociateTableRowProps) {
-  const [isEditing, setIsEditing] = useState(false);
+  const [internalIsEditing, setInternalIsEditing] = useState(false);
+  const isEditing = externalIsEditing || internalIsEditing;
   const [phoneError, setPhoneError] = useState("");
 
   const [editData, setEditData] = useState({
@@ -45,7 +49,7 @@ export function AssociateTableRow({
   });
 
   const handleEdit = () => {
-    setIsEditing(true);
+    setInternalIsEditing(true);
     setPhoneError("");
   };
 
@@ -77,11 +81,20 @@ export function AssociateTableRow({
       onSave(updatedData);
     }
 
-    setIsEditing(false);
+    setInternalIsEditing(false);
     setPhoneError("");
   };
 
   const handleCancel = () => {
+    if (data.isNew) {
+      // For new associates, trigger delete to remove from table
+      if (onDelete) {
+        onDelete();
+      }
+      return;
+    }
+
+    // For existing associates, reset to original data
     setEditData({
       first_name: data.first_name || "",
       last_name: data.last_name || "",
@@ -94,7 +107,7 @@ export function AssociateTableRow({
       job_work_date: data.job_work_date || data.work_date || "",
       job_start_time: data.job_start_time || data.start_time || "", // keep local time
     });
-    setIsEditing(false);
+    setInternalIsEditing(false);
     setPhoneError("");
   };
 
@@ -174,7 +187,9 @@ export function AssociateTableRow({
             <input
               type="number"
               value={editData.num_reminders}
-              onChange={(e) => handleInputChange("num_reminders", e.target.value)}
+              onChange={(e) =>
+                handleInputChange("num_reminders", e.target.value)
+              }
               className="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-blue-500"
               min={0}
             />
@@ -188,7 +203,11 @@ export function AssociateTableRow({
         {isEditing ? (
           <input
             type="date"
-            value={showJobAssignmentColumns ? editData.job_work_date : editData.work_date}
+            value={
+              showJobAssignmentColumns
+                ? editData.job_work_date
+                : editData.work_date
+            }
             onChange={(e) =>
               handleInputChange(
                 showJobAssignmentColumns ? "job_work_date" : "work_date",
@@ -205,11 +224,9 @@ export function AssociateTableRow({
                 : data.work_date
             }
             isFilled={
-              !!(
-                showJobAssignmentColumns
-                  ? data.job_work_date || data.work_date
-                  : data.work_date
-              )
+              !!(showJobAssignmentColumns
+                ? data.job_work_date || data.work_date
+                : data.work_date)
             }
           />
         )}
@@ -220,7 +237,11 @@ export function AssociateTableRow({
           <div className="flex flex-col">
             <input
               type="time"
-              value={showJobAssignmentColumns ? editData.job_start_time : editData.start_time}
+              value={
+                showJobAssignmentColumns
+                  ? editData.job_start_time
+                  : editData.start_time
+              }
               onChange={(e) =>
                 handleInputChange(
                   showJobAssignmentColumns ? "job_start_time" : "start_time",
@@ -246,7 +267,9 @@ export function AssociateTableRow({
             <input
               type="tel"
               value={editData.phone_number}
-              onChange={(e) => handleInputChange("phone_number", e.target.value)}
+              onChange={(e) =>
+                handleInputChange("phone_number", e.target.value)
+              }
               className={`w-full px-1 py-1 text-xs border rounded focus:outline-none focus:border-blue-500 ${
                 phoneError ? "border-red-500" : "border-gray-300"
               }`}
@@ -282,7 +305,9 @@ export function AssociateTableRow({
           {isEditing ? (
             <select
               value={editData.confirmation_status}
-              onChange={(e) => handleInputChange("confirmation_status", e.target.value)}
+              onChange={(e) =>
+                handleInputChange("confirmation_status", e.target.value)
+              }
               className="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-blue-500"
             >
               <option value="Unconfirmed">Unconfirmed</option>
@@ -310,7 +335,9 @@ export function AssociateTableRow({
               onClick={handleSave}
               disabled={!!phoneError}
               className={`px-2 py-1 text-xs text-white rounded focus:outline-none ${
-                phoneError ? "bg-gray-400 cursor-not-allowed" : "bg-green-500 hover:bg-green-600"
+                phoneError
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-green-500 hover:bg-green-600"
               }`}
             >
               Save
@@ -336,7 +363,12 @@ export function AssociateTableRow({
               className="hover:bg-gray-100 p-1 rounded focus:outline-none"
               title="Delete"
             >
-              <Image src="/icons/trash.svg" alt="Delete" width={16} height={16} />
+              <Image
+                src="/icons/trash.svg"
+                alt="Delete"
+                width={16}
+                height={16}
+              />
             </button>
           </div>
         )}
@@ -354,7 +386,11 @@ function TableCell({
 }) {
   return (
     <td className={`px-3 py-2 border border-gray-100 truncate ${className}`}>
-      {typeof children === "string" || typeof children === "number" ? <span>{children}</span> : children}
+      {typeof children === "string" || typeof children === "number" ? (
+        <span>{children}</span>
+      ) : (
+        children
+      )}
     </td>
   );
 }
