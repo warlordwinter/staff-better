@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 const JobTableHeadRow = () => (
   <tr className="bg-neutral-50 text-xs font-semibold text-zinc-700 border-b border-zinc-200 h-10">

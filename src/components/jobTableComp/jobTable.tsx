@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import JobTableHeader from './jobTableHeader';
-import JobTableHeadRow from './jobTableHeadRow';
-import JobTableRow from './jobTableRow';
-import { Job } from '@/model/interfaces/Job';
-import { JobAssignment } from '@/model/interfaces/JobAssignment';
-import { Associate } from '@/model/interfaces/Associate';
-import LoadingSpinner from '../ui/loadingSpinner';
+import React, { useState, useEffect } from "react";
+import JobTableHeader from "./jobTableHeader";
+import JobTableHeadRow from "./JobTableHeadRow";
+import JobTableRow from "./jobTableRow";
+import { Job } from "@/model/interfaces/Job";
+import { JobAssignment } from "@/model/interfaces/JobAssignment";
+import { Associate } from "@/model/interfaces/Associate";
+import LoadingSpinner from "../ui/loadingSpinner";
 
 // Use a type that matches what JobTableHeader expects
 interface ExpectedUploadResult {
@@ -49,29 +49,29 @@ const JobTable = () => {
 
   const handleAddJob = async () => {
     const newJob = {
-      job_title: ' Generic Warehouse Job',
-      customer_name: 'Generic Company Name',
-      job_status: 'Active',
+      job_title: " Generic Warehouse Job",
+      customer_name: "Generic Company Name",
+      job_status: "Active",
       start_date: new Date().toISOString().slice(0, 10),
     };
 
     try {
-      const res = await fetch('/api/jobs', {
-        method: 'POST',
+      const res = await fetch("/api/jobs", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(newJob),
       });
 
       if (!res.ok) {
-        throw new Error('Failed to create job');
+        throw new Error("Failed to create job");
       }
 
       const createdJob = await res.json();
       setJobs([createdJob[0], ...jobs]);
     } catch (error) {
-      console.error('Failed to add job:', error);
+      console.error("Failed to add job:", error);
       // You might want to show a toast notification here
     }
   };
@@ -79,47 +79,47 @@ const JobTable = () => {
   const handleUpdateJob = async (id: string, updatedFields: Partial<Job>) => {
     try {
       const res = await fetch(`/api/jobs/${id}`, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(updatedFields),
       });
 
       if (!res.ok) {
-        throw new Error('Failed to update job');
+        throw new Error("Failed to update job");
       }
 
       // const updatedJob = await res.json();
-      
+
       // Update local state
       setJobs((prev) =>
         prev.map((job) => (job.id === id ? { ...job, ...updatedFields } : job))
       );
     } catch (error) {
-      console.error('Failed to update job:', error);
+      console.error("Failed to update job:", error);
       // You might want to show a toast notification here
     }
   };
 
   const handleDeleteJob = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this job?')) {
+    if (!window.confirm("Are you sure you want to delete this job?")) {
       return;
     }
 
     try {
       const res = await fetch(`/api/jobs/${id}`, {
-        method: 'DELETE',
+        method: "DELETE",
       });
 
       if (!res.ok) {
-        throw new Error('Failed to delete job');
+        throw new Error("Failed to delete job");
       }
 
       // Update local state
       setJobs((prev) => prev.filter((job) => job.id !== id));
     } catch (error) {
-      console.error('Failed to delete job:', error);
+      console.error("Failed to delete job:", error);
       // You might want to show a toast notification here
     }
   };
@@ -127,19 +127,23 @@ const JobTable = () => {
   const handleUploadComplete = (result: ExpectedUploadResult) => {
     if (result.success) {
       console.log(`Successfully uploaded ${result.rowsProcessed} rows`);
-      
+
       // Type guard to safely access the specific data structure
-      if (result.data && typeof result.data === 'object' && result.data !== null) {
-        const uploadData = result.data as UploadResult['data'];
+      if (
+        result.data &&
+        typeof result.data === "object" &&
+        result.data !== null
+      ) {
+        const uploadData = result.data as UploadResult["data"];
         // Now you can safely access uploadData.associateInsertion, etc.
-        console.log('Upload data:', uploadData);
+        console.log("Upload data:", uploadData);
       }
-      
+
       // Refresh the jobs list to show the newly uploaded jobs
       fetchJobs();
       // You might want to show a success toast notification here
     } else {
-      console.error('Upload failed:', result.error);
+      console.error("Upload failed:", result.error);
       // You might want to show an error toast notification here
     }
   };
@@ -150,14 +154,14 @@ const JobTable = () => {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-6xl mx-auto px-4 mt-24 overflow-x-auto">
-      <JobTableHeader 
-        onFileSelect={(file) => console.log('Selected file:', file)} 
+      <JobTableHeader
+        onFileSelect={(file) => console.log("Selected file:", file)}
         onAddManually={handleAddJob}
         onUploadComplete={handleUploadComplete}
       />
       <table className="w-full table-fixed border-collapse bg-white rounded-lg overflow-hidden min-w-[800px]">
         <thead>
-          <JobTableHeadRow  />
+          <JobTableHeadRow />
         </thead>
         <tbody>
           {jobs.map((job) => (
