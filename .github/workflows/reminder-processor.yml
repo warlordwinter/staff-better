@@ -11,7 +11,7 @@ on:
       test_mode:
         description: "Run in test mode (no actual SMS sent)"
         required: false
-        default: "false"
+        default: false
         type: boolean
 
 jobs:
@@ -29,7 +29,7 @@ jobs:
           echo "🌐 Target URL: $VERCEL_APP_URL"
 
           # Make API call to your production Vercel app
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$VERCEL_APP_URL/api/reminders/process" \
+          RESPONSE=$(curl -sL -w "\n%{http_code}" -X POST "$VERCEL_APP_URL/api/reminders/process" \
             -H "Authorization: Bearer $CRON_SECRET" \
             -H "Content-Type: application/json")
 
