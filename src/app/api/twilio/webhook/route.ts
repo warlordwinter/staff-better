@@ -1,4 +1,4 @@
-import { IncomingMessageService } from "@/lib/services/incomingMessageService";
+import { IncomingMessageService } from "@/lib/services/IncomingMessageService";
 import { NextRequest, NextResponse } from "next/server";
 
 const messageService = new IncomingMessageService();

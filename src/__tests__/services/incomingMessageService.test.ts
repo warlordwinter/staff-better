@@ -1,10 +1,10 @@
-import { getAssociateByPhone, optOutAssociate } from "@/lib/dao/AssociatesDao";
+import { getAssociateByPhone } from "@/lib/dao/AssociatesDao";
 import {
   getActiveAssignmentsFromDatabase,
   updateJobAssignment,
 } from "@/lib/dao/JobsAssignmentsDao";
-import { IncomingMessageService } from "@/lib/services/incomingMessageService";
-import { MessageAction } from "@/lib/services/incomingMessageService";
+import { IncomingMessageService } from "@/lib/services/IncomingMessageService";
+import { MessageAction } from "@/lib/services/IncomingMessageService";
 import { sendSMS } from "@/lib/twilio/sms";
 import { ConfirmationStatus } from "@/model/enums/ConfirmationStatus";
 
@@ -16,9 +16,9 @@ jest.mock("@/lib/twilio/sms");
 const mockGetAssociateByPhone = getAssociateByPhone as jest.MockedFunction<
   typeof getAssociateByPhone
 >;
-const mockOptOutAssociate = optOutAssociate as jest.MockedFunction<
-  typeof optOutAssociate
->;
+// const mockOptOutAssociate = optOutAssociate as jest.MockedFunction<
+//   typeof optOutAssociate
+// >;
 const mockGetActiveAssignmentsFromDatabase =
   getActiveAssignmentsFromDatabase as jest.MockedFunction<
     typeof getActiveAssignmentsFromDatabase
