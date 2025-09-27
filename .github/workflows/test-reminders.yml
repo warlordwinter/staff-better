@@ -1,0 +1,88 @@
+name: Test Reminders
+
+on:
+  # Manual trigger only
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: "Type of test to run"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - individual
+      job_id:
+        description: "Job ID (for individual test)"
+        required: false
+        type: string
+      associate_id:
+        description: "Associate ID (for individual test)"
+        required: false
+        type: string
+
+jobs:
+  test-reminders:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Test All Reminders
+        if: ${{ inputs.test_type == 'all' }}
+        env:
+          VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          echo "🧪 Testing all reminders on production..."
+          echo "🌐 Target URL: $VERCEL_APP_URL"
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$VERCEL_APP_URL/api/reminders/process" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          RESPONSE_BODY=$(echo "$RESPONSE" | head -n -1)
+
+          echo "📊 HTTP Status: $HTTP_CODE"
+          echo "📊 Response:"
+          echo "$RESPONSE_BODY" | jq '.' 2>/dev/null || echo "$RESPONSE_BODY"
+
+      - name: Test Individual Reminder
+        if: ${{ inputs.test_type == 'individual' }}
+        env:
+          VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
+          JOB_ID: ${{ inputs.job_id }}
+          ASSOCIATE_ID: ${{ inputs.associate_id }}
+        run: |
+          echo "🧪 Testing individual reminder on production..."
+          echo "🌐 Target URL: $VERCEL_APP_URL"
+          echo "Job ID: $JOB_ID"
+          echo "Associate ID: $ASSOCIATE_ID"
+
+          if [ -z "$JOB_ID" ] || [ -z "$ASSOCIATE_ID" ]; then
+            echo "❌ Job ID and Associate ID are required for individual test"
+            exit 1
+          fi
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$VERCEL_APP_URL/api/test-reminder" \
+            -H "Content-Type: application/json" \
+            -d "{\"jobId\":\"$JOB_ID\",\"associateId\":\"$ASSOCIATE_ID\"}")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          RESPONSE_BODY=$(echo "$RESPONSE" | head -n -1)
+
+          echo "📊 HTTP Status: $HTTP_CODE"
+          echo "📊 Response:"
+          echo "$RESPONSE_BODY" | jq '.' 2>/dev/null || echo "$RESPONSE_BODY"
+
+      - name: Create test summary
+        if: always()
+        run: |
+          echo "## Test Reminder Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Test Type**: ${{ inputs.test_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Time**: $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Target URL**: ${{ secrets.VERCEL_APP_URL }}" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ inputs.test_type }}" == "individual" ]; then
+            echo "- **Job ID**: ${{ inputs.job_id }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Associate ID**: ${{ inputs.associate_id }}" >> $GITHUB_STEP_SUMMARY
+          fi

@@ -388,4 +388,25 @@ export class ReminderService {
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
+
+  /**
+   * Send SMS notification (consolidated from NotificationService)
+   */
+  async sendSMSNotification(
+    phoneNumber: string,
+    messageBody: string
+  ): Promise<SMSResult> {
+    const smsMessage: SMSMessage = {
+      to: phoneNumber,
+      body: messageBody,
+    };
+
+    try {
+      const smsResult: SMSResult = await sendSMS(smsMessage);
+      return smsResult;
+    } catch (error) {
+      console.error("Error sending SMS:", error);
+      throw new Error("Failed to send SMS.");
+    }
+  }
 }

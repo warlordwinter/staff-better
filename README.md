@@ -1,4 +1,5 @@
-# no-show-software
+# Staff Better
+
 Creating a reminder software for staffing agencies to decrease the amount of no shows
 
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
