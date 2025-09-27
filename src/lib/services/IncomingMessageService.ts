@@ -206,7 +206,7 @@ export class IncomingMessageService {
 
         await updateJobAssignment(assignment.job_id, assignment.associate_id, {
           confirmation_status: newStatus,
-          last_confirmation_time: new Date().toISOString(),
+          last_activity_time: new Date().toISOString(),
         });
 
         updatedCount++;
@@ -334,7 +334,10 @@ export class IncomingMessageService {
     console.log("Work Date Time:", workDateTime);
     console.log("Now Time:", now);
 
-    console.log("Calculating the hours difference to determine confirmation message:", hoursDifference);
+    console.log(
+      "Calculating the hours difference to determine confirmation message:",
+      hoursDifference
+    );
 
     // If it's the day of the work (within 6 hours), mark as "Confirmed"
     // Otherwise, mark as "Soft Confirmed" or "Likely Confirmed"

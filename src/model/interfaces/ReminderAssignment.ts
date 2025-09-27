@@ -9,7 +9,6 @@ export interface ReminderAssignment {
   job_title: string;
   customer_name: string;
   num_reminders: number;
-  last_confirmation_time?: Date;
-  last_reminder_time?: Date;
-  confirmation_status?: 'Unconfirmed' | 'Soft Confirmed' | 'Likely Confirmed' | 'Confirmed' | 'Declined';
+  last_activity_time?: string;
+  confirmation_status?: string;
 }

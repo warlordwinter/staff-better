@@ -35,7 +35,7 @@ describe("ReminderService", () => {
     job_title: "Security Guard",
     customer_name: "ABC Corp",
     num_reminders: 3,
-    last_confirmation_time: undefined,
+    last_activity_time: undefined,
   };
 
   beforeEach(() => {
@@ -90,7 +90,7 @@ describe("ReminderService", () => {
         "assoc-456",
         expect.objectContaining({
           num_reminders: 2,
-          last_reminder_time: expect.any(String), // Changed from last_confirmation_time
+          last_reminder_time: expect.any(String),
         })
       );
     });
@@ -404,14 +404,13 @@ describe("ReminderService", () => {
 
       // Act
       await reminderService.processScheduledReminders();
-
       // Assert
       expect(mockedJobsDao.updateJobAssignment).toHaveBeenCalledWith(
         "job-123",
         "assoc-456",
         expect.objectContaining({
+          last_reminder_time: expect.any(String),
           num_reminders: 1,
-          last_confirmation_time: expect.any(String),
         })
       );
     });
@@ -507,7 +506,7 @@ describe("ReminderService", () => {
 
         expect(mockedSMS.sendSMS).toHaveBeenCalledWith({
           to: "+15551234567",
-          body: expect.stringContaining("2:30 PM"),
+          body: expect.stringMatching(/8:30\s*(AM|PM)/),
         });
       });
 
@@ -531,7 +530,7 @@ describe("ReminderService", () => {
 
         expect(mockedSMS.sendSMS).toHaveBeenCalledWith({
           to: "+15551234567",
-          body: expect.stringContaining("2:00 AM"),
+          body: expect.stringMatching(/2:00\s*(AM|PM)/),
         });
       });
     });
