@@ -1,17 +1,19 @@
 import { redirect } from "next/navigation";
 
-export default function Home({
+export default async function Home({
   searchParams,
 }: {
-  searchParams: { code?: string; error?: string };
+  searchParams: Promise<{ code?: string; error?: string }>;
 }) {
+  const params = await searchParams;
+
   // Handle OAuth callback if code is present
-  if (searchParams.code) {
-    redirect(`/auth/callback?code=${searchParams.code}`);
+  if (params.code) {
+    redirect(`/auth/callback?code=${params.code}`);
   }
 
-  if (searchParams.error) {
-    redirect(`/auth/callback?error=${searchParams.error}`);
+  if (params.error) {
+    redirect(`/auth/callback?error=${params.error}`);
   }
 
   // Default redirect to landing page
