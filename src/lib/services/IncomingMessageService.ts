@@ -206,7 +206,7 @@ export class IncomingMessageService {
 
         await updateJobAssignment(assignment.job_id, assignment.associate_id, {
           confirmation_status: newStatus,
-          last_activity_time: new Date().toISOString(),
+          last_confirmation_time: new Date().toISOString(),
         });
 
         updatedCount++;
@@ -342,11 +342,11 @@ export class IncomingMessageService {
     // If it's the day of the work (within 6 hours), mark as "Confirmed"
     // Otherwise, mark as "Soft Confirmed" or "Likely Confirmed"
     if (hoursDifference <= 6 && hoursDifference > 0) {
-      return ConfirmationStatus.Confirmed;
+      return ConfirmationStatus.CONFIRMED;
     } else if (hoursDifference <= 24) {
-      return ConfirmationStatus.LikelyConfirmed;
+      return ConfirmationStatus.LIKELY_CONFIRMED;
     } else {
-      return ConfirmationStatus.SoftConfirmed;
+      return ConfirmationStatus.SOFT_CONFIRMED;
     }
   }
 
@@ -423,20 +423,20 @@ export class IncomingMessageService {
   private mapConfirmationStatus(status: string): ConfirmationStatus {
     switch (status?.toLowerCase()) {
       case "unconfirmed":
-        return ConfirmationStatus.Unconfirmed;
+        return ConfirmationStatus.UNCONFIRMED;
       case "soft confirmed":
-        return ConfirmationStatus.SoftConfirmed;
+        return ConfirmationStatus.SOFT_CONFIRMED;
       case "likely confirmed":
-        return ConfirmationStatus.LikelyConfirmed;
+        return ConfirmationStatus.LIKELY_CONFIRMED;
       case "confirmed":
-        return ConfirmationStatus.Confirmed;
+        return ConfirmationStatus.CONFIRMED;
       case "declined":
-        return ConfirmationStatus.Declined;
+        return ConfirmationStatus.DECLINED;
       default:
         console.warn(
           `Unknown confirmation status: ${status}, defaulting to Unconfirmed`
         );
-        return ConfirmationStatus.Unconfirmed;
+        return ConfirmationStatus.UNCONFIRMED;
     }
   }
 

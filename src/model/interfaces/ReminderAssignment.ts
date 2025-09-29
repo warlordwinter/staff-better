@@ -10,5 +10,7 @@ export interface ReminderAssignment {
   customer_name: string;
   num_reminders: number;
   last_activity_time?: string;
+  last_confirmation_time?: Date;
+  last_reminder_time?: Date;
   confirmation_status?: string;
 }
