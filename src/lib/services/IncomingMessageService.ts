@@ -1,48 +1,29 @@
 // Service for handling incoming SMS messages from associates
 
 import {
-  getActiveAssignmentsFromDatabase,
   updateJobAssignment,
+  getActiveAssignmentsFromDatabase,
 } from "../dao/JobsAssignmentsDao";
-import {
-  getAssociateByPhone,
-  optOutAssociate,
-} from "../dao/implementations/supabase/AssociatesDaoSupabase";
 import { sendSMS } from "../twilio/sms";
 import { SMSMessage } from "../twilio/types";
 import { ConfirmationStatus } from "@/model/enums/ConfirmationStatus";
 import { Associate } from "@/model/interfaces/Associate";
-
-export interface IncomingMessageResult {
-  success: boolean;
-  action: MessageAction;
-  associate_id?: string;
-  phone_number: string;
-  message: string;
-  response_sent?: string;
-  error?: string;
-}
-
-export enum MessageAction {
-  CONFIRMATION = "confirmation",
-  HELP_REQUEST = "help_request",
-  OPT_OUT = "opt_out",
-  UNKNOWN = "unknown",
-}
-
-export interface ActiveAssignment {
-  job_id: string;
-  associate_id: string;
-  work_date: Date;
-  start_time: string;
-  confirmation_status: ConfirmationStatus;
-}
+import { ActiveAssignment } from "./interfaces/ActiveAssignment";
+import { IncomingMessageResult } from "./interfaces/IncomingMessageResult";
+import { MessageAction } from "./interfaces/MessageAction";
+import { AssociateDaoSupabase } from "../dao/implementations/supabase/AssociatesDaoSupabase";
 
 export class IncomingMessageService {
   /**
    * Main method to process incoming SMS messages
    * This should be called by your Twilio webhook endpoint
    */
+  private associatesDao: AssociateDaoSupabase;
+
+  private constructor() {
+    this.associatesDao = new AssociateDaoSupabase();
+  }
+
   async processIncomingMessage(
     fromNumber: string,
     messageBody: string
@@ -54,7 +35,9 @@ export class IncomingMessageService {
       const normalizedPhone = this.normalizePhoneNumber(fromNumber);
 
       // Find the associate by phone number
-      const associate = await getAssociateByPhone(normalizedPhone);
+      const associate = await this.associatesDao.getAssociateByPhone(
+        normalizedPhone
+      );
 
       if (!associate) {
         console.log(`No associate found for phone number: ${normalizedPhone}`);
@@ -274,7 +257,7 @@ export class IncomingMessageService {
   ): Promise<IncomingMessageResult> {
     try {
       // Update associate to opt them out of SMS
-      await optOutAssociate(associate.id);
+      await this.associatesDao.optOutAssociate(associate.id);
 
       const optOutMessage =
         `${associate.first_name}, you have been unsubscribed from our text reminders. ` +

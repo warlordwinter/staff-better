@@ -5,17 +5,17 @@ import {
   createReminderScheduler,
   ScheduleConfig,
 } from "../../lib/services/schedulerService";
+import { ReminderOrchestrator } from "../../lib/services/ReminderOrchestrator";
 import {
-  ReminderService,
   ReminderResult,
   ReminderType,
 } from "../../lib/services/reminderService";
 
-// Mock the ReminderService
-jest.mock("../../lib/services/reminderService");
+// Mock the ReminderOrchestrator
+jest.mock("../../lib/services/ReminderOrchestrator");
 
 describe("SchedulerService", () => {
-  let mockReminderService: jest.Mocked<ReminderService>;
+  let mockReminderOrchestrator: jest.Mocked<ReminderOrchestrator>;
   let schedulerService: SchedulerService;
 
   // Mock timer functions
@@ -23,17 +23,13 @@ describe("SchedulerService", () => {
     jest.useFakeTimers();
     jest.clearAllMocks();
 
-    // Create a proper mock that satisfies all ReminderService methods
-    mockReminderService = {
+    // Create a proper mock that satisfies all ReminderOrchestrator methods
+    mockReminderOrchestrator = {
       processScheduledReminders: jest.fn(),
       sendReminderToAssociate: jest.fn(),
       sendTestReminder: jest.fn(),
       getReminderStats: jest.fn(),
-      findDueReminders: jest.fn(),
-      determineReminderType: jest.fn(),
-      generateReminderMessage: jest.fn(),
-      updateReminderStatus: jest.fn(),
-    } as unknown as jest.Mocked<ReminderService>;
+    } as unknown as jest.Mocked<ReminderOrchestrator>;
 
     // Create scheduler with short intervals for testing
     const testConfig: ScheduleConfig = {
@@ -43,7 +39,10 @@ describe("SchedulerService", () => {
       retryDelayMinutes: 1,
     };
 
-    schedulerService = new SchedulerService(mockReminderService, testConfig);
+    schedulerService = new SchedulerService(
+      mockReminderOrchestrator,
+      testConfig
+    );
   });
 
   afterEach(() => {
@@ -53,7 +52,7 @@ describe("SchedulerService", () => {
 
   describe("Constructor", () => {
     it("should initialize with default config when none provided", () => {
-      const defaultScheduler = new SchedulerService(mockReminderService);
+      const defaultScheduler = new SchedulerService(mockReminderOrchestrator);
       const config = defaultScheduler.getConfig();
 
       expect(config).toEqual({
@@ -73,7 +72,7 @@ describe("SchedulerService", () => {
       };
 
       const customScheduler = new SchedulerService(
-        mockReminderService,
+        mockReminderOrchestrator,
         customConfig
       );
       expect(customScheduler.getConfig()).toEqual(customConfig);
@@ -141,7 +140,7 @@ describe("SchedulerService", () => {
         },
       ];
 
-      mockReminderService.processScheduledReminders.mockResolvedValue(
+      mockReminderOrchestrator.processScheduledReminders.mockResolvedValue(
         mockResults
       );
 
@@ -151,7 +150,9 @@ describe("SchedulerService", () => {
       await jest.runOnlyPendingTimersAsync();
 
       // Should be called at least once (immediate execution)
-      expect(mockReminderService.processScheduledReminders).toHaveBeenCalled();
+      expect(
+        mockReminderOrchestrator.processScheduledReminders
+      ).toHaveBeenCalled();
     });
   });
 
@@ -176,7 +177,7 @@ describe("SchedulerService", () => {
         },
       ];
 
-      mockReminderService.processScheduledReminders.mockResolvedValue(
+      mockReminderOrchestrator.processScheduledReminders.mockResolvedValue(
         mockResults
       );
 
@@ -184,7 +185,7 @@ describe("SchedulerService", () => {
 
       expect(results).toEqual(mockResults);
       expect(
-        mockReminderService.processScheduledReminders
+        mockReminderOrchestrator.processScheduledReminders
       ).toHaveBeenCalledTimes(1);
 
       const stats = schedulerService.getStats();
@@ -204,7 +205,7 @@ describe("SchedulerService", () => {
       ];
 
       // Fail first attempt, succeed on second
-      mockReminderService.processScheduledReminders
+      mockReminderOrchestrator.processScheduledReminders
         .mockRejectedValueOnce(new Error("Database connection failed"))
         .mockResolvedValueOnce(mockResults);
 
@@ -217,13 +218,15 @@ describe("SchedulerService", () => {
       expect(stats.successfulRuns).toBe(1);
       expect(stats.failedRuns).toBe(0);
       expect(
-        mockReminderService.processScheduledReminders
+        mockReminderOrchestrator.processScheduledReminders
       ).toHaveBeenCalledTimes(2);
     });
 
     it("should fail after max retries", async () => {
       const error = new Error("Persistent failure");
-      mockReminderService.processScheduledReminders.mockRejectedValue(error);
+      mockReminderOrchestrator.processScheduledReminders.mockRejectedValue(
+        error
+      );
 
       schedulerService.start();
 
@@ -234,7 +237,7 @@ describe("SchedulerService", () => {
       expect(stats.successfulRuns).toBe(0);
       expect(stats.failedRuns).toBe(1);
       expect(
-        mockReminderService.processScheduledReminders
+        mockReminderOrchestrator.processScheduledReminders
       ).toHaveBeenCalledTimes(2); // maxRetries = 2
     });
 
@@ -242,7 +245,7 @@ describe("SchedulerService", () => {
       const consoleSpy = jest.spyOn(console, "log").mockImplementation();
 
       // Make the first call hang
-      mockReminderService.processScheduledReminders.mockImplementation(
+      mockReminderOrchestrator.processScheduledReminders.mockImplementation(
         () => new Promise((resolve) => setTimeout(resolve, 5000))
       );
 
@@ -271,7 +274,7 @@ describe("SchedulerService", () => {
         },
       ];
 
-      mockReminderService.processScheduledReminders.mockResolvedValue(
+      mockReminderOrchestrator.processScheduledReminders.mockResolvedValue(
         mockResults
       );
 
@@ -279,13 +282,15 @@ describe("SchedulerService", () => {
 
       expect(results).toEqual(mockResults);
       expect(
-        mockReminderService.processScheduledReminders
+        mockReminderOrchestrator.processScheduledReminders
       ).toHaveBeenCalledTimes(1);
     });
 
     it("should throw error on failure", async () => {
       const error = new Error("Processing failed");
-      mockReminderService.processScheduledReminders.mockRejectedValue(error);
+      mockReminderOrchestrator.processScheduledReminders.mockRejectedValue(
+        error
+      );
 
       await expect(schedulerService.runNow()).rejects.toThrow(
         "Processing failed"
@@ -345,7 +350,7 @@ describe("SchedulerService", () => {
         },
       ];
 
-      mockReminderService.processScheduledReminders.mockResolvedValue(
+      mockReminderOrchestrator.processScheduledReminders.mockResolvedValue(
         mockResults
       );
 
@@ -363,7 +368,7 @@ describe("SchedulerService", () => {
     });
 
     it("should track failed runs", async () => {
-      mockReminderService.processScheduledReminders.mockRejectedValue(
+      mockReminderOrchestrator.processScheduledReminders.mockRejectedValue(
         new Error("Failed")
       );
 
@@ -403,7 +408,7 @@ describe("SchedulerService", () => {
       const mockResults: ReminderResult[] = [];
       let callCount = 0;
 
-      mockReminderService.processScheduledReminders.mockImplementation(
+      mockReminderOrchestrator.processScheduledReminders.mockImplementation(
         async () => {
           callCount++;
           console.log(`Call ${callCount} at fake time: ${jest.now()}`);
@@ -419,7 +424,7 @@ describe("SchedulerService", () => {
         retryDelayMinutes: 1,
       };
       const testScheduler = new SchedulerService(
-        mockReminderService,
+        mockReminderOrchestrator,
         testConfig
       );
 
@@ -433,7 +438,7 @@ describe("SchedulerService", () => {
 
       // Reset the mock to get clean counts after initial execution
       console.log("Clearing mock...");
-      mockReminderService.processScheduledReminders.mockClear();
+      mockReminderOrchestrator.processScheduledReminders.mockClear();
       callCount = 0; // Reset our counter too
 
       // Advance time by exactly 5 minutes
@@ -445,7 +450,7 @@ describe("SchedulerService", () => {
 
       // Should have exactly one call from the interval
       expect(
-        mockReminderService.processScheduledReminders
+        mockReminderOrchestrator.processScheduledReminders
       ).toHaveBeenCalledTimes(2);
 
       testScheduler.stop();
@@ -453,7 +458,7 @@ describe("SchedulerService", () => {
 
     it("should stop executing when stopped", async () => {
       const mockResults: ReminderResult[] = [];
-      mockReminderService.processScheduledReminders.mockResolvedValue(
+      mockReminderOrchestrator.processScheduledReminders.mockResolvedValue(
         mockResults
       );
 
@@ -464,21 +469,21 @@ describe("SchedulerService", () => {
 
       // Stop the scheduler
       schedulerService.stop();
-      mockReminderService.processScheduledReminders.mockClear();
+      mockReminderOrchestrator.processScheduledReminders.mockClear();
 
       // Advance time - should not trigger any more calls
       jest.advanceTimersByTime(60 * 1000);
       await jest.runOnlyPendingTimersAsync();
 
       expect(
-        mockReminderService.processScheduledReminders
+        mockReminderOrchestrator.processScheduledReminders
       ).not.toHaveBeenCalled();
     });
   });
 
   describe("createReminderScheduler factory", () => {
     it("should create scheduler with default config", () => {
-      const scheduler = createReminderScheduler(mockReminderService);
+      const scheduler = createReminderScheduler(mockReminderOrchestrator);
       const config = scheduler.getConfig();
 
       expect(config).toEqual({
@@ -490,7 +495,7 @@ describe("SchedulerService", () => {
     });
 
     it("should create scheduler with partial config", () => {
-      const scheduler = createReminderScheduler(mockReminderService, {
+      const scheduler = createReminderScheduler(mockReminderOrchestrator, {
         intervalMinutes: 30,
         maxRetries: 5,
       });
@@ -510,7 +515,9 @@ describe("SchedulerService", () => {
       const consoleSpy = jest.spyOn(console, "error").mockImplementation();
       const error = new Error("Unexpected error");
 
-      mockReminderService.processScheduledReminders.mockRejectedValue(error);
+      mockReminderOrchestrator.processScheduledReminders.mockRejectedValue(
+        error
+      );
 
       schedulerService.start();
       await jest.runOnlyPendingTimersAsync();
@@ -545,7 +552,7 @@ describe("SchedulerService", () => {
         },
       ];
 
-      mockReminderService.processScheduledReminders.mockResolvedValue(
+      mockReminderOrchestrator.processScheduledReminders.mockResolvedValue(
         mockResults
       );
 

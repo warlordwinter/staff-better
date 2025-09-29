@@ -1,6 +1,7 @@
 // Manages reminder scheduling and execution
 
-import { ReminderService, ReminderResult } from "./reminderService";
+import { ReminderOrchestrator } from "./ReminderOrchestrator";
+import { ReminderResult } from "./reminderService";
 
 export interface ScheduleConfig {
   enabled: boolean;
@@ -19,14 +20,14 @@ export interface SchedulerStats {
 }
 
 export class SchedulerService {
-  private reminderService: ReminderService;
+  private reminderService: ReminderOrchestrator;
   private config: ScheduleConfig;
   private intervalId: NodeJS.Timeout | null = null;
   private isRunning: boolean = false;
   private stats: SchedulerStats;
 
   constructor(
-    reminderService: ReminderService,
+    reminderService: ReminderOrchestrator,
     config: ScheduleConfig = {
       enabled: true,
       intervalMinutes: 15, // Check every 15 minutes
@@ -47,33 +48,35 @@ export class SchedulerService {
   }
 
   /**
- * Start the reminder scheduler
- * This begins the recurring process of checking and sending reminders
- */
-start(): void {
-  if (!this.config.enabled) {
-    console.log("Scheduler is disabled in config");
-    return;
-  }
+   * Start the reminder scheduler
+   * This begins the recurring process of checking and sending reminders
+   */
+  start(): void {
+    if (!this.config.enabled) {
+      console.log("Scheduler is disabled in config");
+      return;
+    }
 
-  if (this.intervalId) {
-    console.log("Scheduler is already running");
-    return;
-  }
+    if (this.intervalId) {
+      console.log("Scheduler is already running");
+      return;
+    }
 
-  console.log(`Starting reminder scheduler (checking every ${this.config.intervalMinutes} minutes)`);
-  
-  // Set up recurring execution first so isActive() works correctly
-  this.intervalId = setInterval(() => {
+    console.log(
+      `Starting reminder scheduler (checking every ${this.config.intervalMinutes} minutes)`
+    );
+
+    // Set up recurring execution first so isActive() works correctly
+    this.intervalId = setInterval(() => {
+      this.executeReminderCheck();
+    }, this.config.intervalMinutes * 60 * 1000);
+
+    this.updateNextRunTime();
+
+    // Run the first check immediately, but don't wait for it
+    // This prevents timing conflicts while still executing immediately
     this.executeReminderCheck();
-  }, this.config.intervalMinutes * 60 * 1000);
-
-  this.updateNextRunTime();
-  
-  // Run the first check immediately, but don't wait for it
-  // This prevents timing conflicts while still executing immediately
-  this.executeReminderCheck();
-}
+  }
 
   /**
    * Stop the reminder scheduler
@@ -253,7 +256,7 @@ start(): void {
 
 // Factory function to create and configure the scheduler
 export function createReminderScheduler(
-  reminderService: ReminderService,
+  reminderService: ReminderOrchestrator,
   config?: Partial<ScheduleConfig>
 ): SchedulerService {
   const defaultConfig: ScheduleConfig = {

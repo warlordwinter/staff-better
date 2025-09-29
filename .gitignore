@@ -12,6 +12,7 @@
 
 # testing
 /coverage
+/vscode
 
 # next.js
 /.next/
@@ -48,3 +49,4 @@ node_modules/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+.vscode/launch.json

@@ -1,10 +1,12 @@
-// src/__tests__/services/reminderService.test.ts
+// src/__tests__/services/reminderOrchestrator.test.ts
 
 import {
-  ReminderService,
+  ReminderOrchestrator,
+} from "@/lib/services/ReminderOrchestrator";
+import {
   ReminderType,
   ReminderAssignment,
-} from "@/lib/services/reminderService";
+} from "@/lib/services/reminderOrchestrator";
 import * as JobsAssignmentsDao from "@/lib/dao/JobsAssignmentsDao";
 import * as ReminderDao from "@/lib/dao/ReminderDao";
 import * as SMS from "@/lib/twilio/sms";
@@ -20,8 +22,8 @@ const mockedJobsDao = jest.mocked(JobsAssignmentsDao);
 const mockedReminderDao = jest.mocked(ReminderDao);
 const mockedSMS = jest.mocked(SMS);
 
-describe("ReminderService", () => {
-  let reminderService: ReminderService;
+describe("ReminderOrchestrator", () => {
+  let reminderOrchestrator: ReminderOrchestrator;
 
   // Sample test data
   const mockAssignment: ReminderAssignment = {
@@ -39,7 +41,7 @@ describe("ReminderService", () => {
   };
 
   beforeEach(() => {
-    reminderService = new ReminderService();
+    reminderOrchestrator = new ReminderOrchestrator();
     jest.clearAllMocks();
 
     // Mock console methods to avoid cluttering test output
@@ -78,7 +80,7 @@ describe("ReminderService", () => {
       mockedJobsDao.updateJobAssignment.mockResolvedValue([]);
 
       // Act
-      const results = await reminderService.processScheduledReminders();
+      const results = await reminderOrchestrator.processScheduledReminders();
 
       // Assert
       expect(results).toHaveLength(1);
@@ -102,7 +104,7 @@ describe("ReminderService", () => {
       );
 
       // Act
-      const result = await reminderService.processScheduledReminders();
+      const result = await reminderOrchestrator.processScheduledReminders();
 
       // Assert
       expect(result).toEqual([]);
@@ -152,7 +154,7 @@ describe("ReminderService", () => {
       mockedJobsDao.updateJobAssignment.mockResolvedValue([]);
 
       // Act
-      const results = await reminderService.processScheduledReminders();
+      const results = await reminderOrchestrator.processScheduledReminders();
 
       // Assert
       expect(results).toHaveLength(2);
@@ -177,7 +179,7 @@ describe("ReminderService", () => {
       mockedSMS.sendSMS.mockResolvedValue(mockSMSResult);
 
       // Act
-      const result = await reminderService.sendReminderToAssociate(
+      const result = await reminderOrchestrator.sendReminderToAssociate(
         mockAssignment,
         ReminderType.DAY_BEFORE
       );
@@ -212,7 +214,7 @@ describe("ReminderService", () => {
       mockedSMS.sendSMS.mockResolvedValue(mockSMSResult);
 
       // Act
-      const result = await reminderService.sendReminderToAssociate(
+      const result = await reminderOrchestrator.sendReminderToAssociate(
         mockAssignment,
         ReminderType.DAY_BEFORE
       );
@@ -230,7 +232,7 @@ describe("ReminderService", () => {
       });
 
       // Act
-      const result = await reminderService.sendReminderToAssociate(
+      const result = await reminderOrchestrator.sendReminderToAssociate(
         mockAssignment,
         ReminderType.DAY_BEFORE
       );
@@ -256,7 +258,7 @@ describe("ReminderService", () => {
       });
 
       // Act
-      const result = await reminderService.sendTestReminder(
+      const result = await reminderOrchestrator.sendTestReminder(
         "job-123",
         "assoc-456"
       );
@@ -276,7 +278,7 @@ describe("ReminderService", () => {
 
       // Act & Assert
       await expect(
-        reminderService.sendTestReminder("job-123", "assoc-456")
+        reminderOrchestrator.sendTestReminder("job-123", "assoc-456")
       ).rejects.toThrow("Reminder Assignment is null");
     });
   });
@@ -298,7 +300,7 @@ describe("ReminderService", () => {
       });
 
       // Test DAY_BEFORE type
-      await reminderService.sendReminderToAssociate(
+      await reminderOrchestrator.sendReminderToAssociate(
         mockAssignment,
         ReminderType.DAY_BEFORE
       );
@@ -308,7 +310,7 @@ describe("ReminderService", () => {
       });
 
       // Test MORNING_OF type
-      await reminderService.sendReminderToAssociate(
+      await reminderOrchestrator.sendReminderToAssociate(
         mockAssignment,
         ReminderType.MORNING_OF
       );
@@ -318,7 +320,7 @@ describe("ReminderService", () => {
       });
 
       // Test TWO_DAYS_BEFORE type
-      await reminderService.sendReminderToAssociate(
+      await reminderOrchestrator.sendReminderToAssociate(
         mockAssignment,
         ReminderType.TWO_DAYS_BEFORE
       );
@@ -344,7 +346,7 @@ describe("ReminderService", () => {
       });
 
       // Act
-      await reminderService.sendReminderToAssociate(
+      await reminderOrchestrator.sendReminderToAssociate(
         mockAssignment,
         ReminderType.DAY_BEFORE
       );
@@ -403,7 +405,7 @@ describe("ReminderService", () => {
       mockedJobsDao.updateJobAssignment.mockResolvedValue([]);
 
       // Act
-      await reminderService.processScheduledReminders();
+      await reminderOrchestrator.processScheduledReminders();
       // Assert
       expect(mockedJobsDao.updateJobAssignment).toHaveBeenCalledWith(
         "job-123",
@@ -439,7 +441,7 @@ describe("ReminderService", () => {
       mockedJobsDao.getNumberOfReminders.mockResolvedValue(0);
 
       // Act
-      await reminderService.processScheduledReminders();
+      await reminderOrchestrator.processScheduledReminders();
 
       // Assert
       expect(mockedJobsDao.updateJobAssignment).not.toHaveBeenCalled();
@@ -472,7 +474,7 @@ describe("ReminderService", () => {
       );
 
       // Act - should not throw despite DB error
-      const results = await reminderService.processScheduledReminders();
+      const results = await reminderOrchestrator.processScheduledReminders();
 
       // Assert
       expect(results[0].success).toBe(true); // SMS still succeeded
@@ -499,7 +501,7 @@ describe("ReminderService", () => {
           sentAt: new Date(),
         });
 
-        await reminderService.sendReminderToAssociate(
+        await reminderOrchestrator.sendReminderToAssociate(
           assignment,
           ReminderType.DAY_BEFORE
         );
@@ -523,7 +525,7 @@ describe("ReminderService", () => {
           sentAt: new Date(),
         });
 
-        await reminderService.sendReminderToAssociate(
+        await reminderOrchestrator.sendReminderToAssociate(
           assignment,
           ReminderType.DAY_BEFORE
         );
@@ -565,7 +567,7 @@ describe("ReminderService", () => {
         mockedJobsDao.updateJobAssignment.mockResolvedValue([]);
 
         // Act
-        await reminderService.processScheduledReminders();
+        await reminderOrchestrator.processScheduledReminders();
 
         // Assert
         const endTime = Date.now();
@@ -586,7 +588,7 @@ describe("ReminderService", () => {
       mockedReminderDao.getAssignmentsNotRecentlyReminded.mockResolvedValue([]);
 
       // Act
-      const results = await reminderService.processScheduledReminders();
+      const results = await reminderOrchestrator.processScheduledReminders();
 
       // Assert
       expect(results).toHaveLength(0);
@@ -605,7 +607,7 @@ describe("ReminderService", () => {
       });
 
       // Act
-      const result = await reminderService.sendReminderToAssociate(
+      const result = await reminderOrchestrator.sendReminderToAssociate(
         assignmentWithBadPhone,
         ReminderType.DAY_BEFORE
       );
@@ -635,7 +637,7 @@ describe("ReminderService", () => {
       });
 
       // Act
-      const result = await reminderService.sendReminderToAssociate(
+      const result = await reminderOrchestrator.sendReminderToAssociate(
         incompleteAssignment,
         ReminderType.DAY_BEFORE
       );
