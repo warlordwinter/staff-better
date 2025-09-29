@@ -334,16 +334,19 @@ export class IncomingMessageService {
     console.log("Work Date Time:", workDateTime);
     console.log("Now Time:", now);
 
-    console.log("Calculating the hours difference to determine confirmation message:", hoursDifference);
+    console.log(
+      "Calculating the hours difference to determine confirmation message:",
+      hoursDifference
+    );
 
     // If it's the day of the work (within 6 hours), mark as "Confirmed"
     // Otherwise, mark as "Soft Confirmed" or "Likely Confirmed"
     if (hoursDifference <= 6 && hoursDifference > 0) {
-      return ConfirmationStatus.Confirmed;
+      return ConfirmationStatus.CONFIRMED;
     } else if (hoursDifference <= 24) {
-      return ConfirmationStatus.LikelyConfirmed;
+      return ConfirmationStatus.LIKELY_CONFIRMED;
     } else {
-      return ConfirmationStatus.SoftConfirmed;
+      return ConfirmationStatus.SOFT_CONFIRMED;
     }
   }
 
@@ -420,20 +423,20 @@ export class IncomingMessageService {
   private mapConfirmationStatus(status: string): ConfirmationStatus {
     switch (status?.toLowerCase()) {
       case "unconfirmed":
-        return ConfirmationStatus.Unconfirmed;
+        return ConfirmationStatus.UNCONFIRMED;
       case "soft confirmed":
-        return ConfirmationStatus.SoftConfirmed;
+        return ConfirmationStatus.SOFT_CONFIRMED;
       case "likely confirmed":
-        return ConfirmationStatus.LikelyConfirmed;
+        return ConfirmationStatus.LIKELY_CONFIRMED;
       case "confirmed":
-        return ConfirmationStatus.Confirmed;
+        return ConfirmationStatus.CONFIRMED;
       case "declined":
-        return ConfirmationStatus.Declined;
+        return ConfirmationStatus.DECLINED;
       default:
         console.warn(
           `Unknown confirmation status: ${status}, defaulting to Unconfirmed`
         );
-        return ConfirmationStatus.Unconfirmed;
+        return ConfirmationStatus.UNCONFIRMED;
     }
   }
 

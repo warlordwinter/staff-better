@@ -26,7 +26,7 @@ export interface ReminderAssignment {
   job_title: string;
   customer_name: string;
   num_reminders: number;
-  last_confirmation_time?: Date;
+  last_activity_time?: string;
 }
 
 export interface ReminderResult {
@@ -313,7 +313,7 @@ export class ReminderService {
       if (currentReminders > 0) {
         await updateJobAssignment(job_id, associate_id, {
           num_reminders: currentReminders - 1, // Decrease the reminder count
-          last_reminder_time: new Date().toISOString(), // Changed from last_confirmation_time
+          last_reminder_time: new Date().toISOString(),
         });
         console.log(
           `Updated reminder status for job ${job_id}, associate ${associate_id}`

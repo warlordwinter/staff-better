@@ -1,0 +1,174 @@
+name: Test Incoming Messages
+
+on:
+  # Manual trigger only
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: "Type of test to run"
+        required: true
+        default: "confirmation"
+        type: choice
+        options:
+          - confirmation
+          - help
+          - opt_out
+          - unknown
+          - all
+      phone_number:
+        description: "Phone number to test with"
+        required: false
+        type: string
+        default: "+1234567890"
+      message:
+        description: "Message to test (for custom tests)"
+        required: false
+        type: string
+
+jobs:
+  test-incoming-messages:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Test Confirmation Message
+        if: ${{ inputs.test_type == 'confirmation' || inputs.test_type == 'all' }}
+        env:
+          VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
+          PHONE_NUMBER: ${{ inputs.phone_number || '+1234567890' }}
+        run: |
+          echo "🧪 Testing confirmation message..."
+          echo "📱 Phone: $PHONE_NUMBER"
+          echo "💬 Message: C"
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$VERCEL_APP_URL/api/test-incoming-message" \
+            -H "Content-Type: application/json" \
+            -d "{\"phoneNumber\":\"$PHONE_NUMBER\",\"message\":\"C\"}")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          RESPONSE_BODY=$(echo "$RESPONSE" | head -n -1)
+
+          echo "📊 HTTP Status: $HTTP_CODE"
+          echo "📊 Response:"
+          echo "$RESPONSE_BODY" | jq '.' 2>/dev/null || echo "$RESPONSE_BODY"
+
+      - name: Test Help Message
+        if: ${{ inputs.test_type == 'help' || inputs.test_type == 'all' }}
+        env:
+          VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
+          PHONE_NUMBER: ${{ inputs.phone_number || '+1234567890' }}
+        run: |
+          echo "🧪 Testing help message..."
+          echo "📱 Phone: $PHONE_NUMBER"
+          echo "💬 Message: help"
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$VERCEL_APP_URL/api/test-incoming-message" \
+            -H "Content-Type: application/json" \
+            -d "{\"phoneNumber\":\"$PHONE_NUMBER\",\"message\":\"help\"}")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          RESPONSE_BODY=$(echo "$RESPONSE" | head -n -1)
+
+          echo "📊 HTTP Status: $HTTP_CODE"
+          echo "📊 Response:"
+          echo "$RESPONSE_BODY" | jq '.' 2>/dev/null || echo "$RESPONSE_BODY"
+
+      - name: Test Opt-out Message
+        if: ${{ inputs.test_type == 'opt_out' || inputs.test_type == 'all' }}
+        env:
+          VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
+          PHONE_NUMBER: ${{ inputs.phone_number || '+1234567890' }}
+        run: |
+          echo "🧪 Testing opt-out message..."
+          echo "📱 Phone: $PHONE_NUMBER"
+          echo "💬 Message: stop"
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$VERCEL_APP_URL/api/test-incoming-message" \
+            -H "Content-Type: application/json" \
+            -d "{\"phoneNumber\":\"$PHONE_NUMBER\",\"message\":\"stop\"}")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          RESPONSE_BODY=$(echo "$RESPONSE" | head -n -1)
+
+          echo "📊 HTTP Status: $HTTP_CODE"
+          echo "📊 Response:"
+          echo "$RESPONSE_BODY" | jq '.' 2>/dev/null || echo "$RESPONSE_BODY"
+
+      - name: Test Unknown Message
+        if: ${{ inputs.test_type == 'unknown' || inputs.test_type == 'all' }}
+        env:
+          VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
+          PHONE_NUMBER: ${{ inputs.phone_number || '+1234567890' }}
+        run: |
+          echo "🧪 Testing unknown message..."
+          echo "📱 Phone: $PHONE_NUMBER"
+          echo "💬 Message: random message"
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$VERCEL_APP_URL/api/test-incoming-message" \
+            -H "Content-Type: application/json" \
+            -d "{\"phoneNumber\":\"$PHONE_NUMBER\",\"message\":\"random message\"}")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          RESPONSE_BODY=$(echo "$RESPONSE" | head -n -1)
+
+          echo "📊 HTTP Status: $HTTP_CODE"
+          echo "📊 Response:"
+          echo "$RESPONSE_BODY" | jq '.' 2>/dev/null || echo "$RESPONSE_BODY"
+
+      - name: Test Custom Message
+        if: ${{ inputs.message != '' }}
+        env:
+          VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
+          PHONE_NUMBER: ${{ inputs.phone_number || '+1234567890' }}
+          CUSTOM_MESSAGE: ${{ inputs.message }}
+        run: |
+          echo "🧪 Testing custom message..."
+          echo "📱 Phone: $PHONE_NUMBER"
+          echo "💬 Message: $CUSTOM_MESSAGE"
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$VERCEL_APP_URL/api/test-incoming-message" \
+            -H "Content-Type: application/json" \
+            -d "{\"phoneNumber\":\"$PHONE_NUMBER\",\"message\":\"$CUSTOM_MESSAGE\"}")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          RESPONSE_BODY=$(echo "$RESPONSE" | head -n -1)
+
+          echo "📊 HTTP Status: $HTTP_CODE"
+          echo "📊 Response:"
+          echo "$RESPONSE_BODY" | jq '.' 2>/dev/null || echo "$RESPONSE_BODY"
+
+      - name: Test Twilio Webhook
+        if: ${{ inputs.test_type == 'all' }}
+        env:
+          VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
+          PHONE_NUMBER: ${{ inputs.phone_number || '+1234567890' }}
+        run: |
+          echo "🧪 Testing Twilio webhook..."
+          echo "📱 Phone: $PHONE_NUMBER"
+          echo "💬 Message: C"
+
+          # Test Twilio webhook format
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$VERCEL_APP_URL/api/twilio/webhook" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "From=$PHONE_NUMBER&Body=C")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          RESPONSE_BODY=$(echo "$RESPONSE" | head -n -1)
+
+          echo "📊 HTTP Status: $HTTP_CODE"
+          echo "📊 Response:"
+          echo "$RESPONSE_BODY"
+
+      - name: Create test summary
+        if: always()
+        run: |
+          echo "## Incoming Messages Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Test Type**: ${{ inputs.test_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Time**: $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Target URL**: ${{ secrets.VERCEL_APP_URL }}" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ inputs.phone_number }}" != "" ]; then
+            echo "- **Phone Number**: ${{ inputs.phone_number }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ "${{ inputs.message }}" != "" ]; then
+            echo "- **Custom Message**: ${{ inputs.message }}" >> $GITHUB_STEP_SUMMARY
+          fi

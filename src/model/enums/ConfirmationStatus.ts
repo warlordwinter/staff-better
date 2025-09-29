@@ -1,7 +1,8 @@
 export enum ConfirmationStatus {
-    Unconfirmed = "Unconfirmed",
-    SoftConfirmed = "Soft Confirmed",
-    LikelyConfirmed = "Likely Confirmed",
-    Confirmed = "Confirmed",
-    Declined = "Declined",
+  UNCONFIRMED = "UNCONFIRMED",
+  SOFT_CONFIRMED = "SOFT_CONFIRMED",
+  LIKELY_CONFIRMED = "LIKELY_CONFIRMED",
+  CONFIRMED = "CONFIRMED",
+  DECLINED = "DECLINED",
+  PENDING = "PENDING",
 }
