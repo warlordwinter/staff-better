@@ -382,11 +382,11 @@ describe("SchedulerService", () => {
       // Manually set some stats to test reset using bracket notation to bypass TypeScript
       const stats = schedulerService.getStats();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (schedulerService as any)['stats'].totalRuns = 5;
+      (schedulerService as any)["stats"].totalRuns = 5;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (schedulerService as any)['stats'].successfulRuns = 3;
+      (schedulerService as any)["stats"].successfulRuns = 3;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (schedulerService as any)['stats'].failedRuns = 2;
+      (schedulerService as any)["stats"].failedRuns = 2;
 
       schedulerService.resetStats();
 
@@ -398,17 +398,19 @@ describe("SchedulerService", () => {
     });
   });
 
-  describe('recurring execution', () => {
-    it('should execute reminders at configured intervals', async () => {
+  describe("recurring execution", () => {
+    it("should execute reminders at configured intervals", async () => {
       const mockResults: ReminderResult[] = [];
       let callCount = 0;
-      
-      mockReminderService.processScheduledReminders.mockImplementation(async () => {
-        callCount++;
-        console.log(`Call ${callCount} at fake time: ${jest.now()}`);
-        return mockResults;
-      });
-      
+
+      mockReminderService.processScheduledReminders.mockImplementation(
+        async () => {
+          callCount++;
+          console.log(`Call ${callCount} at fake time: ${jest.now()}`);
+          return mockResults;
+        }
+      );
+
       // Create scheduler with longer interval to avoid timing issues
       const testConfig: ScheduleConfig = {
         enabled: true,
@@ -416,52 +418,61 @@ describe("SchedulerService", () => {
         maxRetries: 1,
         retryDelayMinutes: 1,
       };
-      const testScheduler = new SchedulerService(mockReminderService, testConfig);
-      
-      console.log('Starting scheduler...');
+      const testScheduler = new SchedulerService(
+        mockReminderService,
+        testConfig
+      );
+
+      console.log("Starting scheduler...");
       testScheduler.start();
-      
+
       // Let the initial execution complete
-      console.log('Running initial timers...');
+      console.log("Running initial timers...");
       await jest.runOnlyPendingTimersAsync();
       console.log(`Calls after initial execution: ${callCount}`);
-      
+
       // Reset the mock to get clean counts after initial execution
-      console.log('Clearing mock...');
+      console.log("Clearing mock...");
       mockReminderService.processScheduledReminders.mockClear();
       callCount = 0; // Reset our counter too
-      
+
       // Advance time by exactly 5 minutes
-      console.log('Advancing time by 5 minutes...');
+      console.log("Advancing time by 5 minutes...");
       jest.advanceTimersByTime(5 * 60 * 1000);
-      console.log('Running timers after advance...');
+      console.log("Running timers after advance...");
       await jest.runOnlyPendingTimersAsync();
       console.log(`Calls after 5-minute advance: ${callCount}`);
-      
+
       // Should have exactly one call from the interval
-      expect(mockReminderService.processScheduledReminders).toHaveBeenCalledTimes(2);
-      
+      expect(
+        mockReminderService.processScheduledReminders
+      ).toHaveBeenCalledTimes(2);
+
       testScheduler.stop();
     });
 
-    it('should stop executing when stopped', async () => {
+    it("should stop executing when stopped", async () => {
       const mockResults: ReminderResult[] = [];
-      mockReminderService.processScheduledReminders.mockResolvedValue(mockResults);
-      
+      mockReminderService.processScheduledReminders.mockResolvedValue(
+        mockResults
+      );
+
       schedulerService.start();
-      
+
       // Let initial execution complete
       await jest.runOnlyPendingTimersAsync();
-      
+
       // Stop the scheduler
       schedulerService.stop();
       mockReminderService.processScheduledReminders.mockClear();
-      
+
       // Advance time - should not trigger any more calls
       jest.advanceTimersByTime(60 * 1000);
       await jest.runOnlyPendingTimersAsync();
-      
-      expect(mockReminderService.processScheduledReminders).not.toHaveBeenCalled();
+
+      expect(
+        mockReminderService.processScheduledReminders
+      ).not.toHaveBeenCalled();
     });
   });
 
