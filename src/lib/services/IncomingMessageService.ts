@@ -4,7 +4,10 @@ import {
   getActiveAssignmentsFromDatabase,
   updateJobAssignment,
 } from "../dao/JobsAssignmentsDao";
-import { getAssociateByPhone, optOutAssociate } from "../dao/AssociatesDao";
+import {
+  getAssociateByPhone,
+  optOutAssociate,
+} from "../dao/implementations/supabase/AssociatesDaoSupabase";
 import { sendSMS } from "../twilio/sms";
 import { SMSMessage } from "../twilio/types";
 import { ConfirmationStatus } from "@/model/enums/ConfirmationStatus";

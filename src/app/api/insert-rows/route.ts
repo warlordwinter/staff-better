@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { insertAssociates } from "@/lib/dao/AssociatesDao";
+import { insertAssociates } from "@/lib/dao/implementations/supabase/AssociatesDaoSupabase";
 import { insertJobs } from "@/lib/dao/JobsDao";
 import { insertJobsAssignments } from "@/lib/dao/JobsAssignmentsDao";
 import { formatPhoneToE164 } from "@/utils/phoneUtils";
