@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AssociatesDaoSupabase } from "@/lib/dao/implementations/supabase/AssociatesDaoSupabase";
-import { insertJobs } from "@/lib/dao/JobsDao";
+import { JobsDaoSupabase } from "@/lib/dao/implementations/supabase/JobsDaoSupabase";
 import { JobsAssignmentsDaoSupabase } from "@/lib/dao/implementations/supabase/JobsAssignmentsDaoSupabase";
 import { formatPhoneToE164 } from "@/utils/phoneUtils";
 import { Associate } from "@/model/interfaces/Associate";
@@ -8,6 +8,7 @@ import { Job } from "@/model/interfaces/Job";
 import { JobAssignment } from "@/model/interfaces/JobAssignment";
 
 const associatesDao = new AssociatesDaoSupabase();
+const jobsDao = new JobsDaoSupabase();
 const jobAssignmentsDao = new JobsAssignmentsDaoSupabase();
 
 export async function POST(req: NextRequest) {
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
     const insertedAssociates = await associatesDao.insertAssociates(
       associateData
     );
-    const insertedJobs = await insertJobs(jobData);
+    const insertedJobs = await jobsDao.insertJobs(jobData);
 
     // Create job assignments using the returned IDs
     const jobAssignmentsData = rows.map((r: JobAssignment, index: number) => ({

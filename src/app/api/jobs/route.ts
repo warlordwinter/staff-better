@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getJobs, insertJobs } from "@/lib/dao/JobsDao"; // adjust the import path
+import { JobsDaoSupabase } from "@/lib/dao/implementations/supabase/JobsDaoSupabase";
+
+const jobsDao = new JobsDaoSupabase();
 
 export async function GET() {
   try {
-    const jobs = await getJobs();
+    const jobs = await jobsDao.getJobs();
     return NextResponse.json(jobs);
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred";
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
@@ -17,11 +20,12 @@ export async function POST(request: NextRequest) {
 
     const jobsToInsert = Array.isArray(body) ? body : [body];
 
-    const insertedJobs = await insertJobs(jobsToInsert);
+    const insertedJobs = await jobsDao.insertJobs(jobsToInsert);
     return NextResponse.json(insertedJobs, { status: 201 });
   } catch (error: unknown) {
     console.error("Failed to create job:", error);
-    const errorMessage = error instanceof Error ? error.message : 'Failed to create job';
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to create job";
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

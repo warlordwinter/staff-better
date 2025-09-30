@@ -2,17 +2,12 @@
 
 import { convertUTCTimeToLocal } from "@/utils/timezoneUtils";
 import { JobsAssignmentsDaoSupabase } from "../dao/implementations/supabase/JobsAssignmentsDaoSupabase";
-import {
-  getAssignmentsNotRecentlyReminded,
-  getDayBeforeReminders,
-  getMorningOfReminders,
-  getReminderAssignment,
-  getTwoDaysBeforeReminders,
-} from "../dao/ReminderDao";
+import { ReminderDaoSupabase } from "../dao/implementations/supabase/ReminderDaoSupabase";
 import { formatPhoneNumber, sendSMS } from "../twilio/sms";
 
-// Create instance of JobsAssignmentsDaoSupabase
+// Create instances of DAOs
 const jobAssignmentsDao = new JobsAssignmentsDaoSupabase();
+const reminderDao = new ReminderDaoSupabase();
 import { SMSMessage, SMSResult } from "../twilio/types";
 
 export interface ReminderAssignment {
@@ -170,17 +165,18 @@ export class ReminderService {
 
     try {
       // Get day-before reminders (for work happening tomorrow)
-      const dayBeforeReminders = await getDayBeforeReminders(tomorrow);
+      const dayBeforeReminders = await reminderDao.getDayBeforeReminders(
+        tomorrow
+      );
       console.log("Day Before reminders from dao:", dayBeforeReminders);
 
       // Get morning-of reminders (for work happening today, starting in 1-2 hours)
-      const morningOfReminders = await getMorningOfReminders(2);
+      const morningOfReminders = await reminderDao.getMorningOfReminders(2);
       console.log("Morning of reminders from dao:", morningOfReminders);
 
       // Get two-days-before reminders (for work happening day after tomorrow)
-      const twoDaysBeforeReminders = await getTwoDaysBeforeReminders(
-        dayAfterTomorrow
-      );
+      const twoDaysBeforeReminders =
+        await reminderDao.getTwoDaysBeforeReminders(dayAfterTomorrow);
       console.log("Two days before reminders", twoDaysBeforeReminders);
 
       dueAssignments.push(
@@ -192,7 +188,10 @@ export class ReminderService {
       console.log("All due assignments", dueAssignments);
 
       // Optional: Filter out assignments that were reminded recently
-      return await getAssignmentsNotRecentlyReminded(dueAssignments, 4);
+      return await reminderDao.getAssignmentsNotRecentlyReminded(
+        dueAssignments,
+        4
+      );
     } catch (error) {
       console.error("Error finding due reminders:", error);
       return [];
@@ -334,10 +333,8 @@ export class ReminderService {
     // const assignment = await this.getAssignmentDetails(jobId, associateId);
     // return await this.sendReminderToAssociate(assignment, ReminderType.DAY_BEFORE);
 
-    const assignment: ReminderAssignment | null = await getReminderAssignment(
-      jobId,
-      associateId
-    );
+    const assignment: ReminderAssignment | null =
+      await reminderDao.getReminderAssignment(jobId, associateId);
 
     if (!assignment) {
       throw new Error("Reminder Assignment is null");
