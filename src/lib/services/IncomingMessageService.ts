@@ -1,14 +1,15 @@
 // Service for handling incoming SMS messages from associates
 
-import {
-  getActiveAssignmentsFromDatabase,
-  updateJobAssignment,
-} from "../dao/JobsAssignmentsDao";
-import { getAssociateByPhone, optOutAssociate } from "../dao/AssociatesDao";
+import { AssociatesDaoSupabase } from "../dao/implementations/supabase/AssociatesDaoSupabase";
+import { JobsAssignmentsDaoSupabase } from "../dao/implementations/supabase/JobsAssignmentsDaoSupabase";
 import { sendSMS } from "../twilio/sms";
 import { SMSMessage } from "../twilio/types";
 import { ConfirmationStatus } from "@/model/enums/ConfirmationStatus";
 import { Associate } from "@/model/interfaces/Associate";
+
+// Create instances of DAOs
+const associatesDao = new AssociatesDaoSupabase();
+const jobAssignmentsDao = new JobsAssignmentsDaoSupabase();
 
 export interface IncomingMessageResult {
   success: boolean;
@@ -51,7 +52,9 @@ export class IncomingMessageService {
       const normalizedPhone = this.normalizePhoneNumber(fromNumber);
 
       // Find the associate by phone number
-      const associate = await getAssociateByPhone(normalizedPhone);
+      const associate = await associatesDao.getAssociateByPhone(
+        normalizedPhone
+      );
 
       if (!associate) {
         console.log(`No associate found for phone number: ${normalizedPhone}`);
@@ -204,10 +207,14 @@ export class IncomingMessageService {
       for (const assignment of activeAssignments) {
         const newStatus = this.determineConfirmationStatus(assignment);
 
-        await updateJobAssignment(assignment.job_id, assignment.associate_id, {
-          confirmation_status: newStatus,
-          last_confirmation_time: new Date().toISOString(),
-        });
+        await jobAssignmentsDao.updateJobAssignment(
+          assignment.job_id,
+          assignment.associate_id,
+          {
+            confirmation_status: newStatus,
+            last_confirmation_time: new Date().toISOString(),
+          }
+        );
 
         updatedCount++;
       }
@@ -271,7 +278,7 @@ export class IncomingMessageService {
   ): Promise<IncomingMessageResult> {
     try {
       // Update associate to opt them out of SMS
-      await optOutAssociate(associate.id);
+      await associatesDao.optOutAssociate(associate.id);
 
       const optOutMessage =
         `${associate.first_name}, you have been unsubscribed from our text reminders. ` +
@@ -395,15 +402,22 @@ export class IncomingMessageService {
     console.log(`Getting active assignments for associate: ${associateId}`);
     console.log(`Date range: ${todayString} to ${sevenDaysString}`);
 
-    const assignments = await getActiveAssignmentsFromDatabase(
-      todayString,
-      sevenDaysString,
-      associateId
-    );
+    const assignments =
+      await jobAssignmentsDao.getActiveAssignmentsFromDatabase(
+        todayString,
+        sevenDaysString,
+        associateId
+      );
 
     // Transform the data to match the ActiveAssignment interface
     const activeAssignments: ActiveAssignment[] = assignments.map(
-      (assignment) => ({
+      (assignment: {
+        job_id: string;
+        associate_id: string;
+        work_date: string;
+        start_time: string;
+        confirmation_status: string;
+      }) => ({
         job_id: assignment.job_id,
         associate_id: assignment.associate_id,
         work_date: new Date(assignment.work_date),

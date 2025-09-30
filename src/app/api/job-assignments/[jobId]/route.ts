@@ -1,6 +1,8 @@
 // app/api/job-assignments/job/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getJobAssignmentsByJobId, insertSingleJobAssignment } from "@/lib/dao/JobsAssignmentsDao";
+import { JobsAssignmentsDaoSupabase } from "@/lib/dao/implementations/supabase/JobsAssignmentsDaoSupabase";
+
+const jobAssignmentsDao = new JobsAssignmentsDaoSupabase();
 
 interface RouteParams {
   params: Promise<{
@@ -19,7 +21,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Invalid job ID' }, { status: 400 });
     }
 
-    const data = await getJobAssignmentsByJobId(jobId);
+    const data = await jobAssignmentsDao.getJobAssignmentsByJobId(jobId);
 
     return NextResponse.json(data);
   } catch (error) {
@@ -38,7 +40,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Invalid job ID' }, { status: 400 });
     }
 
-    const data = await insertSingleJobAssignment(jobId, assignmentData);
+    const data = await jobAssignmentsDao.insertSingleJobAssignment(jobId, assignmentData);
 
     return NextResponse.json(data);
   } catch (error) {

@@ -1,31 +1,25 @@
-import { getAssociateByPhone } from "@/lib/dao/AssociatesDao";
-import {
-  getActiveAssignmentsFromDatabase,
-  updateJobAssignment,
-} from "@/lib/dao/JobsAssignmentsDao";
+import { AssociatesDaoSupabase } from "@/lib/dao/implementations/supabase/AssociatesDaoSupabase";
+import { JobsAssignmentsDaoSupabase } from "@/lib/dao/implementations/supabase/JobsAssignmentsDaoSupabase";
 import { IncomingMessageService } from "@/lib/services/IncomingMessageService";
 import { MessageAction } from "@/lib/services/IncomingMessageService";
 import { sendSMS } from "@/lib/twilio/sms";
 import { ConfirmationStatus } from "@/model/enums/ConfirmationStatus";
 
 // Mock the dependencies
-jest.mock("@/lib/dao/AssociatesDao");
-jest.mock("@/lib/dao/JobsAssignmentsDao");
+jest.mock("@/lib/dao/implementations/supabase/AssociatesDaoSupabase");
+jest.mock("@/lib/dao/implementations/supabase/JobsAssignmentsDaoSupabase");
 jest.mock("@/lib/twilio/sms");
 
-const mockGetAssociateByPhone = getAssociateByPhone as jest.MockedFunction<
-  typeof getAssociateByPhone
+const mockAssociatesDao = AssociatesDaoSupabase as jest.MockedClass<
+  typeof AssociatesDaoSupabase
 >;
-// const mockOptOutAssociate = optOutAssociate as jest.MockedFunction<
-//   typeof optOutAssociate
-// >;
-const mockGetActiveAssignmentsFromDatabase =
-  getActiveAssignmentsFromDatabase as jest.MockedFunction<
-    typeof getActiveAssignmentsFromDatabase
-  >;
-const mockUpdateJobAssignment = updateJobAssignment as jest.MockedFunction<
-  typeof updateJobAssignment
+const mockJobAssignmentsDao = JobsAssignmentsDaoSupabase as jest.MockedClass<
+  typeof JobsAssignmentsDaoSupabase
 >;
+const mockGetAssociateByPhone = jest.fn();
+const mockOptOutAssociate = jest.fn();
+const mockGetActiveAssignmentsFromDatabase = jest.fn();
+const mockUpdateJobAssignment = jest.fn();
 const mockSendSMS = sendSMS as jest.MockedFunction<typeof sendSMS>;
 
 describe("IncomingMessageService", () => {
@@ -34,6 +28,22 @@ describe("IncomingMessageService", () => {
   beforeEach(() => {
     service = new IncomingMessageService();
     jest.clearAllMocks();
+
+    // Set up mock instance methods
+    const mockAssociatesInstance = {
+      getAssociateByPhone: mockGetAssociateByPhone,
+      optOutAssociate: mockOptOutAssociate,
+    };
+    const mockJobAssignmentsInstance = {
+      getActiveAssignmentsFromDatabase: mockGetActiveAssignmentsFromDatabase,
+      updateJobAssignment: mockUpdateJobAssignment,
+    };
+    mockAssociatesDao.mockImplementation(
+      () => mockAssociatesInstance as unknown as AssociatesDaoSupabase
+    );
+    mockJobAssignmentsDao.mockImplementation(
+      () => mockJobAssignmentsInstance as unknown as JobsAssignmentsDaoSupabase
+    );
   });
 
   const mockAssociate = {
