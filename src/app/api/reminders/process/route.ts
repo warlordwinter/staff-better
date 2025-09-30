@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ReminderService } from "@/lib/services/reminderService";
-import { SchedulerService } from "@/lib/services/schedulerService";
+import { serviceContainer } from "@/lib/services/ServiceContainer";
 
-const reminderService = new ReminderService();
-const schedulerService = new SchedulerService(reminderService);
+const schedulerService = serviceContainer.getSchedulerService();
 
 export async function POST(request: NextRequest) {
   try {

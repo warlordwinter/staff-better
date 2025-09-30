@@ -1,7 +1,7 @@
-import { IncomingMessageService } from "@/lib/services/IncomingMessageService";
+import { serviceContainer } from "@/lib/services/ServiceContainer";
 import { NextRequest, NextResponse } from "next/server";
 
-const messageService = new IncomingMessageService();
+const messageService = serviceContainer.getIncomingMessageService();
 
 export async function POST(request: NextRequest) {
   try {
