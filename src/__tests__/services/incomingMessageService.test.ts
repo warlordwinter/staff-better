@@ -1,4 +1,4 @@
-import { getAssociateByPhone } from "@/lib/dao/AssociatesDao";
+import { AssociatesDaoSupabase } from "@/lib/dao/implementations/supabase/AssociatesDaoSupabase";
 import {
   getActiveAssignmentsFromDatabase,
   updateJobAssignment,
@@ -13,12 +13,11 @@ jest.mock("@/lib/dao/AssociatesDao");
 jest.mock("@/lib/dao/JobsAssignmentsDao");
 jest.mock("@/lib/twilio/sms");
 
-const mockGetAssociateByPhone = getAssociateByPhone as jest.MockedFunction<
-  typeof getAssociateByPhone
+const mockAssociatesDao = AssociatesDaoSupabase as jest.MockedClass<
+  typeof AssociatesDaoSupabase
 >;
-// const mockOptOutAssociate = optOutAssociate as jest.MockedFunction<
-//   typeof optOutAssociate
-// >;
+const mockGetAssociateByPhone = jest.fn();
+const mockOptOutAssociate = jest.fn();
 const mockGetActiveAssignmentsFromDatabase =
   getActiveAssignmentsFromDatabase as jest.MockedFunction<
     typeof getActiveAssignmentsFromDatabase
@@ -34,6 +33,13 @@ describe("IncomingMessageService", () => {
   beforeEach(() => {
     service = new IncomingMessageService();
     jest.clearAllMocks();
+
+    // Set up mock instance methods
+    const mockInstance = {
+      getAssociateByPhone: mockGetAssociateByPhone,
+      optOutAssociate: mockOptOutAssociate,
+    };
+    mockAssociatesDao.mockImplementation(() => mockInstance as any);
   });
 
   const mockAssociate = {

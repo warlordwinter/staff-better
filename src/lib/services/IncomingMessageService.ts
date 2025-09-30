@@ -4,11 +4,14 @@ import {
   getActiveAssignmentsFromDatabase,
   updateJobAssignment,
 } from "../dao/JobsAssignmentsDao";
-import { getAssociateByPhone, optOutAssociate } from "../dao/AssociatesDao";
+import { AssociatesDaoSupabase } from "../dao/implementations/supabase/AssociatesDaoSupabase";
 import { sendSMS } from "../twilio/sms";
 import { SMSMessage } from "../twilio/types";
 import { ConfirmationStatus } from "@/model/enums/ConfirmationStatus";
 import { Associate } from "@/model/interfaces/Associate";
+
+// Create instance of AssociatesDaoSupabase
+const associatesDao = new AssociatesDaoSupabase();
 
 export interface IncomingMessageResult {
   success: boolean;
@@ -51,7 +54,9 @@ export class IncomingMessageService {
       const normalizedPhone = this.normalizePhoneNumber(fromNumber);
 
       // Find the associate by phone number
-      const associate = await getAssociateByPhone(normalizedPhone);
+      const associate = await associatesDao.getAssociateByPhone(
+        normalizedPhone
+      );
 
       if (!associate) {
         console.log(`No associate found for phone number: ${normalizedPhone}`);
@@ -271,7 +276,7 @@ export class IncomingMessageService {
   ): Promise<IncomingMessageResult> {
     try {
       // Update associate to opt them out of SMS
-      await optOutAssociate(associate.id);
+      await associatesDao.optOutAssociate(associate.id);
 
       const optOutMessage =
         `${associate.first_name}, you have been unsubscribed from our text reminders. ` +
