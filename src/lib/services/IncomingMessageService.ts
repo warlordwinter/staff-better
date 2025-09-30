@@ -411,7 +411,13 @@ export class IncomingMessageService {
 
     // Transform the data to match the ActiveAssignment interface
     const activeAssignments: ActiveAssignment[] = assignments.map(
-      (assignment: any) => ({
+      (assignment: {
+        job_id: string;
+        associate_id: string;
+        work_date: string;
+        start_time: string;
+        confirmation_status: string;
+      }) => ({
         job_id: assignment.job_id,
         associate_id: assignment.associate_id,
         work_date: new Date(assignment.work_date),

@@ -38,9 +38,11 @@ describe("IncomingMessageService", () => {
       getActiveAssignmentsFromDatabase: mockGetActiveAssignmentsFromDatabase,
       updateJobAssignment: mockUpdateJobAssignment,
     };
-    mockAssociatesDao.mockImplementation(() => mockAssociatesInstance as any);
+    mockAssociatesDao.mockImplementation(
+      () => mockAssociatesInstance as unknown as AssociatesDaoSupabase
+    );
     mockJobAssignmentsDao.mockImplementation(
-      () => mockJobAssignmentsInstance as any
+      () => mockJobAssignmentsInstance as unknown as JobsAssignmentsDaoSupabase
     );
   });
 

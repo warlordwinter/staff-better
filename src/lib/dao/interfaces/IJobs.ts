@@ -1,3 +1,5 @@
+import { Job } from "@/model/interfaces/Job";
+
 export interface IJobs {
   insertJobs(
     jobs: {
@@ -6,9 +8,9 @@ export interface IJobs {
       job_status: string;
       start_date: string;
     }[]
-  ): Promise<any[]>;
+  ): Promise<Job[]>;
 
-  getJobs(): Promise<any[]>;
+  getJobs(): Promise<Job[]>;
 
   updateJob(
     id: string,
@@ -18,9 +20,9 @@ export interface IJobs {
       job_status: string;
       start_date: string;
     }>
-  ): Promise<any[]>;
+  ): Promise<Job[]>;
 
   deleteJob(id: string): Promise<{ success: boolean }>;
 
-  getJobById(id: string): Promise<any>;
+  getJobById(id: string): Promise<Job>;
 }

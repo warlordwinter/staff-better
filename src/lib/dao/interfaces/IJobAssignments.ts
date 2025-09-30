@@ -1,4 +1,5 @@
 import { ConfirmationStatus } from "@/model/enums/ConfirmationStatus";
+import { JobAssignment } from "@/model/interfaces/JobAssignment";
 
 export interface IJobAssignments {
   insertJobsAssignments(
@@ -15,9 +16,9 @@ export interface IJobAssignments {
       start_time: string;
       num_reminders?: number;
     }[]
-  ): Promise<any[]>;
+  ): Promise<JobAssignment[]>;
 
-  getJobAssignmentsByJobId(jobId: string): Promise<any[]>;
+  getJobAssignmentsByJobId(jobId: string): Promise<JobAssignment[]>;
 
   insertSingleJobAssignment(
     jobId: string,
@@ -33,7 +34,7 @@ export interface IJobAssignments {
       start_time: string;
       num_reminders?: number;
     }
-  ): Promise<any[]>;
+  ): Promise<JobAssignment[]>;
 
   updateJobAssignment(
     jobId: string,
@@ -46,7 +47,7 @@ export interface IJobAssignments {
       last_reminder_time?: string;
       last_confirmation_time?: string;
     }
-  ): Promise<any[]>;
+  ): Promise<JobAssignment[]>;
 
   deleteJobAssignment(
     jobId: string,
@@ -55,13 +56,16 @@ export interface IJobAssignments {
 
   getNumberOfReminders(jobId: string, associateId: string): Promise<number>;
 
-  getJobAssignment(jobId: string, associateId: string): Promise<any | null>;
+  getJobAssignment(
+    jobId: string,
+    associateId: string
+  ): Promise<JobAssignment | null>;
 
-  getAssignmentsNeedingReminders(): Promise<any[]>;
+  getAssignmentsNeedingReminders(): Promise<JobAssignment[]>;
 
   getActiveAssignmentsFromDatabase(
     todayString: string,
     daysFromNow: string,
     associateId: string
-  ): Promise<any[]>;
+  ): Promise<JobAssignment[]>;
 }

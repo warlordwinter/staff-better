@@ -1,7 +1,7 @@
 import { Associate } from "@/model/interfaces/Associate";
 
 export interface IAssociates {
-  getAssociates(): Promise<any[]>;
+  getAssociates(): Promise<Associate[]>;
   insertAssociates(
     associates: {
       first_name: string;
@@ -11,7 +11,7 @@ export interface IAssociates {
       phone_number: string;
       email_address: string;
     }[]
-  ): Promise<any[]>;
+  ): Promise<Associate[]>;
   updateAssociate(
     id: string,
     updates: Partial<{
@@ -22,7 +22,7 @@ export interface IAssociates {
       phone_number: string;
       email_address: string;
     }>
-  ): Promise<any[]>;
+  ): Promise<Associate[]>;
   deleteAssociate(id: string): Promise<{ success: boolean }>;
   getAssociateByPhone(phoneNumber: string): Promise<Associate | null>;
   optOutAssociate(associateId: string): Promise<void>;

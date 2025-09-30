@@ -51,7 +51,9 @@ describe("ReminderService", () => {
       getNumberOfReminders: jest.fn(),
       updateJobAssignment: jest.fn(),
     };
-    mockedJobsDao.mockImplementation(() => mockJobsInstance as any);
+    mockedJobsDao.mockImplementation(
+      () => mockJobsInstance as unknown as JobsAssignmentsDaoSupabase
+    );
 
     const mockReminderInstance = {
       getDayBeforeReminders: jest.fn(),
@@ -60,16 +62,35 @@ describe("ReminderService", () => {
       getAssignmentsNotRecentlyReminded: jest.fn(),
       getReminderAssignment: jest.fn(),
     };
-    mockedReminderDao.mockImplementation(() => mockReminderInstance as any);
+    mockedReminderDao.mockImplementation(
+      () => mockReminderInstance as unknown as ReminderDaoSupabase
+    );
 
     // Make the mock instances available globally for tests
-    (global as any).mockJobsInstance = mockJobsInstance;
-    (global as any).mockReminderInstance = mockReminderInstance;
+    (global as Record<string, unknown>).mockJobsInstance =
+      mockJobsInstance as unknown;
+    (global as Record<string, unknown>).mockReminderInstance =
+      mockReminderInstance as unknown;
 
     // Mock console methods to avoid cluttering test output
     jest.spyOn(console, "log").mockImplementation();
     jest.spyOn(console, "error").mockImplementation();
   });
+
+  // Helper function to get typed mock instances
+  const getMockJobsInstance = () =>
+    (global as Record<string, unknown>).mockJobsInstance as {
+      getNumberOfReminders: jest.Mock;
+      updateJobAssignment: jest.Mock;
+    };
+  const getMockReminderInstance = () =>
+    (global as Record<string, unknown>).mockReminderInstance as {
+      getDayBeforeReminders: jest.Mock;
+      getMorningOfReminders: jest.Mock;
+      getTwoDaysBeforeReminders: jest.Mock;
+      getAssignmentsNotRecentlyReminded: jest.Mock;
+      getReminderAssignment: jest.Mock;
+    };
 
   afterEach(() => {
     jest.restoreAllMocks();
@@ -88,30 +109,18 @@ describe("ReminderService", () => {
         sentAt: new Date(),
       };
 
-      (
-        global as any
-      ).mockReminderInstance.getDayBeforeReminders.mockResolvedValue(
+      getMockReminderInstance().getDayBeforeReminders.mockResolvedValue(
         mockAssignments
       );
-      (
-        global as any
-      ).mockReminderInstance.getMorningOfReminders.mockResolvedValue([]);
-      (
-        global as any
-      ).mockReminderInstance.getTwoDaysBeforeReminders.mockResolvedValue([]);
-      (
-        global as any
-      ).mockReminderInstance.getAssignmentsNotRecentlyReminded.mockResolvedValue(
+      getMockReminderInstance().getMorningOfReminders.mockResolvedValue([]);
+      getMockReminderInstance().getTwoDaysBeforeReminders.mockResolvedValue([]);
+      getMockReminderInstance().getAssignmentsNotRecentlyReminded.mockResolvedValue(
         mockAssignments
       );
       mockedSMS.formatPhoneNumber.mockReturnValue("+15551234567");
       mockedSMS.sendSMS.mockResolvedValue(mockSMSResult);
-      (global as any).mockJobsInstance.getNumberOfReminders.mockResolvedValue(
-        3
-      );
-      (global as any).mockJobsInstance.updateJobAssignment.mockResolvedValue(
-        []
-      );
+      getMockJobsInstance().getNumberOfReminders.mockResolvedValue(3);
+      getMockJobsInstance().updateJobAssignment.mockResolvedValue([]);
 
       // Act
       const results = await reminderService.processScheduledReminders();
@@ -121,9 +130,7 @@ describe("ReminderService", () => {
       expect(results[0].success).toBe(true);
       expect(results[0].assignment_id).toBe("job-123-assoc-456");
       expect(results[0].message_id).toBe("msg-123");
-      expect(
-        (global as any).mockJobsInstance.updateJobAssignment
-      ).toHaveBeenCalledWith(
+      expect(getMockJobsInstance().updateJobAssignment).toHaveBeenCalledWith(
         "job-123",
         "assoc-456",
         expect.objectContaining({
@@ -135,9 +142,7 @@ describe("ReminderService", () => {
 
     it("should handle errors gracefully", async () => {
       // Arrange
-      (
-        global as any
-      ).mockReminderInstance.getDayBeforeReminders.mockRejectedValue(
+      getMockReminderInstance().getDayBeforeReminders.mockRejectedValue(
         new Error("Database error")
       );
 
@@ -159,21 +164,13 @@ describe("ReminderService", () => {
         associate_id: "assoc-success",
       };
 
-      (
-        global as any
-      ).mockReminderInstance.getDayBeforeReminders.mockResolvedValue([
+      getMockReminderInstance().getDayBeforeReminders.mockResolvedValue([
         failingAssignment,
         successAssignment,
       ]);
-      (
-        global as any
-      ).mockReminderInstance.getMorningOfReminders.mockResolvedValue([]);
-      (
-        global as any
-      ).mockReminderInstance.getTwoDaysBeforeReminders.mockResolvedValue([]);
-      (
-        global as any
-      ).mockReminderInstance.getAssignmentsNotRecentlyReminded.mockResolvedValue(
+      getMockReminderInstance().getMorningOfReminders.mockResolvedValue([]);
+      getMockReminderInstance().getTwoDaysBeforeReminders.mockResolvedValue([]);
+      getMockReminderInstance().getAssignmentsNotRecentlyReminded.mockResolvedValue(
         [failingAssignment, successAssignment]
       );
 
@@ -195,12 +192,8 @@ describe("ReminderService", () => {
           sentAt: new Date(),
         } as SMSSuccess);
 
-      (global as any).mockJobsInstance.getNumberOfReminders.mockResolvedValue(
-        3
-      );
-      (global as any).mockJobsInstance.updateJobAssignment.mockResolvedValue(
-        []
-      );
+      getMockJobsInstance().getNumberOfReminders.mockResolvedValue(3);
+      getMockJobsInstance().updateJobAssignment.mockResolvedValue([]);
 
       // Act
       const results = await reminderService.processScheduledReminders();
@@ -295,9 +288,7 @@ describe("ReminderService", () => {
   describe("sendTestReminder", () => {
     it("should send test reminder successfully", async () => {
       // Arrange
-      (
-        global as any
-      ).mockReminderInstance.getReminderAssignment.mockResolvedValue(
+      getMockReminderInstance().getReminderAssignment.mockResolvedValue(
         mockAssignment
       );
       mockedSMS.formatPhoneNumber.mockReturnValue("+15551234567");
@@ -320,15 +311,13 @@ describe("ReminderService", () => {
       expect(result.success).toBe(true);
       expect(result.reminder_type).toBe(ReminderType.DAY_BEFORE);
       expect(
-        (global as any).mockReminderInstance.getReminderAssignment
+        getMockReminderInstance().getReminderAssignment
       ).toHaveBeenCalledWith("job-123", "assoc-456");
     });
 
     it("should throw error when assignment not found", async () => {
       // Arrange
-      (
-        global as any
-      ).mockReminderInstance.getReminderAssignment.mockResolvedValue(null);
+      getMockReminderInstance().getReminderAssignment.mockResolvedValue(null);
 
       // Act & Assert
       await expect(
@@ -438,20 +427,12 @@ describe("ReminderService", () => {
       // Arrange - this is tested indirectly through processScheduledReminders
       const mockAssignments = [mockAssignment];
 
-      (
-        global as any
-      ).mockReminderInstance.getDayBeforeReminders.mockResolvedValue(
+      getMockReminderInstance().getDayBeforeReminders.mockResolvedValue(
         mockAssignments
       );
-      (
-        global as any
-      ).mockReminderInstance.getMorningOfReminders.mockResolvedValue([]);
-      (
-        global as any
-      ).mockReminderInstance.getTwoDaysBeforeReminders.mockResolvedValue([]);
-      (
-        global as any
-      ).mockReminderInstance.getAssignmentsNotRecentlyReminded.mockResolvedValue(
+      getMockReminderInstance().getMorningOfReminders.mockResolvedValue([]);
+      getMockReminderInstance().getTwoDaysBeforeReminders.mockResolvedValue([]);
+      getMockReminderInstance().getAssignmentsNotRecentlyReminded.mockResolvedValue(
         mockAssignments
       );
       mockedSMS.formatPhoneNumber.mockReturnValue("+15551234567");
@@ -463,19 +444,13 @@ describe("ReminderService", () => {
         from: "+15559876543",
         sentAt: new Date(),
       });
-      (global as any).mockJobsInstance.getNumberOfReminders.mockResolvedValue(
-        2
-      );
-      (global as any).mockJobsInstance.updateJobAssignment.mockResolvedValue(
-        []
-      );
+      getMockJobsInstance().getNumberOfReminders.mockResolvedValue(2);
+      getMockJobsInstance().updateJobAssignment.mockResolvedValue([]);
 
       // Act
       await reminderService.processScheduledReminders();
       // Assert
-      expect(
-        (global as any).mockJobsInstance.updateJobAssignment
-      ).toHaveBeenCalledWith(
+      expect(getMockJobsInstance().updateJobAssignment).toHaveBeenCalledWith(
         "job-123",
         "assoc-456",
         expect.objectContaining({
@@ -489,20 +464,12 @@ describe("ReminderService", () => {
       // Arrange
       const mockAssignments = [mockAssignment];
 
-      (
-        global as any
-      ).mockReminderInstance.getDayBeforeReminders.mockResolvedValue(
+      getMockReminderInstance().getDayBeforeReminders.mockResolvedValue(
         mockAssignments
       );
-      (
-        global as any
-      ).mockReminderInstance.getMorningOfReminders.mockResolvedValue([]);
-      (
-        global as any
-      ).mockReminderInstance.getTwoDaysBeforeReminders.mockResolvedValue([]);
-      (
-        global as any
-      ).mockReminderInstance.getAssignmentsNotRecentlyReminded.mockResolvedValue(
+      getMockReminderInstance().getMorningOfReminders.mockResolvedValue([]);
+      getMockReminderInstance().getTwoDaysBeforeReminders.mockResolvedValue([]);
+      getMockReminderInstance().getAssignmentsNotRecentlyReminded.mockResolvedValue(
         mockAssignments
       );
       mockedSMS.formatPhoneNumber.mockReturnValue("+15551234567");
@@ -514,37 +481,25 @@ describe("ReminderService", () => {
         from: "+15559876543",
         sentAt: new Date(),
       });
-      (global as any).mockJobsInstance.getNumberOfReminders.mockResolvedValue(
-        0
-      );
+      getMockJobsInstance().getNumberOfReminders.mockResolvedValue(0);
 
       // Act
       await reminderService.processScheduledReminders();
 
       // Assert
-      expect(
-        (global as any).mockJobsInstance.updateJobAssignment
-      ).not.toHaveBeenCalled();
+      expect(getMockJobsInstance().updateJobAssignment).not.toHaveBeenCalled();
     });
 
     it("should handle database update errors gracefully", async () => {
       // Arrange
       const mockAssignments = [mockAssignment];
 
-      (
-        global as any
-      ).mockReminderInstance.getDayBeforeReminders.mockResolvedValue(
+      getMockReminderInstance().getDayBeforeReminders.mockResolvedValue(
         mockAssignments
       );
-      (
-        global as any
-      ).mockReminderInstance.getMorningOfReminders.mockResolvedValue([]);
-      (
-        global as any
-      ).mockReminderInstance.getTwoDaysBeforeReminders.mockResolvedValue([]);
-      (
-        global as any
-      ).mockReminderInstance.getAssignmentsNotRecentlyReminded.mockResolvedValue(
+      getMockReminderInstance().getMorningOfReminders.mockResolvedValue([]);
+      getMockReminderInstance().getTwoDaysBeforeReminders.mockResolvedValue([]);
+      getMockReminderInstance().getAssignmentsNotRecentlyReminded.mockResolvedValue(
         mockAssignments
       );
       mockedSMS.formatPhoneNumber.mockReturnValue("+15551234567");
@@ -556,10 +511,8 @@ describe("ReminderService", () => {
         from: "+15559876543",
         sentAt: new Date(),
       });
-      (global as any).mockJobsInstance.getNumberOfReminders.mockResolvedValue(
-        2
-      );
-      (global as any).mockJobsInstance.updateJobAssignment.mockRejectedValue(
+      getMockJobsInstance().getNumberOfReminders.mockResolvedValue(2);
+      getMockJobsInstance().updateJobAssignment.mockRejectedValue(
         new Error("DB Error")
       );
 
@@ -636,20 +589,14 @@ describe("ReminderService", () => {
           { ...mockAssignment, associate_id: "assoc-2" },
         ];
 
-        (
-          global as any
-        ).mockReminderInstance.getDayBeforeReminders.mockResolvedValue(
+        getMockReminderInstance().getDayBeforeReminders.mockResolvedValue(
           mockAssignments
         );
-        (
-          global as any
-        ).mockReminderInstance.getMorningOfReminders.mockResolvedValue([]);
-        (
-          global as any
-        ).mockReminderInstance.getTwoDaysBeforeReminders.mockResolvedValue([]);
-        (
-          global as any
-        ).mockReminderInstance.getAssignmentsNotRecentlyReminded.mockResolvedValue(
+        getMockReminderInstance().getMorningOfReminders.mockResolvedValue([]);
+        getMockReminderInstance().getTwoDaysBeforeReminders.mockResolvedValue(
+          []
+        );
+        getMockReminderInstance().getAssignmentsNotRecentlyReminded.mockResolvedValue(
           mockAssignments
         );
         mockedSMS.formatPhoneNumber.mockReturnValue("+15551234567");
@@ -661,12 +608,8 @@ describe("ReminderService", () => {
           from: "+15559876543",
           sentAt: new Date(),
         });
-        (global as any).mockJobsInstance.getNumberOfReminders.mockResolvedValue(
-          2
-        );
-        (global as any).mockJobsInstance.updateJobAssignment.mockResolvedValue(
-          []
-        );
+        getMockJobsInstance().getNumberOfReminders.mockResolvedValue(2);
+        getMockJobsInstance().updateJobAssignment.mockResolvedValue([]);
 
         // Act
         await reminderService.processScheduledReminders();
@@ -684,18 +627,10 @@ describe("ReminderService", () => {
   describe("Edge cases", () => {
     it("should handle empty reminder assignments", async () => {
       // Arrange
-      (
-        global as any
-      ).mockReminderInstance.getDayBeforeReminders.mockResolvedValue([]);
-      (
-        global as any
-      ).mockReminderInstance.getMorningOfReminders.mockResolvedValue([]);
-      (
-        global as any
-      ).mockReminderInstance.getTwoDaysBeforeReminders.mockResolvedValue([]);
-      (
-        global as any
-      ).mockReminderInstance.getAssignmentsNotRecentlyReminded.mockResolvedValue(
+      getMockReminderInstance().getDayBeforeReminders.mockResolvedValue([]);
+      getMockReminderInstance().getMorningOfReminders.mockResolvedValue([]);
+      getMockReminderInstance().getTwoDaysBeforeReminders.mockResolvedValue([]);
+      getMockReminderInstance().getAssignmentsNotRecentlyReminded.mockResolvedValue(
         []
       );
 

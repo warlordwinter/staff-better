@@ -252,6 +252,15 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
       return [];
     }
 
-    return data;
+    // Transform the data to match JobAssignment interface
+    return data.map((assignment) => ({
+      job_id: assignment.job_id,
+      associate_id: assignment.associate_id,
+      confirmation_status: assignment.confirmation_status,
+      last_activity_time: new Date().toISOString(), // Default to current time
+      work_date: assignment.work_date,
+      start_time: assignment.start_time,
+      num_reminders: 0, // Default value
+    }));
   }
 }
