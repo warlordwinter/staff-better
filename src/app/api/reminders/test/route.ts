@@ -1,7 +1,7 @@
 // app/api/reminders/test/route.ts
 
-import { NextRequest, NextResponse } from 'next/server';
-import { ReminderService } from '@/lib/services/reminderService';
+import { NextRequest, NextResponse } from "next/server";
+import { serviceContainer } from "@/lib/services/ServiceContainer";
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,25 +9,24 @@ export async function POST(request: NextRequest) {
 
     if (!jobId || !associateId) {
       return NextResponse.json(
-        { error: 'jobId and associateId are required' },
+        { error: "jobId and associateId are required" },
         { status: 400 }
       );
     }
 
-    const reminderService = new ReminderService();
+    const reminderService = serviceContainer.getReminderService();
     const result = await reminderService.sendTestReminder(jobId, associateId);
 
     return NextResponse.json({
       success: true,
-      result
+      result,
     });
-
   } catch (error) {
-    console.error('Test reminder error:', error);
+    console.error("Test reminder error:", error);
     return NextResponse.json(
-      { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 }
     );
@@ -41,7 +40,7 @@ export async function PUT(request: NextRequest) {
 
     if (!phone_number) {
       return NextResponse.json(
-        { error: 'phone_number is required' },
+        { error: "phone_number is required" },
         { status: 400 }
       );
     }
@@ -52,16 +51,15 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Test data created',
-      data: testData
+      message: "Test data created",
+      data: testData,
     });
-
   } catch (error) {
-    console.error('Create test data error:', error);
+    console.error("Create test data error:", error);
     return NextResponse.json(
-      { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 }
     );
@@ -72,36 +70,36 @@ export async function PUT(request: NextRequest) {
 async function createTestJobAssignment(phoneNumber: string) {
   // You'll need to implement this with your Supabase client
   // This is pseudocode showing what data you'd need
-  
+
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
-  
+
   const testJob = {
-    id: 'test-job-id',
-    job_title: 'Test Cleaning Job',
-    customer_name: 'Test Customer',
-    job_status: 'Upcoming' as const,
-    start_date: tomorrow
+    id: "test-job-id",
+    job_title: "Test Cleaning Job",
+    customer_name: "Test Customer",
+    job_status: "Upcoming" as const,
+    start_date: tomorrow,
   };
 
   const testAssociate = {
-    id: 'test-associate-id',
-    first_name: 'Test',
-    last_name: 'User',
+    id: "test-associate-id",
+    first_name: "Test",
+    last_name: "User",
     work_date: tomorrow,
-    start_time: '09:00',
+    start_time: "09:00",
     phone_number: phoneNumber,
-    email_address: 'test@example.com'
+    email_address: "test@example.com",
   };
 
   const testAssignment = {
     job_id: testJob.id,
     associate_id: testAssociate.id,
-    confirmation_status: 'Pending' as const,
+    confirmation_status: "Pending" as const,
     last_confirmation_time: null,
     work_date: tomorrow,
-    start_time: '09:00',
-    num_reminders: 3
+    start_time: "09:00",
+    num_reminders: 3,
   };
 
   // Insert into your database here
@@ -112,6 +110,6 @@ async function createTestJobAssignment(phoneNumber: string) {
   return {
     job: testJob,
     associate: testAssociate,
-    assignment: testAssignment
+    assignment: testAssignment,
   };
 }

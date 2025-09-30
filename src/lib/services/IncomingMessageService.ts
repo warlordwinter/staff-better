@@ -8,7 +8,6 @@ import {
 } from "./interfaces/index";
 import { MessageAction, IncomingMessageResult } from "./types";
 import { Associate } from "@/model/interfaces/Associate";
-import { ConfirmationStatus } from "@/model/enums/ConfirmationStatus";
 import { IMessageHandler } from "./messageHandlers/IMessageHandler";
 import { ConfirmationHandler } from "./messageHandlers/ConfirmationHandler";
 import { HelpHandler } from "./messageHandlers/HelpHandler";

@@ -1,7 +1,7 @@
 // Export all interfaces
 
-export { IReminderRepository } from "./IReminderRepository";
-export { IMessageService } from "./IMessageService";
-export { ILogger } from "./ILogger";
-export { IAssociateRepository } from "./IAssociateRepository";
-export { IAssignmentRepository } from "./IAssignmentRepository";
+export type { IReminderRepository } from "./IReminderRepository";
+export type { IMessageService } from "./IMessageService";
+export type { ILogger } from "./ILogger";
+export type { IAssociateRepository } from "./IAssociateRepository";
+export type { IAssignmentRepository } from "./IAssignmentRepository";
