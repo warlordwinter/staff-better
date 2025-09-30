@@ -5,18 +5,20 @@ import {
   ReminderType,
   ReminderAssignment,
 } from "@/lib/services/reminderService";
-import * as JobsAssignmentsDao from "@/lib/dao/JobsAssignmentsDao";
+import { JobsAssignmentsDaoSupabase } from "@/lib/dao/implementations/supabase/JobsAssignmentsDaoSupabase";
 import * as ReminderDao from "@/lib/dao/ReminderDao";
 import * as SMS from "@/lib/twilio/sms";
 import { SMSSuccess, SMSError } from "@/lib/twilio/types";
 
 // Mock all external dependencies
-jest.mock("@/lib/dao/JobsAssignmentsDao");
+jest.mock("@/lib/dao/implementations/supabase/JobsAssignmentsDaoSupabase");
 jest.mock("@/lib/dao/ReminderDao");
 jest.mock("@/lib/twilio/sms");
 
 // Type the mocked modules
-const mockedJobsDao = jest.mocked(JobsAssignmentsDao);
+const mockedJobsDao = JobsAssignmentsDaoSupabase as jest.MockedClass<
+  typeof JobsAssignmentsDaoSupabase
+>;
 const mockedReminderDao = jest.mocked(ReminderDao);
 const mockedSMS = jest.mocked(SMS);
 
@@ -41,6 +43,16 @@ describe("ReminderService", () => {
   beforeEach(() => {
     reminderService = new ReminderService();
     jest.clearAllMocks();
+
+    // Set up mock instance methods
+    const mockInstance = {
+      getNumberOfReminders: jest.fn(),
+      updateJobAssignment: jest.fn(),
+    };
+    mockedJobsDao.mockImplementation(() => mockInstance as any);
+
+    // Make the mock instance available globally for tests
+    (global as any).mockJobsInstance = mockInstance;
 
     // Mock console methods to avoid cluttering test output
     jest.spyOn(console, "log").mockImplementation();
@@ -74,8 +86,12 @@ describe("ReminderService", () => {
       );
       mockedSMS.formatPhoneNumber.mockReturnValue("+15551234567");
       mockedSMS.sendSMS.mockResolvedValue(mockSMSResult);
-      mockedJobsDao.getNumberOfReminders.mockResolvedValue(3);
-      mockedJobsDao.updateJobAssignment.mockResolvedValue([]);
+      (global as any).mockJobsInstance.getNumberOfReminders.mockResolvedValue(
+        3
+      );
+      (global as any).mockJobsInstance.updateJobAssignment.mockResolvedValue(
+        []
+      );
 
       // Act
       const results = await reminderService.processScheduledReminders();
@@ -85,7 +101,9 @@ describe("ReminderService", () => {
       expect(results[0].success).toBe(true);
       expect(results[0].assignment_id).toBe("job-123-assoc-456");
       expect(results[0].message_id).toBe("msg-123");
-      expect(mockedJobsDao.updateJobAssignment).toHaveBeenCalledWith(
+      expect(
+        (global as any).mockJobsInstance.updateJobAssignment
+      ).toHaveBeenCalledWith(
         "job-123",
         "assoc-456",
         expect.objectContaining({
@@ -148,8 +166,12 @@ describe("ReminderService", () => {
           sentAt: new Date(),
         } as SMSSuccess);
 
-      mockedJobsDao.getNumberOfReminders.mockResolvedValue(3);
-      mockedJobsDao.updateJobAssignment.mockResolvedValue([]);
+      (global as any).mockJobsInstance.getNumberOfReminders.mockResolvedValue(
+        3
+      );
+      (global as any).mockJobsInstance.updateJobAssignment.mockResolvedValue(
+        []
+      );
 
       // Act
       const results = await reminderService.processScheduledReminders();
@@ -399,13 +421,19 @@ describe("ReminderService", () => {
         from: "+15559876543",
         sentAt: new Date(),
       });
-      mockedJobsDao.getNumberOfReminders.mockResolvedValue(2);
-      mockedJobsDao.updateJobAssignment.mockResolvedValue([]);
+      (global as any).mockJobsInstance.getNumberOfReminders.mockResolvedValue(
+        2
+      );
+      (global as any).mockJobsInstance.updateJobAssignment.mockResolvedValue(
+        []
+      );
 
       // Act
       await reminderService.processScheduledReminders();
       // Assert
-      expect(mockedJobsDao.updateJobAssignment).toHaveBeenCalledWith(
+      expect(
+        (global as any).mockJobsInstance.updateJobAssignment
+      ).toHaveBeenCalledWith(
         "job-123",
         "assoc-456",
         expect.objectContaining({
@@ -436,13 +464,17 @@ describe("ReminderService", () => {
         from: "+15559876543",
         sentAt: new Date(),
       });
-      mockedJobsDao.getNumberOfReminders.mockResolvedValue(0);
+      (global as any).mockJobsInstance.getNumberOfReminders.mockResolvedValue(
+        0
+      );
 
       // Act
       await reminderService.processScheduledReminders();
 
       // Assert
-      expect(mockedJobsDao.updateJobAssignment).not.toHaveBeenCalled();
+      expect(
+        (global as any).mockJobsInstance.updateJobAssignment
+      ).not.toHaveBeenCalled();
     });
 
     it("should handle database update errors gracefully", async () => {
@@ -466,8 +498,10 @@ describe("ReminderService", () => {
         from: "+15559876543",
         sentAt: new Date(),
       });
-      mockedJobsDao.getNumberOfReminders.mockResolvedValue(2);
-      mockedJobsDao.updateJobAssignment.mockRejectedValue(
+      (global as any).mockJobsInstance.getNumberOfReminders.mockResolvedValue(
+        2
+      );
+      (global as any).mockJobsInstance.updateJobAssignment.mockRejectedValue(
         new Error("DB Error")
       );
 
@@ -561,8 +595,12 @@ describe("ReminderService", () => {
           from: "+15559876543",
           sentAt: new Date(),
         });
-        mockedJobsDao.getNumberOfReminders.mockResolvedValue(2);
-        mockedJobsDao.updateJobAssignment.mockResolvedValue([]);
+        (global as any).mockJobsInstance.getNumberOfReminders.mockResolvedValue(
+          2
+        );
+        (global as any).mockJobsInstance.updateJobAssignment.mockResolvedValue(
+          []
+        );
 
         // Act
         await reminderService.processScheduledReminders();

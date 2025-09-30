@@ -1,17 +1,15 @@
 // Service for handling incoming SMS messages from associates
 
-import {
-  getActiveAssignmentsFromDatabase,
-  updateJobAssignment,
-} from "../dao/JobsAssignmentsDao";
 import { AssociatesDaoSupabase } from "../dao/implementations/supabase/AssociatesDaoSupabase";
+import { JobsAssignmentsDaoSupabase } from "../dao/implementations/supabase/JobsAssignmentsDaoSupabase";
 import { sendSMS } from "../twilio/sms";
 import { SMSMessage } from "../twilio/types";
 import { ConfirmationStatus } from "@/model/enums/ConfirmationStatus";
 import { Associate } from "@/model/interfaces/Associate";
 
-// Create instance of AssociatesDaoSupabase
+// Create instances of DAOs
 const associatesDao = new AssociatesDaoSupabase();
+const jobAssignmentsDao = new JobsAssignmentsDaoSupabase();
 
 export interface IncomingMessageResult {
   success: boolean;
@@ -209,10 +207,14 @@ export class IncomingMessageService {
       for (const assignment of activeAssignments) {
         const newStatus = this.determineConfirmationStatus(assignment);
 
-        await updateJobAssignment(assignment.job_id, assignment.associate_id, {
-          confirmation_status: newStatus,
-          last_confirmation_time: new Date().toISOString(),
-        });
+        await jobAssignmentsDao.updateJobAssignment(
+          assignment.job_id,
+          assignment.associate_id,
+          {
+            confirmation_status: newStatus,
+            last_confirmation_time: new Date().toISOString(),
+          }
+        );
 
         updatedCount++;
       }
@@ -400,15 +402,16 @@ export class IncomingMessageService {
     console.log(`Getting active assignments for associate: ${associateId}`);
     console.log(`Date range: ${todayString} to ${sevenDaysString}`);
 
-    const assignments = await getActiveAssignmentsFromDatabase(
-      todayString,
-      sevenDaysString,
-      associateId
-    );
+    const assignments =
+      await jobAssignmentsDao.getActiveAssignmentsFromDatabase(
+        todayString,
+        sevenDaysString,
+        associateId
+      );
 
     // Transform the data to match the ActiveAssignment interface
     const activeAssignments: ActiveAssignment[] = assignments.map(
-      (assignment) => ({
+      (assignment: any) => ({
         job_id: assignment.job_id,
         associate_id: assignment.associate_id,
         work_date: new Date(assignment.work_date),

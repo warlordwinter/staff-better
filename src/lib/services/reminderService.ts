@@ -1,10 +1,7 @@
 // Core reminder business logic
 
 import { convertUTCTimeToLocal } from "@/utils/timezoneUtils";
-import {
-  getNumberOfReminders,
-  updateJobAssignment,
-} from "../dao/JobsAssignmentsDao";
+import { JobsAssignmentsDaoSupabase } from "../dao/implementations/supabase/JobsAssignmentsDaoSupabase";
 import {
   getAssignmentsNotRecentlyReminded,
   getDayBeforeReminders,
@@ -13,6 +10,9 @@ import {
   getTwoDaysBeforeReminders,
 } from "../dao/ReminderDao";
 import { formatPhoneNumber, sendSMS } from "../twilio/sms";
+
+// Create instance of JobsAssignmentsDaoSupabase
+const jobAssignmentsDao = new JobsAssignmentsDaoSupabase();
 import { SMSMessage, SMSResult } from "../twilio/types";
 
 export interface ReminderAssignment {
@@ -305,13 +305,11 @@ export class ReminderService {
     associate_id: string
   ): Promise<void> {
     try {
-      const currentReminders: number = await getNumberOfReminders(
-        job_id,
-        associate_id
-      );
+      const currentReminders: number =
+        await jobAssignmentsDao.getNumberOfReminders(job_id, associate_id);
 
       if (currentReminders > 0) {
-        await updateJobAssignment(job_id, associate_id, {
+        await jobAssignmentsDao.updateJobAssignment(job_id, associate_id, {
           num_reminders: currentReminders - 1, // Decrease the reminder count
           last_reminder_time: new Date().toISOString(),
         });

@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AssociatesDaoSupabase } from "@/lib/dao/implementations/supabase/AssociatesDaoSupabase";
 import { insertJobs } from "@/lib/dao/JobsDao";
-import { insertJobsAssignments } from "@/lib/dao/JobsAssignmentsDao";
+import { JobsAssignmentsDaoSupabase } from "@/lib/dao/implementations/supabase/JobsAssignmentsDaoSupabase";
 import { formatPhoneToE164 } from "@/utils/phoneUtils";
 import { Associate } from "@/model/interfaces/Associate";
 import { Job } from "@/model/interfaces/Job";
 import { JobAssignment } from "@/model/interfaces/JobAssignment";
 
 const associatesDao = new AssociatesDaoSupabase();
+const jobAssignmentsDao = new JobsAssignmentsDaoSupabase();
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -70,9 +71,8 @@ export async function POST(req: NextRequest) {
       start_time: r.start_time,
     }));
 
-    const jobAssignmentInsertion = await insertJobsAssignments(
-      jobAssignmentsData
-    );
+    const jobAssignmentInsertion =
+      await jobAssignmentsDao.insertJobsAssignments(jobAssignmentsData);
 
     // Return the results of both insertions
     return NextResponse.json({
