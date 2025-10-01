@@ -1,4 +1,7 @@
-import { IncomingMessageService } from "@/lib/services/IncomingMessageService";
+import {
+  IncomingMessageService,
+  MessageAction,
+} from "@/lib/services/IncomingMessageService";
 import {
   IAssignmentRepository,
   IAssociateRepository,
@@ -31,6 +34,8 @@ const mockLogger: jest.Mocked<ILogger> = {
 
 let service: IncomingMessageService;
 beforeAll(async () => {
+  jest.clearAllMocks();
+
   service = new IncomingMessageService(
     mockAssociateRepository,
     mockAssignmentRepository,
@@ -39,12 +44,40 @@ beforeAll(async () => {
   );
 });
 
+beforeEach(() => {
+  jest.resetAllMocks();
+});
+
 it("Processing an incoming message should return a success result", async () => {
-  const result = await service.processIncomingMessage("1234567890", "Hello");
+  mockAssociateRepository.getAssociateByPhone.mockResolvedValue({
+    id: "1",
+    first_name: "Wile E.",
+  } as any);
+
+  mockAssignmentRepository.getActiveAssignments.mockResolvedValue([
+    {
+      job_id: "job-1",
+      associate_id: "1",
+      work_date: new Date(),
+      start_time: "09:00",
+    },
+  ] as any);
+
+  mockAssignmentRepository.updateAssignmentStatus.mockResolvedValue(void 0);
+  mockMessageService.sendSMS.mockResolvedValue({ success: true } as any);
+
+  const result = await service.processIncomingMessage("1234567890", "C");
   expect(result.success).toBe(true);
+  expect(mockAssignmentRepository.getActiveAssignments).toHaveBeenCalledWith(
+    "1"
+  );
+  expect(mockAssignmentRepository.updateAssignmentStatus).toHaveBeenCalled();
+  expect(mockMessageService.sendSMS).toHaveBeenCalled();
 });
 
 it("Processing an incoming message should return a failure result", async () => {
+  mockAssociateRepository.getAssociateByPhone.mockResolvedValue(null);
+
   const result = await service.processIncomingMessage("1234567890", "Hello");
   expect(result.success).toBe(false);
 });

@@ -124,6 +124,8 @@ export class IncomingMessageService {
       return MessageAction.OPT_OUT;
     }
 
+    //TODO: Add a way to handle other messages
+
     return MessageAction.UNKNOWN;
   }
 
