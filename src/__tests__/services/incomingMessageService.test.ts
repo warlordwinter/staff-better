@@ -1,7 +1,5 @@
-import {
-  IncomingMessageService,
-  MessageAction,
-} from "@/lib/services/IncomingMessageService";
+import { IncomingMessageService } from "@/lib/services/IncomingMessageService";
+import { MessageAction } from "@/lib/services/types";
 import {
   IAssignmentRepository,
   IAssociateRepository,
@@ -52,14 +50,22 @@ it("Processing an incoming message should return a success result", async () => 
   mockAssociateRepository.getAssociateByPhone.mockResolvedValue({
     id: "1",
     first_name: "Wile E.",
+    last_name: "Coyote",
+    work_date: "2025-01-01",
+    start_time: "09:00",
+    phone_number: "+11234567890",
+    email_address: "wile@acme.com",
   } as any);
 
   mockAssignmentRepository.getActiveAssignments.mockResolvedValue([
     {
       job_id: "job-1",
       associate_id: "1",
+      confirmation_status: "PENDING",
+      last_activity_time: new Date().toISOString(),
       work_date: new Date(),
       start_time: "09:00",
+      num_reminders: 0,
     },
   ] as any);
 
@@ -81,3 +87,24 @@ it("Processing an incoming message should return a failure result", async () => 
   const result = await service.processIncomingMessage("1234567890", "Hello");
   expect(result.success).toBe(false);
 });
+
+it("Processing an incoming message for help should return success and HELP action", async () => {
+  mockAssociateRepository.getAssociateByPhone.mockResolvedValue({
+    id: "1",
+    first_name: "Wile E.",
+    last_name: "Coyote",
+    work_date: "2025-01-01",
+    start_time: "09:00",
+    phone_number: "+11234567890",
+    email_address: "wile@acme.com",
+  } as any);
+
+  mockMessageService.sendSMS.mockResolvedValue({ success: true } as any);
+
+  const result = await service.processIncomingMessage("1234567890", "help");
+  expect(result.success).toBe(true);
+  expect(result.action).toBe(MessageAction.HELP_REQUEST);
+  expect(mockMessageService.sendSMS).toHaveBeenCalled();
+});
+
+// TODO: Add a test for processing an unknown message
