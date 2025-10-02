@@ -128,3 +128,94 @@ it("Sends a reminder to an associate", async () => {
     error: undefined,
   });
 });
+
+it("Handles error when sending reminder to associate", async () => {
+  mockMessageService.formatPhoneNumber.mockReturnValue("+11234567890");
+  mockMessageService.sendSMS.mockResolvedValue({
+    success: false,
+    error: "Failed to send message",
+    code: "30001",
+    to: "+11234567890",
+    sentAt: new Date(),
+  });
+
+  const mockAssignment: ReminderAssignment = {
+    job_id: "job-1",
+    associate_id: "assoc-1",
+    phone_number: "+11234567890",
+    work_date: new Date(),
+    start_time: "09:00",
+    associate_first_name: "Test",
+    associate_last_name: "User",
+    job_title: "Electrician",
+    customer_name: "Acme Co",
+    num_reminders: 0,
+  };
+
+  const result = await service.sendReminderToAssociate(
+    mockAssignment,
+    "day_before" as ReminderType
+  );
+
+  expect(result).toEqual({
+    success: false,
+    assignment_id: "job-1-assoc-1",
+    associate_id: "assoc-1",
+    phone_number: "+11234567890",
+    reminder_type: "day_before",
+    message_id: undefined,
+    error: "Failed to send message",
+  });
+});
+
+it("Handles exception when sending reminder to associate", async () => {
+  mockMessageService.formatPhoneNumber.mockReturnValue("+11234567890");
+  mockMessageService.sendSMS.mockRejectedValue(new Error("Network error"));
+
+  const mockAssignment: ReminderAssignment = {
+    job_id: "job-1",
+    associate_id: "assoc-1",
+    phone_number: "+11234567890",
+    work_date: new Date(),
+    start_time: "09:00",
+    associate_first_name: "Test",
+    associate_last_name: "User",
+    job_title: "Electrician",
+    customer_name: "Acme Co",
+    num_reminders: 0,
+  };
+
+  const result = await service.sendReminderToAssociate(
+    mockAssignment,
+    "day_before" as ReminderType
+  );
+
+  expect(result).toEqual({
+    success: false,
+    assignment_id: "job-1-assoc-1",
+    associate_id: "assoc-1",
+    phone_number: "+11234567890",
+    reminder_type: "day_before",
+    error: "Network error",
+  });
+  expect(mockLogger.error).toHaveBeenCalledWith(
+    "Error sending reminder to associate assoc-1",
+    expect.any(Error)
+  );
+});
+
+it("Handles error when processing scheduled reminders", async () => {
+  const error = new Error("Database error");
+  mockReminderRepository.getDueReminders.mockRejectedValue(error);
+
+  await expect(service.processScheduledReminders()).rejects.toThrow(
+    "Database error"
+  );
+
+  expect(mockLogger.error).toHaveBeenCalledWith(
+    "Error processing scheduled reminders",
+    error
+  );
+  expect(mockMessageService.sendSMS).not.toHaveBeenCalled();
+  expect(mockReminderRepository.updateReminderStatus).not.toHaveBeenCalled();
+});
