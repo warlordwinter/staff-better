@@ -13,8 +13,9 @@ import { ConfirmationHandler } from "./messageHandlers/ConfirmationHandler";
 import { HelpHandler } from "./messageHandlers/HelpHandler";
 import { OptOutHandler } from "./messageHandlers/OptOutHandler";
 
-// Re-export types from the types file
-export type { IncomingMessageResult, MessageAction } from "./types";
+// Re-export from the types file
+export type { IncomingMessageResult } from "./types";
+export { MessageAction } from "./types";
 
 export class IncomingMessageService {
   private messageHandlers: Map<MessageAction, IMessageHandler> = new Map();
@@ -123,6 +124,8 @@ export class IncomingMessageService {
     if (normalizedMessage === "stop" || normalizedMessage === "unsubscribe") {
       return MessageAction.OPT_OUT;
     }
+
+    //TODO: Add a way to handle other messages
 
     return MessageAction.UNKNOWN;
   }

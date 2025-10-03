@@ -1,0 +1,41 @@
+# Engineering Principles for Cursor AI
+
+This document defines core principles to ensure consistent, high-quality engineering practices when using Cursor AI for development tasks.
+
+## Core Principles
+
+### 1. Follow Good Engineering Practices
+
+- Write clear, maintainable, and well-structured code.
+- Prioritize readability and simplicity.
+- Use consistent naming conventions and formatting.
+
+### 2. Always Provide Pseudocode Before Implementation
+
+- Before writing any code, provide detailed pseudocode or an outline of the approach.
+- Ensure the logic and steps are clear before coding.
+- Use pseudocode to validate understanding of the problem.
+
+### 3. Request Review Before Code Changes
+
+- Always ask for a code review before adding or changing any code.
+- Make sure changes align with project goals and coding standards.
+- Use reviews to catch potential issues early.
+
+### 4. Document Thought Process and Justifications
+
+- Explain the rationale behind architectural or implementation decisions.
+- Clarify assumptions and trade-offs made in the design.
+
+### 5. Test and Validate Thoroughly
+
+- Ensure all code is covered by appropriate tests.
+- Validate edge cases and possible failure scenarios.
+- Verify that security and compliance requirements are met.
+
+### 6. Collaborate and Communicate Clearly
+
+- Ask clarifying questions when requirements or constraints are unclear.
+- Use precise language and avoid ambiguity in explanations.
+
+---
