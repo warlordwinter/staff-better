@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useMemo } from 'react';
-import { createClient } from '@/lib/supabase/supabaseClient';
-import { User } from '@supabase/supabase-js';
+import { useState, useEffect, useMemo } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { User } from "@supabase/supabase-js";
 export interface AuthState {
   user: User | null;
   loading: boolean;
@@ -29,7 +29,11 @@ export const useAuth = () => {
         } = await supabase.auth.getUser();
 
         if (error) {
-          setAuthState((prev) => ({ ...prev, error: error.message, loading: false }));
+          setAuthState((prev) => ({
+            ...prev,
+            error: error.message,
+            loading: false,
+          }));
           return;
         }
 
@@ -41,7 +45,7 @@ export const useAuth = () => {
       } catch {
         setAuthState((prev) => ({
           ...prev,
-          error: 'Failed to get user',
+          error: "Failed to get user",
           loading: false,
         }));
       }
@@ -68,10 +72,10 @@ export const useAuth = () => {
       setAuthState((prev) => ({ ...prev, loading: true, error: null }));
 
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'azure',
+        provider: "azure",
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
-          scopes: 'openid profile email',
+          scopes: "openid profile email",
         },
       });
 
@@ -85,7 +89,7 @@ export const useAuth = () => {
     } catch {
       setAuthState((prev) => ({
         ...prev,
-        error: 'Failed to sign in with Azure',
+        error: "Failed to sign in with Azure",
         loading: false,
       }));
     }
@@ -107,7 +111,7 @@ export const useAuth = () => {
     } catch {
       setAuthState((prev) => ({
         ...prev,
-        error: 'Failed to sign out',
+        error: "Failed to sign out",
         loading: false,
       }));
     }
@@ -118,7 +122,7 @@ export const useAuth = () => {
       setAuthState((prev) => ({ ...prev, loading: true, error: null }));
 
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
+        provider: "google",
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
         },
@@ -134,7 +138,7 @@ export const useAuth = () => {
     } catch {
       setAuthState((prev) => ({
         ...prev,
-        error: 'Failed to sign in with Google',
+        error: "Failed to sign in with Google",
         loading: false,
       }));
     }
