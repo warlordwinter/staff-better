@@ -1,12 +1,12 @@
 import { Associate } from "@/model/interfaces/Associate";
-import { createServerSupabaseClient } from "../../../supabase/server";
+import { createClient } from "../../../supabase/server";
 import { formatPhoneToE164, normalizePhoneForLookup } from "@/utils/phoneUtils";
 import { IAssociates } from "../../interfaces/IAssociates";
 
 export class AssociatesDaoSupabase implements IAssociates {
   // Get all associates - returns UTC times from database
   async getAssociates() {
-    const supabase = createServerSupabaseClient();
+    const supabase = createClient();
 
     const { data, error } = await supabase
       .from("associates")
@@ -35,7 +35,7 @@ export class AssociatesDaoSupabase implements IAssociates {
       email_address: string;
     }[]
   ) {
-    const supabase = createServerSupabaseClient();
+    const supabase = createClient();
 
     // Format phone numbers before insertion - no time conversion here
     const formattedAssociates = associates.map((associate) => {
@@ -85,7 +85,7 @@ export class AssociatesDaoSupabase implements IAssociates {
       email_address: string;
     }>
   ) {
-    const supabase = createServerSupabaseClient();
+    const supabase = createClient();
 
     const cleanedUpdates = Object.fromEntries(
       Object.entries(updates).filter(([, value]) => value !== "")
@@ -127,7 +127,7 @@ export class AssociatesDaoSupabase implements IAssociates {
 
   // Delete associate
   async deleteAssociate(id: string) {
-    const supabase = createServerSupabaseClient();
+    const supabase = createClient();
 
     const { error } = await supabase.from("associates").delete().eq("id", id);
 
@@ -144,7 +144,7 @@ export class AssociatesDaoSupabase implements IAssociates {
    * Returns UTC times from database
    */
   async getAssociateByPhone(phoneNumber: string): Promise<Associate | null> {
-    const supabase = createServerSupabaseClient();
+    const supabase = createClient();
 
     // Normalize the incoming phone number to E.164 format
     const normalizedPhone = normalizePhoneForLookup(phoneNumber);
@@ -196,7 +196,7 @@ export class AssociatesDaoSupabase implements IAssociates {
   }
 
   async optOutAssociate(associateId: string): Promise<void> {
-    const supabase = createServerSupabaseClient();
+    const supabase = createClient();
 
     const { error } = await supabase
       .from("associates")
