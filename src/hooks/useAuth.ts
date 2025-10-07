@@ -17,9 +17,26 @@ export const useAuth = () => {
   });
 
   // Create the Supabase client once and keep it stable
-  const supabase = useMemo(() => createClient(), []);
+  const supabase = useMemo(() => {
+    try {
+      return createClient();
+    } catch (error) {
+      console.warn("Failed to create Supabase client:", error);
+      return null;
+    }
+  }, []);
 
   useEffect(() => {
+    // If Supabase client is not available, set loading to false
+    if (!supabase) {
+      setAuthState((prev) => ({
+        ...prev,
+        loading: false,
+        error: "Supabase client not available",
+      }));
+      return;
+    }
+
     // Get initial user
     const getInitialUser = async () => {
       try {
@@ -68,6 +85,15 @@ export const useAuth = () => {
   }, [supabase]); // ✅ include supabase so the hook passes exhaustive-deps
 
   const signInWithAzure = async () => {
+    if (!supabase) {
+      setAuthState((prev) => ({
+        ...prev,
+        error: "Supabase client not available",
+        loading: false,
+      }));
+      return;
+    }
+
     try {
       setAuthState((prev) => ({ ...prev, loading: true, error: null }));
 
@@ -96,6 +122,15 @@ export const useAuth = () => {
   };
 
   const signOut = async () => {
+    if (!supabase) {
+      setAuthState((prev) => ({
+        ...prev,
+        error: "Supabase client not available",
+        loading: false,
+      }));
+      return;
+    }
+
     try {
       setAuthState((prev) => ({ ...prev, loading: true, error: null }));
 
@@ -118,6 +153,15 @@ export const useAuth = () => {
   };
 
   const signInWithGoogle = async () => {
+    if (!supabase) {
+      setAuthState((prev) => ({
+        ...prev,
+        error: "Supabase client not available",
+        loading: false,
+      }));
+      return;
+    }
+
     try {
       setAuthState((prev) => ({ ...prev, loading: true, error: null }));
 
