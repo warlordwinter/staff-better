@@ -6,7 +6,7 @@ import LoadingSpinner from "@/components/ui/loadingSpinner";
 import { useAuthCheck } from "@/hooks/useAuthCheck";
 
 export default function GroupsPage() {
-  const { user, loading: authLoading, isAuthenticated } = useAuthCheck();
+  const { loading: authLoading, isAuthenticated } = useAuthCheck();
 
   // Show loading spinner while checking authentication
   if (authLoading) {
