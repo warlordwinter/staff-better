@@ -1,22 +1,19 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { redirect, useParams } from "next/navigation";
+import { useParams } from "next/navigation";
 import Navbar from "@/components/ui/navBar";
 import AssociateTable from "@/components/associates/associateTable";
 import { Job } from "@/model/interfaces/Job";
 import LoadingSpinner from "@/components/ui/loadingSpinner";
-import { getAuthUser } from "@/lib/auth/utils";
+import { useAuthCheck } from "@/hooks/useAuthCheck";
 
-export default async function JobAssociates() {
+export default function JobAssociates() {
   const params = useParams();
   const jobId = params.id as string;
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
-  const user = await getAuthUser();
-  if (!user) {
-    redirect("/login");
-  }
+  const { loading: authLoading, isAuthenticated } = useAuthCheck();
 
   useEffect(() => {
     const fetchJob = async () => {
@@ -40,13 +37,19 @@ export default async function JobAssociates() {
     }
   }, [jobId]);
 
-  if (loading) {
+  // Show loading spinner while auth is loading or data is loading
+  if (authLoading || loading) {
     return (
       <div>
         <Navbar />
         <LoadingSpinner />
       </div>
     );
+  }
+
+  // Don't render anything if user is not authenticated (will redirect)
+  if (!isAuthenticated) {
+    return null;
   }
 
   if (!job) {

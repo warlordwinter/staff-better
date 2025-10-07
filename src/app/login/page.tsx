@@ -1,26 +1,45 @@
+"use client";
+
 import { signInWithGoogle, signInWithAzure } from "@/lib/auth/actions";
-import { getAuthUser } from "@/lib/auth/utils";
-import { redirect } from "next/navigation";
+import { useAuthCheck } from "@/hooks/useAuthCheck";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import LoadingSpinner from "@/components/ui/loadingSpinner";
 
-export default async function LoginPage() {
-  // Check if user is already authenticated
-  const user = await getAuthUser();
+export default function LoginPage() {
+  const { user, loading, isAuthenticated } = useAuthCheck();
+  const router = useRouter();
 
-  if (user) {
-    // Check if user has completed company setup
-    const hasCompletedSetup =
-      user.user_metadata?.company_setup_completed === true;
+  // Handle redirect for authenticated users with setup completion check
+  useEffect(() => {
+    if (!loading && user) {
+      // Check if user has completed company setup
+      const hasCompletedSetup =
+        user.user_metadata?.company_setup_completed === true;
 
-    if (hasCompletedSetup) {
-      redirect("/jobs");
-    } else {
-      redirect("/company-setup");
+      if (hasCompletedSetup) {
+        router.push("/jobs");
+      } else {
+        router.push("/company-setup");
+      }
     }
+  }, [user, loading, router]);
+
+  // Show loading spinner while checking authentication
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <LoadingSpinner />
+      </div>
+    );
   }
 
-  // If no user, show login page (no redirect needed)
+  // Don't render login form if user is authenticated (will redirect)
+  if (isAuthenticated) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-white py-12 px-4 sm:px-6 lg:px-8">
