@@ -6,7 +6,7 @@ import { IAssociates } from "../../interfaces/IAssociates";
 export class AssociatesDaoSupabase implements IAssociates {
   // Get all associates - returns UTC times from database
   async getAssociates() {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     const { data, error } = await supabase
       .from("associates")
@@ -35,7 +35,7 @@ export class AssociatesDaoSupabase implements IAssociates {
       email_address: string;
     }[]
   ) {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     // Format phone numbers before insertion - no time conversion here
     const formattedAssociates = associates.map((associate) => {
@@ -85,7 +85,7 @@ export class AssociatesDaoSupabase implements IAssociates {
       email_address: string;
     }>
   ) {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     const cleanedUpdates = Object.fromEntries(
       Object.entries(updates).filter(([, value]) => value !== "")
@@ -127,7 +127,7 @@ export class AssociatesDaoSupabase implements IAssociates {
 
   // Delete associate
   async deleteAssociate(id: string) {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     const { error } = await supabase.from("associates").delete().eq("id", id);
 
@@ -144,7 +144,7 @@ export class AssociatesDaoSupabase implements IAssociates {
    * Returns UTC times from database
    */
   async getAssociateByPhone(phoneNumber: string): Promise<Associate | null> {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     // Normalize the incoming phone number to E.164 format
     const normalizedPhone = normalizePhoneForLookup(phoneNumber);
@@ -196,7 +196,7 @@ export class AssociatesDaoSupabase implements IAssociates {
   }
 
   async optOutAssociate(associateId: string): Promise<void> {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     const { error } = await supabase
       .from("associates")

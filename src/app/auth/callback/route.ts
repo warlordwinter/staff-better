@@ -42,15 +42,21 @@ export async function GET(request: NextRequest) {
     if (data.session) {
       console.log("Session created successfully:", data.session.user.email);
 
-      // Check if this is a new user by looking at user metadata
+      // Check if this is a new user by looking at user metadata and creation date
       const hasCompletedSetup =
         data.session.user.user_metadata?.company_setup_completed === true;
 
+      // Also check if this is a very new user (created within last few minutes)
+      // const isNewUser = new Date(data.session.user.created_at).getTime() >
+      //   (Date.now() - 5 * 60 * 1000); // Created within last 5 minutes
+
       if (!hasCompletedSetup) {
-        // New user - redirect to company setup
+        // New user or user who hasn't completed setup - redirect to company setup
+        console.log("User needs company setup, redirecting to setup page");
         return NextResponse.redirect(`${origin}/company-setup`);
       } else {
         // Returning user - redirect to jobs page
+        console.log("Returning user, redirecting to jobs page");
         return NextResponse.redirect(`${origin}${next}`);
       }
     } else {

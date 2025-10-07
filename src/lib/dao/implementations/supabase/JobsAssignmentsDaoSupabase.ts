@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from "../../../supabase/server";
+import { createClient } from "../../../supabase/server";
 import { ConfirmationStatus } from "@/model/enums/ConfirmationStatus";
 import { IJobAssignments } from "../../interfaces/IJobAssignments";
 
@@ -18,7 +18,7 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
       num_reminders?: number;
     }[]
   ) {
-    const supabase = createServerSupabaseClient();
+    const supabase = await createClient();
     console.log("Job Assignment Creation: ", jobsAssignments);
 
     // Use the correct table name (lowercase in Supabase by default)
@@ -41,7 +41,7 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
   }
 
   async getJobAssignmentsByJobId(jobId: string) {
-    const supabase = createServerSupabaseClient();
+    const supabase = await createClient();
 
     const { data, error } = await supabase
       .from("jobassignments")
@@ -84,7 +84,7 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
       num_reminders?: number;
     }
   ) {
-    const supabase = createServerSupabaseClient();
+    const supabase = await createClient();
 
     const { data, error } = await supabase
       .from("jobassignments")
@@ -119,7 +119,7 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
       last_confirmation_time?: string;
     }
   ) {
-    const supabase = createServerSupabaseClient();
+    const supabase = await createClient();
     console.log("Job Assignment jobid:", jobId);
     console.log("Job Assignment AssociateId:", associateId);
     console.log("Job Assignment updates:", updates);
@@ -144,7 +144,7 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
   }
 
   async deleteJobAssignment(jobId: string, associateId: string) {
-    const supabase = createServerSupabaseClient();
+    const supabase = await createClient();
 
     const { error } = await supabase
       .from("jobassignments")
@@ -161,7 +161,7 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
   }
 
   async getNumberOfReminders(jobId: string, associateId: string) {
-    const supabase = createServerSupabaseClient();
+    const supabase = await createClient();
 
     const { data, error } = await supabase
       .from("jobassignments")
@@ -182,7 +182,7 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
   }
 
   async getJobAssignment(jobId: string, associateId: string) {
-    const supabase = createServerSupabaseClient();
+    const supabase = await createClient();
 
     const { data, error } = await supabase
       .from("jobassignments")
@@ -204,7 +204,7 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
    * @returns jobassignment with needed reminders to be sent
    */
   async getAssignmentsNeedingReminders() {
-    const supabase = createServerSupabaseClient();
+    const supabase = await createClient();
 
     const { data, error } = await supabase
       .from("jobassignments")
@@ -228,7 +228,7 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
     daysFromNow: string,
     associateId: string
   ) {
-    const supabase = createServerSupabaseClient();
+    const supabase = await createClient();
 
     const { data, error } = await supabase
       .from("jobassignments")
