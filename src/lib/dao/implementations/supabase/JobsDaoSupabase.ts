@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from "../../../supabase/server";
+import { createClient } from "../../../supabase/server";
 import { IJobs } from "../../interfaces/IJobs";
 
 export class JobsDaoSupabase implements IJobs {
@@ -11,7 +11,7 @@ export class JobsDaoSupabase implements IJobs {
       start_date: string;
     }[]
   ) {
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createClient();
     console.log("Jobs: ", jobs);
 
     const { data, error } = await supabase.from("jobs").insert(jobs).select();
@@ -26,7 +26,7 @@ export class JobsDaoSupabase implements IJobs {
 
   // Get jobs
   async getJobs() {
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createClient();
 
     const { data, error } = await supabase
       .from("jobs")
@@ -51,7 +51,7 @@ export class JobsDaoSupabase implements IJobs {
       start_date: string;
     }>
   ) {
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createClient();
 
     const { data, error } = await supabase
       .from("jobs")
@@ -69,7 +69,7 @@ export class JobsDaoSupabase implements IJobs {
 
   // Delete job
   async deleteJob(id: string) {
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createClient();
 
     const { error } = await supabase.from("jobs").delete().eq("id", id);
 
@@ -83,7 +83,7 @@ export class JobsDaoSupabase implements IJobs {
 
   // Get single job by ID
   async getJobById(id: string) {
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createClient();
 
     const { data, error } = await supabase
       .from("jobs")

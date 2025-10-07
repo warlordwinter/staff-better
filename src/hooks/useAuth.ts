@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useMemo } from 'react';
-import { createClient } from '@/lib/supabase/supabaseClient';
-import { User } from '@supabase/supabase-js';
+import { useState, useEffect, useMemo } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { User } from "@supabase/supabase-js";
 export interface AuthState {
   user: User | null;
   loading: boolean;
@@ -17,9 +17,26 @@ export const useAuth = () => {
   });
 
   // Create the Supabase client once and keep it stable
-  const supabase = useMemo(() => createClient(), []);
+  const supabase = useMemo(() => {
+    try {
+      return createClient();
+    } catch (error) {
+      console.warn("Failed to create Supabase client:", error);
+      return null;
+    }
+  }, []);
 
   useEffect(() => {
+    // If Supabase client is not available, set loading to false
+    if (!supabase) {
+      setAuthState((prev) => ({
+        ...prev,
+        loading: false,
+        error: "Supabase client not available",
+      }));
+      return;
+    }
+
     // Get initial user
     const getInitialUser = async () => {
       try {
@@ -29,7 +46,11 @@ export const useAuth = () => {
         } = await supabase.auth.getUser();
 
         if (error) {
-          setAuthState((prev) => ({ ...prev, error: error.message, loading: false }));
+          setAuthState((prev) => ({
+            ...prev,
+            error: error.message,
+            loading: false,
+          }));
           return;
         }
 
@@ -41,7 +62,7 @@ export const useAuth = () => {
       } catch {
         setAuthState((prev) => ({
           ...prev,
-          error: 'Failed to get user',
+          error: "Failed to get user",
           loading: false,
         }));
       }
@@ -64,14 +85,23 @@ export const useAuth = () => {
   }, [supabase]); // ✅ include supabase so the hook passes exhaustive-deps
 
   const signInWithAzure = async () => {
+    if (!supabase) {
+      setAuthState((prev) => ({
+        ...prev,
+        error: "Supabase client not available",
+        loading: false,
+      }));
+      return;
+    }
+
     try {
       setAuthState((prev) => ({ ...prev, loading: true, error: null }));
 
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'azure',
+        provider: "azure",
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
-          scopes: 'openid profile email',
+          scopes: "openid profile email",
         },
       });
 
@@ -85,13 +115,22 @@ export const useAuth = () => {
     } catch {
       setAuthState((prev) => ({
         ...prev,
-        error: 'Failed to sign in with Azure',
+        error: "Failed to sign in with Azure",
         loading: false,
       }));
     }
   };
 
   const signOut = async () => {
+    if (!supabase) {
+      setAuthState((prev) => ({
+        ...prev,
+        error: "Supabase client not available",
+        loading: false,
+      }));
+      return;
+    }
+
     try {
       setAuthState((prev) => ({ ...prev, loading: true, error: null }));
 
@@ -107,18 +146,27 @@ export const useAuth = () => {
     } catch {
       setAuthState((prev) => ({
         ...prev,
-        error: 'Failed to sign out',
+        error: "Failed to sign out",
         loading: false,
       }));
     }
   };
 
   const signInWithGoogle = async () => {
+    if (!supabase) {
+      setAuthState((prev) => ({
+        ...prev,
+        error: "Supabase client not available",
+        loading: false,
+      }));
+      return;
+    }
+
     try {
       setAuthState((prev) => ({ ...prev, loading: true, error: null }));
 
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
+        provider: "google",
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
         },
@@ -134,7 +182,7 @@ export const useAuth = () => {
     } catch {
       setAuthState((prev) => ({
         ...prev,
-        error: 'Failed to sign in with Google',
+        error: "Failed to sign in with Google",
         loading: false,
       }));
     }

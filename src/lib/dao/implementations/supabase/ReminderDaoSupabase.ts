@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from "../../../supabase/server";
+import { createClient } from "../../../supabase/server";
 import { ReminderAssignment } from "@/model/interfaces/ReminderAssignment";
 import { IReminder } from "../../interfaces/IReminder";
 
@@ -90,7 +90,7 @@ export class ReminderDaoSupabase implements IReminder {
     jobId: string,
     associateId: string
   ): Promise<ReminderAssignment | null> {
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createClient();
 
     const { data, error } = await supabase
       .from("jobassignments")
@@ -169,7 +169,7 @@ export class ReminderDaoSupabase implements IReminder {
 
   // Get all upcoming assignments that may need reminders (TODO: NEED TO TEST)
   async getAllUpcomingReminders(): Promise<ReminderAssignment[]> {
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createClient();
 
     const { data, error } = await supabase
       .from("jobassignments")
@@ -236,7 +236,7 @@ export class ReminderDaoSupabase implements IReminder {
 
   // Get assignments by specific date
   async getAssignmentsByDate(date: Date): Promise<ReminderAssignment[]> {
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createClient();
     const dateString = date.toISOString().split("T")[0]; // Convert to YYYY-MM-DD
 
     const { data, error } = await supabase
@@ -304,7 +304,7 @@ export class ReminderDaoSupabase implements IReminder {
   }
 
   async getDayBeforeReminders(targetDate: Date): Promise<ReminderAssignment[]> {
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createClient();
 
     const dateString = targetDate.toISOString().split("T")[0];
 
@@ -351,7 +351,7 @@ export class ReminderDaoSupabase implements IReminder {
   async getTwoDaysBeforeReminders(
     targetDate: Date
   ): Promise<ReminderAssignment[]> {
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createClient();
     const dateString = targetDate.toISOString().split("T")[0]; // Convert to YYYY-MM-DD
 
     const { data, error } = await supabase
@@ -438,7 +438,7 @@ export class ReminderDaoSupabase implements IReminder {
   async getMorningOfReminders(
     hoursAhead: number = 2
   ): Promise<ReminderAssignment[]> {
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createClient();
     const now = new Date();
     const todayString = now.toISOString().split("T")[0];
 

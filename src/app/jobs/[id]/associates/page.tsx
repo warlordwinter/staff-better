@@ -6,12 +6,14 @@ import Navbar from "@/components/ui/navBar";
 import AssociateTable from "@/components/associates/associateTable";
 import { Job } from "@/model/interfaces/Job";
 import LoadingSpinner from "@/components/ui/loadingSpinner";
+import { useAuthCheck } from "@/hooks/useAuthCheck";
 
 export default function JobAssociates() {
   const params = useParams();
   const jobId = params.id as string;
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
+  const { loading: authLoading, isAuthenticated } = useAuthCheck();
 
   useEffect(() => {
     const fetchJob = async () => {
@@ -19,12 +21,12 @@ export default function JobAssociates() {
         console.log("Job ID:", jobId);
         const res = await fetch(`/api/jobs/${jobId}`);
         if (!res.ok) {
-          throw new Error('Failed to fetch job');
+          throw new Error("Failed to fetch job");
         }
         const jobData = await res.json();
         setJob(jobData);
       } catch (error) {
-        console.error('Failed to fetch job:', error);
+        console.error("Failed to fetch job:", error);
       } finally {
         setLoading(false);
       }
@@ -35,13 +37,19 @@ export default function JobAssociates() {
     }
   }, [jobId]);
 
-  if (loading) {
+  // Show loading spinner while auth is loading or data is loading
+  if (authLoading || loading) {
     return (
       <div>
         <Navbar />
-          <LoadingSpinner />
+        <LoadingSpinner />
       </div>
     );
+  }
+
+  // Don't render anything if user is not authenticated (will redirect)
+  if (!isAuthenticated) {
+    return null;
   }
 
   if (!job) {
@@ -58,7 +66,7 @@ export default function JobAssociates() {
   return (
     <div>
       <Navbar />
-      <AssociateTable jobId={jobId} job={job}/>
+      <AssociateTable jobId={jobId} job={job} />
     </div>
   );
 }

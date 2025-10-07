@@ -5,7 +5,7 @@ import CallToAction from "@/components/landingPage/callToAction";
 import Footer from "@/components/ui/footer";
 import Navbar from "@/components/ui/navBar";
 
-export default function HomePage() {
+export default async function LandingPage() {
   return (
     <>
       <Navbar />

@@ -4,12 +4,13 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "Debug Next.js (dev)",
+      "name": "Debug Next.js (Full Stack)",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "console": "integratedTerminal",
       "skipFiles": ["<node_internals>/**"],
-      "outFiles": ["${workspaceFolder}/**/*.ts", "${workspaceFolder}/**/*.tsx"]
+      "outFiles": ["${workspaceFolder}/.next/**/*.js"],
+      "sourceMaps": true
     },
     {
       "type": "node",

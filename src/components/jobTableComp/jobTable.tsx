@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useEffect } from "react";
 import JobTableHeader from "./jobTableHeader";
 import JobTableHeadRow from "./JobTableHeadRow";
