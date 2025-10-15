@@ -9,9 +9,10 @@ import {
   AssignmentRepositorySupabase,
 } from "./implementations/index";
 import { ReminderService } from "./reminderService";
-import { IncomingMessageService } from "./IncomingMessageService";
 import { SchedulerService } from "./schedulerService";
-import { ScheduleConfig } from "./types";
+import { StudioService } from "./studioService";
+import { StudioReminderService } from "./studioReminderService";
+import { ScheduleConfig, StudioFlowConfig } from "./types";
 
 export class ServiceContainer {
   private static instance: ServiceContainer;
@@ -43,10 +44,17 @@ export class ServiceContainer {
       logger
     );
 
-    const incomingMessageService = ServiceFactory.createIncomingMessageService(
-      associateRepository,
-      assignmentRepository,
-      messageService,
+    // Create Studio service for confirmation calls
+    const studioConfig: StudioFlowConfig = {
+      accountSid: process.env.TWILIO_ACCOUNT_SID || "",
+      authToken: process.env.TWILIO_AUTH_TOKEN || "",
+      flowSid: process.env.TWILIO_STUDIO_FLOW_SID || "",
+      fromNumber: process.env.TWILIO_PHONE_NUMBER || "",
+    };
+
+    const studioService = new StudioService(studioConfig, logger);
+    const studioReminderService = new StudioReminderService(
+      studioService,
       logger
     );
 
@@ -67,7 +75,8 @@ export class ServiceContainer {
     this.services.set("associateRepository", associateRepository);
     this.services.set("assignmentRepository", assignmentRepository);
     this.services.set("reminderService", reminderService);
-    this.services.set("incomingMessageService", incomingMessageService);
+    this.services.set("studioService", studioService);
+    this.services.set("studioReminderService", studioReminderService);
     this.services.set("schedulerService", schedulerService);
   }
 
@@ -75,8 +84,16 @@ export class ServiceContainer {
     return this.services.get("reminderService");
   }
 
-  getIncomingMessageService(): IncomingMessageService {
-    return this.services.get("incomingMessageService");
+  getAssignmentRepository() {
+    return this.services.get("assignmentRepository");
+  }
+
+  getStudioService(): StudioService {
+    return this.services.get("studioService");
+  }
+
+  getStudioReminderService(): StudioReminderService {
+    return this.services.get("studioReminderService");
   }
 
   getSchedulerService(): SchedulerService {

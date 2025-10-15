@@ -1,14 +1,11 @@
 // Factory for creating properly configured services
 
 import { ReminderService } from "./reminderService";
-import { IncomingMessageService } from "./IncomingMessageService";
 import { SchedulerService } from "./schedulerService";
 import {
   IReminderRepository,
   IMessageService,
   ILogger,
-  IAssociateRepository,
-  IAssignmentRepository,
 } from "./interfaces/index";
 import { ScheduleConfig } from "./types";
 
@@ -21,19 +18,7 @@ export class ServiceFactory {
     return new ReminderService(reminderRepository, messageService, logger);
   }
 
-  static createIncomingMessageService(
-    associateRepository: IAssociateRepository,
-    assignmentRepository: IAssignmentRepository,
-    messageService: IMessageService,
-    logger: ILogger
-  ): IncomingMessageService {
-    return new IncomingMessageService(
-      associateRepository,
-      assignmentRepository,
-      messageService,
-      logger
-    );
-  }
+  // Removed createIncomingMessageService - now using Twilio Studio
 
   static createSchedulerService(
     reminderService: ReminderService,
