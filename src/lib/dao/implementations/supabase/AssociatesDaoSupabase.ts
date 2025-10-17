@@ -278,7 +278,10 @@ export class AssociatesDaoSupabase implements IAssociates {
 
     console.log("Cleaned Updates:", cleanedUpdates);
 
-    const { data, error } = await supabase
+    // Use service client for the actual update to avoid RLS blocking after ownership check
+    const service = createServiceClient();
+
+    const { data, error } = await service
       .from("users")
       .update(cleanedUpdates)
       .eq("id", id)

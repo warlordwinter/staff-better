@@ -42,6 +42,12 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       updates,
       company.id
     );
+    if (!updatedAssociate || updatedAssociate.length === 0) {
+      return NextResponse.json(
+        { error: "Associate not found or no changes applied" },
+        { status: 404 }
+      );
+    }
     return NextResponse.json(updatedAssociate[0]);
   } catch (error) {
     console.error("Failed to update associate:", error);
