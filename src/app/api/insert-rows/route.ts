@@ -2,20 +2,39 @@ import { NextRequest, NextResponse } from "next/server";
 import { AssociatesDaoSupabase } from "@/lib/dao/implementations/supabase/AssociatesDaoSupabase";
 import { JobsDaoSupabase } from "@/lib/dao/implementations/supabase/JobsDaoSupabase";
 import { JobsAssignmentsDaoSupabase } from "@/lib/dao/implementations/supabase/JobsAssignmentsDaoSupabase";
+import { CompaniesDaoSupabase } from "@/lib/dao/implementations/supabase/CompaniesDaoSupabase";
 import { formatPhoneToE164 } from "@/utils/phoneUtils";
 import { Associate } from "@/model/interfaces/Associate";
-import { Job } from "@/model/interfaces/Job";
 import { JobAssignment } from "@/model/interfaces/JobAssignment";
+import { createClient } from "@/lib/supabase/server";
 
 const associatesDao = new AssociatesDaoSupabase();
 const jobsDao = new JobsDaoSupabase();
 const jobAssignmentsDao = new JobsAssignmentsDaoSupabase();
+const companiesDao = new CompaniesDaoSupabase();
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const rows = body.rows;
 
   try {
+    // Get the authenticated user and their company
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    // Get the user's company
+    const company = await companiesDao.getCompanyByManagerId(user.id);
+
+    if (!company) {
+      return NextResponse.json({ error: "No company found" }, { status: 404 });
+    }
     // Prepare associate data for insertion with phone formatting
     const associateData = rows.map((r: Associate) => {
       let formattedPhone = r.phone_number;
@@ -45,11 +64,12 @@ export async function POST(req: NextRequest) {
     });
 
     // Prepare job data for insertion
-    const jobData = rows.map((r: Job) => ({
-      job_title: r.job_title,
-      customer_name: r.customer_name,
+    const jobData = rows.map((r: any) => ({
+      title: r.job_title || r.title,
+      location: r.customer_name || r.location,
       job_status: "Upcoming", // or map accordingly if the status needs transformation
       start_date: r.start_date,
+      company_id: company.id, // Set the company ID from the authenticated user's company
     }));
 
     // Log the data to be inserted for debugging

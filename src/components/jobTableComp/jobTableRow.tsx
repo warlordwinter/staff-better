@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState } from 'react';
-import Image from 'next/image';
-import { Job } from '@/model/interfaces/Job';
-import { useRouter } from 'next/navigation';
+import React, { useState } from "react";
+import Image from "next/image";
+import { Job } from "@/model/interfaces/Job";
+import { useRouter } from "next/navigation";
 
 interface Props {
   job: Job;
@@ -13,19 +13,19 @@ interface Props {
 
 const getStatusStyle = (status: string) => {
   switch (status.toLowerCase()) {
-    case 'active':
-      return 'bg-emerald-50 text-green-600';
-    case 'past':
-      return 'bg-gray-100 text-gray-500';
-    case 'upcoming':
-      return 'bg-yellow-50 text-yellow-600';
+    case "active":
+      return "bg-emerald-50 text-green-600";
+    case "past":
+      return "bg-gray-100 text-gray-500";
+    case "upcoming":
+      return "bg-yellow-50 text-yellow-600";
     default:
-      return 'bg-gray-50 text-gray-600';
+      return "bg-gray-50 text-gray-600";
   }
 };
 
 const JobTableRow: React.FC<Props> = ({ job, onUpdate, onDelete }) => {
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(job.isNew || false); // Start editing if it's a new job
   const [editedJob, setEditedJob] = useState(job);
   const router = useRouter();
 
@@ -33,26 +33,42 @@ const JobTableRow: React.FC<Props> = ({ job, onUpdate, onDelete }) => {
     e.stopPropagation(); // Prevent row click when editing
     setIsEditing(true);
   };
-  
+
   const handleSave = (e: React.MouseEvent) => {
     e.stopPropagation();
+
+    // Validate required fields for new jobs
+    if (job.isNew && (!editedJob.title.trim() || !editedJob.location?.trim())) {
+      alert("Please fill in the job title and location");
+      return;
+    }
+
     onUpdate(job.id, editedJob);
     setIsEditing(false);
   };
-  
+
   const handleCancel = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setEditedJob(job);
-    setIsEditing(false);
+
+    if (job.isNew) {
+      // For new jobs, cancel means delete the row
+      onDelete(job.id);
+    } else {
+      // For existing jobs, cancel means revert changes
+      setEditedJob(job);
+      setIsEditing(false);
+    }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     const { name, value } = e.target;
     setEditedJob((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleRowClick = () => {
-    if (!isEditing) {
+    if (!isEditing && !job.isNew) {
       router.push(`/jobs/${job.id}/associates`);
     }
   };
@@ -63,37 +79,37 @@ const JobTableRow: React.FC<Props> = ({ job, onUpdate, onDelete }) => {
   };
 
   return (
-    <tr 
+    <tr
       className={`text-sm text-black border-b border-zinc-100 h-10 ${
-        !isEditing ? 'hover:bg-gray-50 cursor-pointer' : ''
-      }`}
+        job.isNew ? "bg-blue-50" : ""
+      } ${!isEditing && !job.isNew ? "hover:bg-gray-50 cursor-pointer" : ""}`}
       onClick={handleRowClick}
     >
       <td className="px-4">
         {isEditing ? (
           <input
-            name="job_title"
-            value={editedJob.job_title}
+            name="title"
+            value={editedJob.title}
             onChange={handleChange}
             onClick={(e) => e.stopPropagation()}
             className="border border-gray-300 rounded px-2 w-full"
           />
         ) : (
-          job.job_title
+          job.title
         )}
       </td>
 
       <td className="px-4 text-blue-600">
         {isEditing ? (
           <input
-            name="customer_name"
-            value={editedJob.customer_name}
+            name="location"
+            value={editedJob.location || ""}
             onChange={handleChange}
             onClick={(e) => e.stopPropagation()}
             className="border border-gray-300 rounded px-2 w-full"
           />
         ) : (
-          job.customer_name
+          job.location
         )}
       </td>
 
@@ -101,7 +117,7 @@ const JobTableRow: React.FC<Props> = ({ job, onUpdate, onDelete }) => {
         {isEditing ? (
           <select
             name="job_status"
-            value={editedJob.job_status}
+            value={editedJob.job_status || "Upcoming"}
             onChange={handleChange}
             onClick={(e) => e.stopPropagation()}
             className="border border-gray-300 rounded px-2 w-full"
@@ -111,8 +127,12 @@ const JobTableRow: React.FC<Props> = ({ job, onUpdate, onDelete }) => {
             <option value="Past">Past</option>
           </select>
         ) : (
-          <span className={`px-2 py-0.5 rounded-sm text-xs font-bold uppercase ${getStatusStyle(job.job_status)}`}>
-            {job.job_status}
+          <span
+            className={`px-2 py-0.5 rounded-sm text-xs font-bold uppercase ${getStatusStyle(
+              job.job_status || "Upcoming"
+            )}`}
+          >
+            {job.job_status || "Upcoming"}
           </span>
         )}
       </td>
@@ -122,13 +142,46 @@ const JobTableRow: React.FC<Props> = ({ job, onUpdate, onDelete }) => {
           <input
             name="start_date"
             type="date"
-            value={editedJob.start_date}
+            value={editedJob.start_date || ""}
             onChange={handleChange}
             onClick={(e) => e.stopPropagation()}
             className="border border-gray-300 rounded px-2 w-full"
           />
         ) : (
           job.start_date
+        )}
+      </td>
+
+      <td className="px-4">
+        {isEditing ? (
+          <input
+            name="end_date"
+            type="date"
+            value={editedJob.end_date || ""}
+            onChange={handleChange}
+            onClick={(e) => e.stopPropagation()}
+            className="border border-gray-300 rounded px-2 w-full"
+          />
+        ) : (
+          job.end_date
+        )}
+      </td>
+
+      <td className="px-4">
+        {isEditing ? (
+          <input
+            name="pay_rate"
+            type="number"
+            step="0.01"
+            value={editedJob.pay_rate || ""}
+            onChange={handleChange}
+            onClick={(e) => e.stopPropagation()}
+            className="border border-gray-300 rounded px-2 w-full"
+          />
+        ) : job.pay_rate ? (
+          `$${job.pay_rate}`
+        ) : (
+          ""
         )}
       </td>
 
@@ -139,13 +192,13 @@ const JobTableRow: React.FC<Props> = ({ job, onUpdate, onDelete }) => {
               onClick={handleSave}
               className="px-1.5 py-0.5 text-[11px] bg-green-500 text-white rounded hover:bg-green-600 focus:outline-none"
             >
-              Save
+              {job.isNew ? "Create" : "Save"}
             </button>
             <button
               onClick={handleCancel}
               className="px-1.5 py-0.5 text-[11px] bg-gray-500 text-white rounded hover:bg-gray-600 focus:outline-none"
             >
-              Cancel
+              {job.isNew ? "Cancel" : "Cancel"}
             </button>
           </div>
         ) : (

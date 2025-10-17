@@ -18,7 +18,7 @@ export function AssociateTableTitle({ job, onAdd }: AssociateTableTitleProps) {
 
   const getJobTitle = () => {
     if (job) {
-      return `${job.job_title} - ${job.customer_name}`;
+      return `${job.title} - ${job.location}`;
     }
     return "Associates"; // Default title when no job is provided
   };

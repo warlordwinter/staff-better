@@ -3,14 +3,18 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { markSetupComplete } from "@/lib/auth/actions";
+import { upsertProfile } from "@/lib/supabase/profile";
 
 interface CompanyFormData {
   companyName: string;
   nonTempEmployees: string;
   email: string;
+  phoneNumber: string;
   zipCode: string;
   systemReadiness: string;
   referralSource: string;
+  firstName: string;
+  lastName: string;
 }
 
 interface CompanySetupFormProps {
@@ -23,9 +27,12 @@ export default function CompanySetupForm({ userEmail }: CompanySetupFormProps) {
     companyName: "",
     nonTempEmployees: "",
     email: userEmail,
+    phoneNumber: "",
     zipCode: "",
     systemReadiness: "",
     referralSource: "",
+    firstName: "",
+    lastName: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -56,15 +63,26 @@ export default function CompanySetupForm({ userEmail }: CompanySetupFormProps) {
     setIsSubmitting(true);
 
     try {
-      // TODO: Save company information to database
-      console.log("Company setup data:", formData);
+      // Convert nonTempEmployees to a number
+      const nonTempEmployeesNumber = Number(formData.nonTempEmployees);
 
-      // Mark user as having completed company setup
+      await upsertProfile({
+        companyName: formData.companyName,
+        nonTempEmployees: nonTempEmployeesNumber,
+        email: formData.email,
+        phoneNumber: formData.phoneNumber,
+        zipCode: formData.zipCode,
+        systemReadiness: formData.systemReadiness,
+        referralSource: formData.referralSource,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+      });
+
+      // Mark user as having completed company setup (existing action)
       await markSetupComplete();
-
       router.push("/jobs");
     } catch (error) {
-      console.error("Error saving company information:", error);
+      console.error(error);
       setFormError("Failed to complete setup. Please try again.");
     } finally {
       setIsSubmitting(false);
@@ -74,6 +92,46 @@ export default function CompanySetupForm({ userEmail }: CompanySetupFormProps) {
   return (
     <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
       <div className="space-y-4">
+        {/* Personal Information */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label
+              htmlFor="firstName"
+              className="block text-sm font-medium text-gray-700"
+            >
+              First Name
+            </label>
+            <input
+              id="firstName"
+              name="firstName"
+              type="text"
+              required
+              value={formData.firstName}
+              onChange={(e) => handleInputChange("firstName", e.target.value)}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
+              placeholder="John"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="lastName"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Last Name
+            </label>
+            <input
+              id="lastName"
+              name="lastName"
+              type="text"
+              required
+              value={formData.lastName}
+              onChange={(e) => handleInputChange("lastName", e.target.value)}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
+              placeholder="Doe"
+            />
+          </div>
+        </div>
+
         {/* Company Name */}
         <div>
           <label
@@ -137,6 +195,26 @@ export default function CompanySetupForm({ userEmail }: CompanySetupFormProps) {
           />
         </div>
 
+        {/* Phone Number */}
+        <div>
+          <label
+            htmlFor="phoneNumber"
+            className="block text-sm font-medium text-gray-700"
+          >
+            Phone Number
+          </label>
+          <input
+            id="phoneNumber"
+            name="phoneNumber"
+            type="tel"
+            required
+            value={formData.phoneNumber}
+            onChange={(e) => handleInputChange("phoneNumber", e.target.value)}
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
+            placeholder="(555) 123-4567"
+          />
+        </div>
+
         {/* Zip Code */}
         <div>
           <label
@@ -176,9 +254,9 @@ export default function CompanySetupForm({ userEmail }: CompanySetupFormProps) {
             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
           >
             <option value="">Select an option</option>
-            <option value="very-ready">Very Ready</option>
-            <option value="somewhat-ready">Somewhat Ready</option>
-            <option value="not-ready">Not Ready</option>
+            <option value="yes">Very Ready</option>
+            <option value="maybe">Somewhat Ready</option>
+            <option value="no">Not Ready</option>
           </select>
         </div>
 
@@ -202,7 +280,7 @@ export default function CompanySetupForm({ userEmail }: CompanySetupFormProps) {
           >
             <option value="">Select an option</option>
             <option value="google">Google Search</option>
-            <option value="social-media">Social Media</option>
+            <option value="social_media">Social Media</option>
             <option value="referral">Referral</option>
             <option value="other">Other</option>
           </select>

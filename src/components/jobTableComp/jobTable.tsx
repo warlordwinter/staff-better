@@ -37,9 +37,20 @@ const JobTable = () => {
     try {
       const res = await fetch("/api/jobs");
       const data = await res.json();
-      setJobs(data);
+
+      // Check if the response contains an error
+      if (data.error) {
+        console.error("API Error:", data.error);
+        setJobs([]); // Set empty array on error
+      } else if (Array.isArray(data)) {
+        setJobs(data);
+      } else {
+        console.error("Unexpected data format:", data);
+        setJobs([]); // Set empty array for unexpected format
+      }
     } catch (err) {
       console.error("Failed to fetch jobs", err);
+      setJobs([]); // Set empty array on network error
     } finally {
       setLoading(false);
     }
@@ -49,55 +60,72 @@ const JobTable = () => {
     fetchJobs();
   }, []);
 
-  const handleAddJob = async () => {
+  const handleAddJob = () => {
     const newJob = {
-      job_title: " Generic Warehouse Job",
-      customer_name: "Generic Company Name",
-      job_status: "Active",
+      id: `temp-${Date.now()}`, // Temporary ID for new jobs
+      title: "",
+      location: "",
+      company_id: "", // Will be set when creating
+      associate_id: null,
       start_date: new Date().toISOString().slice(0, 10),
+      end_date: null,
+      pay_rate: null,
+      incentive_bonus: null,
+      num_reminders: null,
+      job_status: "Upcoming",
+      isNew: true, // Flag to indicate this is a new job
     };
 
-    try {
-      const res = await fetch("/api/jobs", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(newJob),
-      });
-
-      if (!res.ok) {
-        throw new Error("Failed to create job");
-      }
-
-      const createdJob = await res.json();
-      setJobs([createdJob[0], ...jobs]);
-    } catch (error) {
-      console.error("Failed to add job:", error);
-      // You might want to show a toast notification here
-    }
+    setJobs([newJob, ...jobs]);
   };
 
   const handleUpdateJob = async (id: string, updatedFields: Partial<Job>) => {
+    const isNewJob = id.startsWith("temp-");
+
     try {
-      const res = await fetch(`/api/jobs/${id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updatedFields),
-      });
+      if (isNewJob) {
+        // Create new job
+        const res = await fetch("/api/jobs", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(updatedFields),
+        });
 
-      if (!res.ok) {
-        throw new Error("Failed to update job");
+        if (!res.ok) {
+          throw new Error("Failed to create job");
+        }
+
+        const createdJob = await res.json();
+
+        // Replace the temporary job with the created one
+        setJobs((prev) =>
+          prev.map((job) =>
+            job.id === id ? { ...createdJob[0], isNew: false } : job
+          )
+        );
+      } else {
+        // Update existing job
+        const res = await fetch(`/api/jobs/${id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(updatedFields),
+        });
+
+        if (!res.ok) {
+          throw new Error("Failed to update job");
+        }
+
+        // Update local state
+        setJobs((prev) =>
+          prev.map((job) =>
+            job.id === id ? { ...job, ...updatedFields } : job
+          )
+        );
       }
-
-      // const updatedJob = await res.json();
-
-      // Update local state
-      setJobs((prev) =>
-        prev.map((job) => (job.id === id ? { ...job, ...updatedFields } : job))
-      );
     } catch (error) {
       console.error("Failed to update job:", error);
       // You might want to show a toast notification here
@@ -105,20 +133,28 @@ const JobTable = () => {
   };
 
   const handleDeleteJob = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this job?")) {
+    const isNewJob = id.startsWith("temp-");
+
+    if (
+      !isNewJob &&
+      !window.confirm("Are you sure you want to delete this job?")
+    ) {
       return;
     }
 
     try {
-      const res = await fetch(`/api/jobs/${id}`, {
-        method: "DELETE",
-      });
+      if (!isNewJob) {
+        // Delete existing job from database
+        const res = await fetch(`/api/jobs/${id}`, {
+          method: "DELETE",
+        });
 
-      if (!res.ok) {
-        throw new Error("Failed to delete job");
+        if (!res.ok) {
+          throw new Error("Failed to delete job");
+        }
       }
 
-      // Update local state
+      // Remove from local state (works for both new and existing jobs)
       setJobs((prev) => prev.filter((job) => job.id !== id));
     } catch (error) {
       console.error("Failed to delete job:", error);
@@ -166,14 +202,15 @@ const JobTable = () => {
           <JobTableHeadRow />
         </thead>
         <tbody>
-          {jobs.map((job) => (
-            <JobTableRow
-              key={job.id}
-              job={job}
-              onUpdate={handleUpdateJob}
-              onDelete={handleDeleteJob}
-            />
-          ))}
+          {Array.isArray(jobs) &&
+            jobs.map((job) => (
+              <JobTableRow
+                key={job.id}
+                job={job}
+                onUpdate={handleUpdateJob}
+                onDelete={handleDeleteJob}
+              />
+            ))}
         </tbody>
       </table>
     </div>

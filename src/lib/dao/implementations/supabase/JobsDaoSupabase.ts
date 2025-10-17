@@ -1,16 +1,10 @@
 import { createClient } from "../../../supabase/server";
 import { IJobs } from "../../interfaces/IJobs";
+import { Job } from "@/model/interfaces/Job";
 
 export class JobsDaoSupabase implements IJobs {
   // Insert jobs
-  async insertJobs(
-    jobs: {
-      job_title: string;
-      customer_name: string;
-      job_status: string;
-      start_date: string;
-    }[]
-  ) {
+  async insertJobs(jobs: Partial<Job>[]) {
     const supabase = await createClient();
     console.log("Jobs: ", jobs);
 
@@ -30,7 +24,53 @@ export class JobsDaoSupabase implements IJobs {
 
     const { data, error } = await supabase
       .from("jobs")
-      .select("id, job_title, customer_name, job_status, start_date")
+      .select(
+        `
+        id, 
+        title, 
+        location, 
+        company_id, 
+        associate_id, 
+        start_date, 
+        end_date, 
+        pay_rate, 
+        incentive_bonus, 
+        num_reminders, 
+        job_status
+      `
+      )
+      .order("start_date", { ascending: false });
+
+    if (error) {
+      console.error("Supabase fetch error:", error);
+      throw new Error("Failed to fetch jobs");
+    }
+
+    return data;
+  }
+
+  // Get jobs by company ID
+  async getJobsByCompanyId(companyId: string) {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+      .from("jobs")
+      .select(
+        `
+        id, 
+        title, 
+        location, 
+        company_id, 
+        associate_id, 
+        start_date, 
+        end_date, 
+        pay_rate, 
+        incentive_bonus, 
+        num_reminders, 
+        job_status
+      `
+      )
+      .eq("company_id", companyId)
       .order("start_date", { ascending: false });
 
     if (error) {
@@ -42,15 +82,7 @@ export class JobsDaoSupabase implements IJobs {
   }
 
   // Update job
-  async updateJob(
-    id: string,
-    updates: Partial<{
-      job_title: string;
-      customer_name: string;
-      job_status: string;
-      start_date: string;
-    }>
-  ) {
+  async updateJob(id: string, updates: Partial<Job>) {
     const supabase = await createClient();
 
     const { data, error } = await supabase
@@ -87,7 +119,21 @@ export class JobsDaoSupabase implements IJobs {
 
     const { data, error } = await supabase
       .from("jobs")
-      .select("id, job_title, customer_name, job_status, start_date")
+      .select(
+        `
+        id, 
+        title, 
+        location, 
+        company_id, 
+        associate_id, 
+        start_date, 
+        end_date, 
+        pay_rate, 
+        incentive_bonus, 
+        num_reminders, 
+        job_status
+      `
+      )
       .eq("id", id)
       .single();
 
