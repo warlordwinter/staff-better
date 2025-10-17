@@ -2,7 +2,9 @@ interface AssociateTableHeaderProps {
   showJobAssignmentColumns?: boolean;
 }
 
-export function AssociateTableHeader({ showJobAssignmentColumns = false }: AssociateTableHeaderProps) {
+export function AssociateTableHeader({
+  showJobAssignmentColumns = false,
+}: AssociateTableHeaderProps) {
   // Base columns that are always shown
   const baseColumns = [
     { title: "First Name", className: "w-[120px]" },
@@ -10,32 +12,32 @@ export function AssociateTableHeader({ showJobAssignmentColumns = false }: Assoc
   ];
 
   // Job assignment specific columns
-  const jobAssignmentColumns = [
-    { title: "Reminders", className: "w-[50px]" },
-  ];
+  const jobAssignmentColumns = [{ title: "Reminders", className: "w-[50px]" }];
 
   // Common columns
   const commonColumns = [
-    { title: "Work Date", className: "w-[180px]" },
-    { title: "Start Time", className: "w-[100px] text-right" },
     { title: "Phone Number", className: "w-[140px]" },
     { title: "Email Address", className: "w-[240px]" },
+    { title: "WhatsApp", className: "w-[140px]" },
+  ];
+
+  // Job-specific columns (work date and start time are only relevant for job assignments)
+  const jobSpecificColumns = [
+    { title: "Work Date", className: "w-[180px]" },
+    { title: "Start Time", className: "w-[100px] text-right" },
   ];
 
   // Status column (only for job assignments)
-  const statusColumn = [
-    { title: "Status", className: "w-[140px]" },
-  ];
+  const statusColumn = [{ title: "Status", className: "w-[140px]" }];
 
   // Actions column
-  const actionsColumn = [
-    { title: "", className: "w-[100px]" },
-  ];
+  const actionsColumn = [{ title: "", className: "w-[100px]" }];
 
   // Build the columns array based on the mode
   const columns = [
     ...baseColumns,
     ...(showJobAssignmentColumns ? jobAssignmentColumns : []),
+    ...(showJobAssignmentColumns ? jobSpecificColumns : []), // Only show work date/time for job assignments
     ...commonColumns,
     ...(showJobAssignmentColumns ? statusColumn : []),
     ...actionsColumn,

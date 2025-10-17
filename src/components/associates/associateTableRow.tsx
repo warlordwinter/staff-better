@@ -43,6 +43,7 @@ export function AssociateTableRow({
     start_time: data.start_time || "", // local time for display
     phone_number: data.phone_number || "",
     email_address: data.email_address || "",
+    whatsapp: data.whatsapp || "",
     confirmation_status: data.confirmation_status || "Unconfirmed",
     job_work_date: data.job_work_date || data.work_date || "",
     job_start_time: data.job_start_time || data.start_time || "", // local time for display
@@ -72,7 +73,8 @@ export function AssociateTableRow({
         work_date: editData.work_date,
         start_time: editData.start_time, // local; parent converts to UTC
         phone_number: editData.phone_number,
-        email_address: editData.email_address,
+        email_address: editData.email_address || undefined,
+        whatsapp: editData.whatsapp || undefined,
         num_reminders: Number(editData.num_reminders) || 0,
         confirmation_status: editData.confirmation_status,
         job_work_date: editData.job_work_date,
@@ -103,6 +105,7 @@ export function AssociateTableRow({
       start_time: data.start_time || "", // keep local time for display
       phone_number: data.phone_number || "",
       email_address: data.email_address || "",
+      whatsapp: data.whatsapp || "",
       confirmation_status: data.confirmation_status || "Unconfirmed",
       job_work_date: data.job_work_date || data.work_date || "",
       job_start_time: data.job_start_time || data.start_time || "", // keep local time
@@ -199,67 +202,45 @@ export function AssociateTableRow({
         </TableCell>
       )}
 
-      <TableCell className="w-[180px]">
-        {isEditing ? (
-          <input
-            type="date"
-            value={
-              showJobAssignmentColumns
-                ? editData.job_work_date
-                : editData.work_date
-            }
-            onChange={(e) =>
-              handleInputChange(
-                showJobAssignmentColumns ? "job_work_date" : "work_date",
-                e.target.value
-              )
-            }
-            className="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-          />
-        ) : (
-          <AssociateDateDisplay
-            value={
-              showJobAssignmentColumns
-                ? data.job_work_date || data.work_date
-                : data.work_date
-            }
-            isFilled={
-              !!(showJobAssignmentColumns
-                ? data.job_work_date || data.work_date
-                : data.work_date)
-            }
-          />
-        )}
-      </TableCell>
+      {showJobAssignmentColumns && (
+        <>
+          <TableCell className="w-[180px]">
+            {isEditing ? (
+              <input
+                type="date"
+                value={editData.job_work_date}
+                onChange={(e) =>
+                  handleInputChange("job_work_date", e.target.value)
+                }
+                className="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+              />
+            ) : (
+              <AssociateDateDisplay
+                value={data.job_work_date || data.work_date}
+                isFilled={!!(data.job_work_date || data.work_date)}
+              />
+            )}
+          </TableCell>
 
-      <TableCell className="w-[140px] text-right">
-        {isEditing ? (
-          <div className="flex flex-col">
-            <input
-              type="time"
-              value={
-                showJobAssignmentColumns
-                  ? editData.job_start_time
-                  : editData.start_time
-              }
-              onChange={(e) =>
-                handleInputChange(
-                  showJobAssignmentColumns ? "job_start_time" : "start_time",
-                  e.target.value
-                )
-              }
-              className="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-blue-500"
-            />
-            {/* Intentionally no timezone label */}
-          </div>
-        ) : (
-          displayTime(
-            showJobAssignmentColumns
-              ? data.job_start_time || data.start_time
-              : data.start_time
-          )
-        )}
-      </TableCell>
+          <TableCell className="w-[140px] text-right">
+            {isEditing ? (
+              <div className="flex flex-col">
+                <input
+                  type="time"
+                  value={editData.job_start_time}
+                  onChange={(e) =>
+                    handleInputChange("job_start_time", e.target.value)
+                  }
+                  className="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+                />
+                {/* Intentionally no timezone label */}
+              </div>
+            ) : (
+              displayTime(data.job_start_time || data.start_time)
+            )}
+          </TableCell>
+        </>
+      )}
 
       <TableCell className="w-[140px]">
         {isEditing ? (
@@ -294,9 +275,24 @@ export function AssociateTableRow({
             value={editData.email_address}
             onChange={(e) => handleInputChange("email_address", e.target.value)}
             className="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+            placeholder="Optional"
           />
         ) : (
-          data.email_address
+          data.email_address || "-"
+        )}
+      </TableCell>
+
+      <TableCell className="w-[140px]">
+        {isEditing ? (
+          <input
+            type="text"
+            value={editData.whatsapp}
+            onChange={(e) => handleInputChange("whatsapp", e.target.value)}
+            className="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-blue-500"
+            placeholder="Optional"
+          />
+        ) : (
+          data.whatsapp || "-"
         )}
       </TableCell>
 

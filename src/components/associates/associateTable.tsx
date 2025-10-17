@@ -48,96 +48,107 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
   const [error, setError] = useState<string | null>(null);
   const [newlyAddedIds, setNewlyAddedIds] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setError(null);
+  const fetchData = async () => {
+    try {
+      setError(null);
 
-        if (jobId) {
-          console.log("Fetching job assignments for job ID:", jobId);
+      if (jobId) {
+        console.log("Fetching job assignments for job ID:", jobId);
 
-          const res = await fetch(`/api/job-assignments/${jobId}`);
-          if (!res.ok) {
-            const errorText = await res.text();
-            console.error("API Error:", errorText);
-            throw new Error(`Failed to fetch job assignments: ${res.status}`);
-          }
-
-          const assignments = await res.json();
-          console.log("Raw assignments data:", assignments);
-
-          if (!assignments || assignments.length === 0) {
-            console.log("No job assignments found for this job");
-            setAssociatesData([]);
-            return;
-          }
-
-          const displayData: AssociateDisplay[] = assignments
-            .map((assignment: JobAssignmentResponse) => {
-              if (!assignment.associates) {
-                console.error(
-                  "No associates data found in assignment:",
-                  assignment
-                );
-                return null;
-              }
-
-              // Convert UTC times from database to local times for display (pass date strings)
-              const localAssociateTime = convertUTCTimeToLocal(
-                assignment.associates.start_time,
-                assignment.associates.work_date
-              );
-              const localJobTime = convertUTCTimeToLocal(
-                assignment.start_time,
-                assignment.work_date
-              );
-
-              return {
-                id: assignment.associates.id,
-                first_name: assignment.associates.first_name,
-                last_name: assignment.associates.last_name,
-                work_date: assignment.associates.work_date,
-                start_time: localAssociateTime, // Local time for display
-                phone_number: assignment.associates.phone_number,
-                email_address: assignment.associates.email_address,
-                // Job assignment specific fields
-                confirmation_status: assignment.confirmation_status,
-                num_reminders: assignment.num_reminders,
-                job_work_date: assignment.work_date,
-                job_start_time: localJobTime, // Local time for display
-              };
-            })
-            .filter(Boolean) as AssociateDisplay[];
-
-          setAssociatesData(displayData);
-        } else {
-          // Fetch all associates
-          const res = await fetch("/api/associates");
-          if (!res.ok) {
-            throw new Error("Failed to fetch associates");
-          }
-          const utcAssociates = await res.json();
-
-          // Convert UTC times to local times for display
-          const localAssociates = utcAssociates.map((associate: Associate) => ({
-            ...associate,
-            start_time: associate.start_time
-              ? convertUTCTimeToLocal(associate.start_time, associate.work_date)
-              : "",
-          }));
-
-          setAssociatesData(localAssociates);
+        const res = await fetch(`/api/job-assignments/${jobId}`);
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error("API Error:", errorText);
+          throw new Error(`Failed to fetch job assignments: ${res.status}`);
         }
-      } catch (error) {
-        console.error("Failed to fetch data:", error);
-        setError(
-          error instanceof Error ? error.message : "Failed to fetch data"
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
 
+        const assignments = await res.json();
+        console.log("Raw assignments data:", assignments);
+
+        if (!assignments || assignments.length === 0) {
+          console.log("No job assignments found for this job");
+          setAssociatesData([]);
+          return;
+        }
+
+        const displayData: AssociateDisplay[] = assignments
+          .map((assignment: JobAssignmentResponse) => {
+            if (!assignment.associates) {
+              console.error(
+                "No associates data found in assignment:",
+                assignment
+              );
+              return null;
+            }
+
+            // Convert UTC times from database to local times for display (pass date strings)
+            const localAssociateTime = convertUTCTimeToLocal(
+              assignment.associates.start_time,
+              assignment.associates.work_date
+            );
+            const localJobTime = convertUTCTimeToLocal(
+              assignment.start_time,
+              assignment.work_date
+            );
+
+            return {
+              id: assignment.associates.id,
+              first_name: assignment.associates.first_name,
+              last_name: assignment.associates.last_name,
+              work_date: assignment.associates.work_date,
+              start_time: localAssociateTime, // Local time for display
+              phone_number: assignment.associates.phone_number,
+              email_address: assignment.associates.email_address,
+              // Job assignment specific fields
+              confirmation_status: assignment.confirmation_status,
+              num_reminders: assignment.num_reminders,
+              job_work_date: assignment.work_date,
+              job_start_time: localJobTime, // Local time for display
+            };
+          })
+          .filter(Boolean) as AssociateDisplay[];
+
+        setAssociatesData(displayData);
+      } else {
+        // Fetch all associates
+        const res = await fetch("/api/associates");
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error("API Error:", errorText);
+          throw new Error(
+            `Failed to fetch associates: ${res.status} - ${errorText}`
+          );
+        }
+        const utcAssociates = await res.json();
+
+        // Handle case where API returns null or undefined
+        if (!utcAssociates) {
+          console.log("API returned null/undefined, setting empty array");
+          setAssociatesData([]);
+          return;
+        }
+
+        // Note: work_date and start_time are not stored in users table
+        // These are typically associated with job assignments
+        const localAssociates = utcAssociates.map((associate: Associate) => ({
+          ...associate,
+          // work_date and start_time are empty strings from the DAO
+          // They would be populated from job assignments if needed
+        }));
+
+        setAssociatesData(localAssociates);
+      }
+    } catch (error) {
+      console.error("Failed to fetch data:", error);
+      setError(error instanceof Error ? error.message : "Failed to fetch data");
+      // Set empty array so user can still add associates
+      setAssociatesData([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchData();
   }, [jobId]);
 
@@ -146,11 +157,8 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
       const associate = associatesData[index];
       const isNewAssociate = associate.isNew;
 
-      // Convert local times to UTC before sending to API
-      const utcAssociateTime = convertLocalTimeToUTC(
-        updatedData.start_time,
-        updatedData.work_date
-      );
+      // Note: work_date and start_time are not stored in users table
+      // These would typically be handled in job assignments
 
       let savedAssociate;
 
@@ -162,10 +170,11 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
           body: JSON.stringify({
             first_name: updatedData.first_name,
             last_name: updatedData.last_name,
-            work_date: updatedData.work_date,
-            start_time: utcAssociateTime, // UTC for API
+            work_date: "", // Not stored in users table
+            start_time: "", // Not stored in users table
             phone_number: updatedData.phone_number,
             email_address: updatedData.email_address,
+            whatsapp: updatedData.whatsapp,
           }),
         });
         if (!associateRes.ok) throw new Error("Failed to create associate");
@@ -174,11 +183,6 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
 
         // Create job assignment if in job context
         if (jobId) {
-          const utcJobTime = convertLocalTimeToUTC(
-            updatedData.job_start_time || updatedData.start_time,
-            updatedData.job_work_date || updatedData.work_date
-          );
-
           const assignmentRes = await fetch(`/api/job-assignments/${jobId}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -187,8 +191,8 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
               associate_id: savedAssociate.id,
               confirmation_status:
                 updatedData.confirmation_status || "Unconfirmed",
-              work_date: updatedData.job_work_date || updatedData.work_date,
-              start_time: utcJobTime, // UTC for API
+              work_date: updatedData.job_work_date || "",
+              start_time: updatedData.job_start_time || "",
               num_reminders: updatedData.num_reminders || 0,
             }),
           });
@@ -200,10 +204,11 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
         const associateUpdates = {
           first_name: updatedData.first_name,
           last_name: updatedData.last_name,
-          work_date: updatedData.work_date,
-          start_time: utcAssociateTime, // UTC for API
+          work_date: "", // Not stored in users table
+          start_time: "", // Not stored in users table
           phone_number: updatedData.phone_number,
           email_address: updatedData.email_address,
+          whatsapp: updatedData.whatsapp,
         };
 
         const associateRes = await fetch(`/api/associates/${associate.id}`, {
@@ -221,16 +226,11 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
             updatedData.job_work_date ||
             updatedData.job_start_time)
         ) {
-          const utcJobTime = convertLocalTimeToUTC(
-            updatedData.job_start_time || updatedData.start_time,
-            updatedData.job_work_date || updatedData.work_date
-          );
-
           const assignmentUpdates = {
             confirmation_status: updatedData.confirmation_status,
             num_reminders: updatedData.num_reminders,
-            work_date: updatedData.job_work_date || updatedData.work_date,
-            start_time: utcJobTime, // UTC for API
+            work_date: updatedData.job_work_date || "",
+            start_time: updatedData.job_start_time || "",
           };
 
           const assignmentRes = await fetch(
@@ -314,30 +314,24 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
   };
 
   const handleAdd = () => {
-    const localTime = "08:00"; // default local
-    const workDate = new Date();
-    const yyyy = workDate.getFullYear();
-    const mm = String(workDate.getMonth() + 1).padStart(2, "0");
-    const dd = String(workDate.getDate()).padStart(2, "0");
-    const workDateISO = `${yyyy}-${mm}-${dd}`;
-
     // Create a temporary local-only associate
     const tempId = `temp-${Date.now()}`; // Generate temporary ID
     const newAssociate: AssociateDisplay = {
       id: tempId,
       first_name: "",
       last_name: "",
-      work_date: workDateISO,
-      start_time: localTime,
+      work_date: "", // Not stored in users table
+      start_time: "", // Not stored in users table
       phone_number: "",
-      email_address: "",
+      email_address: undefined, // Optional
+      whatsapp: undefined, // Optional
       isNew: true, // Mark as new unsaved associate
       // Job assignment fields if in job context
       ...(jobId && {
         confirmation_status: "Unconfirmed",
         num_reminders: 0,
-        job_work_date: workDateISO,
-        job_start_time: localTime,
+        job_work_date: "",
+        job_start_time: "",
       }),
     };
 
@@ -350,19 +344,48 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
 
   if (loading) return <LoadingSpinner />;
 
-  if (error) {
-    return (
-      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 h-screen">
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-          Error: {error}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 overflow-x-auto">
       <AssociateTableTitle job={job} onAdd={handleAdd} />
+
+      {/* Show error message if there's an error, but still allow adding associates */}
+      {error && (
+        <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded mb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <svg
+                className="w-5 h-5 mr-2"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              <span className="font-medium">Warning:</span>
+              <span className="ml-2">{error}</span>
+            </div>
+            <button
+              onClick={() => {
+                setError(null);
+                setLoading(true);
+                // Re-trigger the fetch by calling the fetch function directly
+                fetchData();
+              }}
+              className="ml-4 px-3 py-1 bg-yellow-600 text-white text-sm rounded hover:bg-yellow-700 transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+          <p className="mt-2 text-sm">
+            You can still add new associates below, but existing data may not be
+            displayed.
+          </p>
+        </div>
+      )}
+
       {associatesData.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
           {jobId

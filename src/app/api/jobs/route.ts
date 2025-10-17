@@ -110,13 +110,19 @@ export async function POST(request: NextRequest) {
         // Ensure required fields have default values
         title: cleanJob.title || "",
         location: cleanJob.location || null,
+        client_company: cleanJob.client_company || null,
         associate_id: cleanJob.associate_id || null,
         start_date: cleanJob.start_date || null,
         end_date: cleanJob.end_date || null,
         pay_rate: cleanJob.pay_rate || null,
         incentive_bonus: cleanJob.incentive_bonus || null,
         num_reminders: cleanJob.num_reminders || null,
-        job_status: cleanJob.job_status || "Upcoming",
+        job_status: (() => {
+          const up = String(cleanJob.job_status || "UPCOMING").toUpperCase();
+          return ["UPCOMING", "ONGOING", "COMPLETED", "CANCELLED"].includes(up)
+            ? up
+            : "UPCOMING";
+        })(),
       };
     });
 

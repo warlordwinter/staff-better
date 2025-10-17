@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useRef } from 'react';
-import Image from 'next/image';
-import Link from 'next/link';
-import { useAuth } from '@/hooks/useAuth';
+import React, { useState, useEffect, useRef } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { useAuth } from "@/hooks/useAuth";
 
 const Navbar = () => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -16,14 +16,17 @@ const Navbar = () => {
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setProfileDropdownOpen(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
@@ -33,7 +36,7 @@ const Navbar = () => {
       setProfileDropdownOpen(false);
       setMenuOpen(false);
     } catch (error) {
-      console.error('Sign out error:', error);
+      console.error("Sign out error:", error);
     }
   };
 
@@ -41,9 +44,14 @@ const Navbar = () => {
     <nav className="w-full px-5 py-3 bg-[#F59144]">
       <div className="flex justify-between items-center">
         {/* Logo + Brand */}
-        <Link href="/landingpage" className="flex items-center gap-5 cursor-pointer">
+        <Link
+          href="/landingpage"
+          className="flex items-center gap-5 cursor-pointer"
+        >
           <Image height={50} width={50} alt="Logo" src="/icons/logo.svg" />
-          <span className="text-white text-2xl sm:text-3xl font-semibold font-inter">Staff Better</span>
+          <span className="text-white text-2xl sm:text-3xl font-semibold font-inter">
+            Staff Better
+          </span>
         </Link>
 
         {/* Hamburger Icon */}
@@ -51,11 +59,26 @@ const Navbar = () => {
           onClick={() => setMenuOpen(!menuOpen)}
           className="sm:hidden flex items-center px-2 py-1 border rounded text-white border-white"
         >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg
+            className="w-6 h-6"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
             {menuOpen ? (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             ) : (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 6h16M4 12h16M4 18h16"
+              />
             )}
           </svg>
         </button>
@@ -66,6 +89,12 @@ const Navbar = () => {
             <>
               <a href="/jobs" className="text-white text-lg hover:underline">
                 Jobs
+              </a>
+              <a
+                href="/associates"
+                className="text-white text-lg hover:underline"
+              >
+                Associates
               </a>
               <a href="/groups" className="text-white text-lg hover:underline">
                 Groups
@@ -83,8 +112,18 @@ const Navbar = () => {
                       height={36}
                       className="rounded-full"
                     />
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
                     </svg>
                   </button>
                 </div>
@@ -103,7 +142,10 @@ const Navbar = () => {
             </>
           ) : (
             <>
-              <a href="/get-started" className="text-white text-lg hover:underline">
+              <a
+                href="/get-started"
+                className="text-white text-lg hover:underline"
+              >
                 Get Started
               </a>
               <a href="/blogs" className="text-white text-lg hover:underline">
@@ -111,16 +153,16 @@ const Navbar = () => {
               </a>
               <button
                 type="button"
-                onClick={() => (window.location.href = '/login')}
+                onClick={() => (window.location.href = "/login")}
                 className="w-24 h-9 px-4 bg-[#F59144] rounded-md border border-[#FFD9B3] text-white text-base font-normal font-inter leading-tight flex justify-center items-center hover:brightness-105 transition"
               >
                 Log In
               </button>
               <button
                 type="button"
-                onClick={() => (window.location.href = '/login')}
+                onClick={() => (window.location.href = "/login")}
                 className="w-24 h-9 px-4 bg-white rounded-md border border-[#FFD9B3] text-base font-normal font-inter leading-tight flex justify-center items-center transition"
-                style={{ color: '#F59144' }}
+                style={{ color: "#F59144" }}
               >
                 Sign Up
               </button>
@@ -137,6 +179,12 @@ const Navbar = () => {
               <a href="/jobs" className="text-white text-lg hover:underline">
                 Jobs
               </a>
+              <a
+                href="/associates"
+                className="text-white text-lg hover:underline"
+              >
+                Associates
+              </a>
               <a href="/groups" className="text-white text-lg hover:underline">
                 Groups
               </a>
@@ -151,7 +199,10 @@ const Navbar = () => {
             </>
           ) : (
             <>
-              <a href="/get-started" className="text-white text-lg hover:underline">
+              <a
+                href="/get-started"
+                className="text-white text-lg hover:underline"
+              >
                 Get Started
               </a>
               <a href="/blogs" className="text-white text-lg hover:underline">
@@ -159,16 +210,16 @@ const Navbar = () => {
               </a>
               <button
                 type="button"
-                onClick={() => (window.location.href = '/login')}
+                onClick={() => (window.location.href = "/login")}
                 className="w-full h-9 px-4 bg-[#F59144] rounded-md border border-[#FFD9B3] text-white text-base font-normal font-inter leading-tight flex justify-center items-center hover:brightness-105 transition"
               >
                 Log In
               </button>
               <button
                 type="button"
-                onClick={() => (window.location.href = '/login')}
+                onClick={() => (window.location.href = "/login")}
                 className="w-full h-9 px-4 bg-white rounded-md border border-[#FFD9B3] text-base font-normal font-inter leading-tight flex justify-center items-center transition"
-                style={{ color: '#F59144' }}
+                style={{ color: "#F59144" }}
               >
                 Sign Up
               </button>

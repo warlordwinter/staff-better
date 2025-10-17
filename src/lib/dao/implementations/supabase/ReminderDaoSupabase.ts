@@ -93,7 +93,7 @@ export class ReminderDaoSupabase implements IReminder {
     const supabase = await createClient();
 
     const { data, error } = await supabase
-      .from("jobassignments")
+      .from("job_reminders")
       .select(
         `
             job_id,
@@ -172,7 +172,7 @@ export class ReminderDaoSupabase implements IReminder {
     const supabase = await createClient();
 
     const { data, error } = await supabase
-      .from("jobassignments")
+      .from("job_reminders")
       .select(
         `
             job_id,
@@ -240,7 +240,7 @@ export class ReminderDaoSupabase implements IReminder {
     const dateString = date.toISOString().split("T")[0]; // Convert to YYYY-MM-DD
 
     const { data, error } = await supabase
-      .from("jobassignments")
+      .from("job_reminders")
       .select(
         `
             job_id,
@@ -309,7 +309,7 @@ export class ReminderDaoSupabase implements IReminder {
     const dateString = targetDate.toISOString().split("T")[0];
 
     const { data, error } = await supabase
-      .from("jobassignments")
+      .from("job_reminders")
       .select(
         `
             job_id,
@@ -355,7 +355,7 @@ export class ReminderDaoSupabase implements IReminder {
     const dateString = targetDate.toISOString().split("T")[0]; // Convert to YYYY-MM-DD
 
     const { data, error } = await supabase
-      .from("jobassignments")
+      .from("job_reminders")
       .select(
         `
             job_id,
@@ -449,7 +449,7 @@ export class ReminderDaoSupabase implements IReminder {
       .split(" ")[0];
 
     const { data, error } = await supabase
-      .from("jobassignments")
+      .from("job_reminders")
       .select(
         `
             job_id,

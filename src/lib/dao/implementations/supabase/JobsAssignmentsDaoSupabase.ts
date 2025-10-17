@@ -23,7 +23,7 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
 
     // Use the correct table name (lowercase in Supabase by default)
     const { data, error } = await supabase
-      .from("jobassignments")
+      .from("job_reminders")
       .insert(
         jobsAssignments.map((assignment) => ({
           ...assignment,
@@ -43,30 +43,75 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
   async getJobAssignmentsByJobId(jobId: string) {
     const supabase = await createClient();
 
-    const { data, error } = await supabase
-      .from("jobassignments")
+    // First get the job assignments
+    const { data: assignments, error: assignmentsError } = await supabase
+      .from("job_reminders")
       .select(
         `
-        *,
-        associates!inner (
-          id,
-          first_name,
-          last_name,
-          work_date,
-          start_time,
-          phone_number,
-          email_address
-        )
+        job_id,
+        associate_id,
+        work_date,
+        start_time,
+        num_reminders,
+        confirmation_status,
+        last_confirmation_time,
+        last_reminder_time
       `
       )
       .eq("job_id", jobId);
 
-    if (error) {
-      console.error("Error fetching job assignments:", error);
-      throw new Error(JSON.stringify(error));
+    if (assignmentsError) {
+      console.error("Error fetching job assignments:", assignmentsError);
+      throw new Error(JSON.stringify(assignmentsError));
     }
 
-    return data;
+    if (!assignments || assignments.length === 0) {
+      return [];
+    }
+
+    // Transform to match JobAssignment interface
+    const jobAssignments = assignments.map((assignment) => ({
+      job_id: assignment.job_id,
+      associate_id: assignment.associate_id,
+      confirmation_status: assignment.confirmation_status,
+      last_activity_time:
+        assignment.last_confirmation_time ||
+        assignment.last_reminder_time ||
+        new Date().toISOString(),
+      work_date: assignment.work_date,
+      start_time: assignment.start_time,
+      num_reminders: assignment.num_reminders || 0,
+    }));
+
+    // Get associate IDs
+    const associateIds = jobAssignments
+      .map((a) => a.associate_id)
+      .filter(Boolean);
+
+    if (associateIds.length === 0) {
+      return jobAssignments;
+    }
+
+    // Fetch associates separately
+    const { data: associates, error: associatesError } = await supabase
+      .from("associates")
+      .select("id, first_name, last_name, phone_number, email_address")
+      .in("id", associateIds);
+
+    if (associatesError) {
+      console.error("Error fetching associates:", associatesError);
+      // Return assignments without associate data rather than failing
+      return jobAssignments;
+    }
+
+    // Join the data and return with associates info
+    const assignmentsWithAssociates = jobAssignments.map((assignment) => ({
+      ...assignment,
+      associates:
+        associates?.find((a) => a.id === assignment.associate_id) || null,
+    }));
+
+    return assignmentsWithAssociates;
   }
 
   async insertSingleJobAssignment(
@@ -87,7 +132,7 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
     const supabase = await createClient();
 
     const { data, error } = await supabase
-      .from("jobassignments")
+      .from("job_reminders")
       .insert({
         job_id: jobId,
         associate_id: assignmentData.associate_id,
@@ -129,7 +174,7 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
     );
 
     const { data, error } = await supabase
-      .from("jobassignments")
+      .from("job_reminders")
       .update(cleanedUpdates)
       .eq("job_id", jobId)
       .eq("associate_id", associateId)
@@ -147,7 +192,7 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
     const supabase = await createClient();
 
     const { error } = await supabase
-      .from("jobassignments")
+      .from("job_reminders")
       .delete()
       .eq("job_id", jobId)
       .eq("associate_id", associateId);
@@ -164,7 +209,7 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
     const supabase = await createClient();
 
     const { data, error } = await supabase
-      .from("jobassignments")
+      .from("job_reminders")
       .select("num_reminders")
       .eq("job_id", jobId)
       .eq("associate_id", associateId);
@@ -185,7 +230,7 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
     const supabase = await createClient();
 
     const { data, error } = await supabase
-      .from("jobassignments")
+      .from("job_reminders")
       .select("*")
       .eq("job_id", jobId)
       .eq("associate_id", associateId);
@@ -207,7 +252,7 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
     const supabase = await createClient();
 
     const { data, error } = await supabase
-      .from("jobassignments")
+      .from("job_reminders")
       .select("*")
       .gt("num_reminders", 0)
       .neq("confirmation_status", "Confirmed");
@@ -231,7 +276,7 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
     const supabase = await createClient();
 
     const { data, error } = await supabase
-      .from("jobassignments")
+      .from("job_reminders")
       .select(
         "job_id, associate_id, work_date, start_time, confirmation_status"
       )

@@ -32,6 +32,7 @@ interface UploadResult {
 const JobTable = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
+  const [associates, setAssociates] = useState<Associate[]>([]);
 
   const fetchJobs = async () => {
     try {
@@ -58,6 +59,20 @@ const JobTable = () => {
 
   useEffect(() => {
     fetchJobs();
+    // Fetch associates for dropdown
+    (async () => {
+      try {
+        const res = await fetch("/api/associates");
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setAssociates(data);
+        } else {
+          console.error("Unexpected associates data:", data);
+        }
+      } catch (e) {
+        console.error("Failed to fetch associates", e);
+      }
+    })();
   }, []);
 
   const handleAddJob = () => {
@@ -65,14 +80,15 @@ const JobTable = () => {
       id: `temp-${Date.now()}`, // Temporary ID for new jobs
       title: "",
       location: "",
-      company_id: "", // Will be set when creating
+      client_company: "",
+      company_id: "", // Server will set based on auth user
       associate_id: null,
       start_date: new Date().toISOString().slice(0, 10),
       end_date: null,
       pay_rate: null,
       incentive_bonus: null,
       num_reminders: null,
-      job_status: "Upcoming",
+      job_status: "UPCOMING",
       isNew: true, // Flag to indicate this is a new job
     };
 
@@ -86,13 +102,53 @@ const JobTable = () => {
       if (isNewJob) {
         // Create new job
         console.log("Creating new job with data:", updatedFields);
+        // Shape payload: omit id and isNew and company_id; coerce number fields
+        const {
+          id: _omitId,
+          isNew: _omitIsNew,
+          company_id: _omitCompany,
+          ...rest
+        } = updatedFields as any;
+        const payload: any = {
+          ...rest,
+        };
+        if (payload.pay_rate !== undefined) {
+          payload.pay_rate =
+            payload.pay_rate === null || payload.pay_rate === ""
+              ? null
+              : Number(payload.pay_rate);
+        }
+        if (payload.incentive_bonus !== undefined) {
+          payload.incentive_bonus =
+            payload.incentive_bonus === null || payload.incentive_bonus === ""
+              ? null
+              : Number(payload.incentive_bonus);
+        }
+        if (payload.num_reminders !== undefined) {
+          payload.num_reminders =
+            payload.num_reminders === null || payload.num_reminders === ""
+              ? null
+              : parseInt(payload.num_reminders as any, 10);
+        }
+        if (payload.job_status) {
+          // Align to DB enum
+          const up = String(payload.job_status).toUpperCase();
+          payload.job_status = [
+            "UPCOMING",
+            "ONGOING",
+            "COMPLETED",
+            "CANCELLED",
+          ].includes(up)
+            ? up
+            : "UPCOMING";
+        }
 
         const res = await fetch("/api/jobs", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(updatedFields),
+          body: JSON.stringify(payload),
         });
 
         const responseData = await res.json();
@@ -113,13 +169,50 @@ const JobTable = () => {
       } else {
         // Update existing job
         console.log("Updating existing job:", id, "with data:", updatedFields);
+        // Shape update payload
+        const {
+          id: _omitId2,
+          company_id: _omitCompany2,
+          isNew: _omitIsNew2,
+          ...rest
+        } = updatedFields as any;
+        const payload: any = { ...rest };
+        if (payload.pay_rate !== undefined) {
+          payload.pay_rate =
+            payload.pay_rate === null || payload.pay_rate === ""
+              ? null
+              : Number(payload.pay_rate);
+        }
+        if (payload.incentive_bonus !== undefined) {
+          payload.incentive_bonus =
+            payload.incentive_bonus === null || payload.incentive_bonus === ""
+              ? null
+              : Number(payload.incentive_bonus);
+        }
+        if (payload.num_reminders !== undefined) {
+          payload.num_reminders =
+            payload.num_reminders === null || payload.num_reminders === ""
+              ? null
+              : parseInt(payload.num_reminders as any, 10);
+        }
+        if (payload.job_status) {
+          const up = String(payload.job_status).toUpperCase();
+          payload.job_status = [
+            "UPCOMING",
+            "ONGOING",
+            "COMPLETED",
+            "CANCELLED",
+          ].includes(up)
+            ? up
+            : undefined;
+        }
 
         const res = await fetch(`/api/jobs/${id}`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(updatedFields),
+          body: JSON.stringify(payload),
         });
 
         const responseData = await res.json();
@@ -133,9 +226,7 @@ const JobTable = () => {
 
         // Update local state
         setJobs((prev) =>
-          prev.map((job) =>
-            job.id === id ? { ...job, ...updatedFields } : job
-          )
+          prev.map((job) => (job.id === id ? { ...job, ...payload } : job))
         );
       }
     } catch (error) {
@@ -211,7 +302,7 @@ const JobTable = () => {
         onAddManually={handleAddJob}
         onUploadComplete={handleUploadComplete}
       />
-      <table className="w-full table-fixed border-collapse bg-white rounded-lg overflow-hidden min-w-[800px]">
+      <table className="w-full table-auto border-collapse bg-white rounded-lg overflow-hidden min-w-[1200px]">
         <thead>
           <JobTableHeadRow />
         </thead>
@@ -221,6 +312,7 @@ const JobTable = () => {
               <JobTableRow
                 key={job.id}
                 job={job}
+                associates={associates}
                 onUpdate={handleUpdateJob}
                 onDelete={handleDeleteJob}
               />

@@ -3,10 +3,12 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import { Job } from "@/model/interfaces/Job";
+import { Associate } from "@/model/interfaces/Associate";
 import { useRouter } from "next/navigation";
 
 interface Props {
   job: Job;
+  associates: Associate[];
   onUpdate: (id: string, updatedJob: Partial<Job>) => void;
   onDelete: (id: string) => void;
 }
@@ -24,7 +26,12 @@ const getStatusStyle = (status: string) => {
   }
 };
 
-const JobTableRow: React.FC<Props> = ({ job, onUpdate, onDelete }) => {
+const JobTableRow: React.FC<Props> = ({
+  job,
+  associates,
+  onUpdate,
+  onDelete,
+}) => {
   const [isEditing, setIsEditing] = useState(job.isNew || false); // Start editing if it's a new job
   const [editedJob, setEditedJob] = useState(job);
   const router = useRouter();
@@ -64,6 +71,20 @@ const JobTableRow: React.FC<Props> = ({ job, onUpdate, onDelete }) => {
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
+    if (name === "pay_rate" || name === "incentive_bonus") {
+      const num = value === "" ? null : Number(value);
+      setEditedJob((prev) => ({ ...prev, [name]: num as any }));
+      return;
+    }
+    if (name === "num_reminders") {
+      const num = value === "" ? null : parseInt(value, 10);
+      setEditedJob((prev) => ({ ...prev, [name]: num as any }));
+      return;
+    }
+    if (name === "job_status") {
+      setEditedJob((prev) => ({ ...prev, [name]: value.toUpperCase() }));
+      return;
+    }
     setEditedJob((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -85,6 +106,7 @@ const JobTableRow: React.FC<Props> = ({ job, onUpdate, onDelete }) => {
       } ${!isEditing && !job.isNew ? "hover:bg-gray-50 cursor-pointer" : ""}`}
       onClick={handleRowClick}
     >
+      {/* Job Title */}
       <td className="px-4">
         {isEditing ? (
           <input
@@ -96,6 +118,21 @@ const JobTableRow: React.FC<Props> = ({ job, onUpdate, onDelete }) => {
           />
         ) : (
           job.title
+        )}
+      </td>
+
+      {/* Client Company */}
+      <td className="px-4">
+        {isEditing ? (
+          <input
+            name="client_company"
+            value={editedJob.client_company || ""}
+            onChange={handleChange}
+            onClick={(e) => e.stopPropagation()}
+            className="border border-gray-300 rounded px-2 w-full"
+          />
+        ) : (
+          editedJob.client_company || ""
         )}
       </td>
 
@@ -122,22 +159,23 @@ const JobTableRow: React.FC<Props> = ({ job, onUpdate, onDelete }) => {
             onClick={(e) => e.stopPropagation()}
             className="border border-gray-300 rounded px-2 w-full"
           >
-            <option value="Active">Active</option>
-            <option value="Upcoming">Upcoming</option>
-            <option value="Past">Past</option>
+            <option value="UPCOMING">Upcoming</option>
+            <option value="ONGOING">Ongoing</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="CANCELLED">Cancelled</option>
           </select>
         ) : (
           <span
             className={`px-2 py-0.5 rounded-sm text-xs font-bold uppercase ${getStatusStyle(
-              job.job_status || "Upcoming"
+              job.job_status || "UPCOMING"
             )}`}
           >
-            {job.job_status || "Upcoming"}
+            {job.job_status || "UPCOMING"}
           </span>
         )}
       </td>
 
-      <td className="px-4">
+      <td className="px-4 text-right whitespace-nowrap">
         {isEditing ? (
           <input
             name="start_date"
@@ -152,7 +190,7 @@ const JobTableRow: React.FC<Props> = ({ job, onUpdate, onDelete }) => {
         )}
       </td>
 
-      <td className="px-4">
+      <td className="px-4 text-right whitespace-nowrap">
         {isEditing ? (
           <input
             name="end_date"
@@ -167,7 +205,7 @@ const JobTableRow: React.FC<Props> = ({ job, onUpdate, onDelete }) => {
         )}
       </td>
 
-      <td className="px-4">
+      <td className="px-4 text-right whitespace-nowrap">
         {isEditing ? (
           <input
             name="pay_rate"
@@ -179,7 +217,70 @@ const JobTableRow: React.FC<Props> = ({ job, onUpdate, onDelete }) => {
             className="border border-gray-300 rounded px-2 w-full"
           />
         ) : job.pay_rate ? (
-          `$${job.pay_rate}`
+          `$${Number(job.pay_rate).toFixed(2)}`
+        ) : (
+          ""
+        )}
+      </td>
+
+      {/* Incentive */}
+      <td className="px-4 text-right whitespace-nowrap">
+        {isEditing ? (
+          <input
+            name="incentive_bonus"
+            type="number"
+            step="0.01"
+            value={editedJob.incentive_bonus ?? ""}
+            onChange={handleChange}
+            onClick={(e) => e.stopPropagation()}
+            className="border border-gray-300 rounded px-2 w-full"
+          />
+        ) : editedJob.incentive_bonus ? (
+          `$${Number(editedJob.incentive_bonus).toFixed(2)}`
+        ) : (
+          ""
+        )}
+      </td>
+
+      {/* Associate dropdown */}
+      <td className="px-4">
+        {associates.length === 0 ? (
+          <span className="text-gray-500">No associates found</span>
+        ) : isEditing ? (
+          <select
+            name="associate_id"
+            value={editedJob.associate_id || ""}
+            onChange={handleChange}
+            onClick={(e) => e.stopPropagation()}
+            className="border border-gray-300 rounded px-2 w-full"
+          >
+            <option value="">Unassigned</option>
+            {associates.map((a) => (
+              <option
+                key={a.id}
+                value={a.id}
+              >{`${a.first_name} ${a.last_name}`}</option>
+            ))}
+          </select>
+        ) : (
+          (() => {
+            const found = associates.find(
+              (a) => a.id === editedJob.associate_id
+            );
+            return found ? `${found.first_name} ${found.last_name}` : "";
+          })()
+        )}
+      </td>
+
+      {/* Reminder Type placeholder (future) */}
+      <td className="px-4">
+        {isEditing ? (
+          <input
+            name="reminder_type"
+            disabled
+            placeholder="(coming soon)"
+            className="border border-gray-200 bg-gray-50 text-gray-400 rounded px-2 w-full"
+          />
         ) : (
           ""
         )}
