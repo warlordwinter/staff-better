@@ -85,6 +85,8 @@ const JobTable = () => {
     try {
       if (isNewJob) {
         // Create new job
+        console.log("Creating new job with data:", updatedFields);
+
         const res = await fetch("/api/jobs", {
           method: "POST",
           headers: {
@@ -93,20 +95,25 @@ const JobTable = () => {
           body: JSON.stringify(updatedFields),
         });
 
+        const responseData = await res.json();
+
         if (!res.ok) {
-          throw new Error("Failed to create job");
+          console.error("Job creation failed:", responseData);
+          throw new Error(responseData.error || "Failed to create job");
         }
 
-        const createdJob = await res.json();
+        console.log("Job created successfully:", responseData);
 
         // Replace the temporary job with the created one
         setJobs((prev) =>
           prev.map((job) =>
-            job.id === id ? { ...createdJob[0], isNew: false } : job
+            job.id === id ? { ...responseData[0], isNew: false } : job
           )
         );
       } else {
         // Update existing job
+        console.log("Updating existing job:", id, "with data:", updatedFields);
+
         const res = await fetch(`/api/jobs/${id}`, {
           method: "PUT",
           headers: {
@@ -115,9 +122,14 @@ const JobTable = () => {
           body: JSON.stringify(updatedFields),
         });
 
+        const responseData = await res.json();
+
         if (!res.ok) {
-          throw new Error("Failed to update job");
+          console.error("Job update failed:", responseData);
+          throw new Error(responseData.error || "Failed to update job");
         }
+
+        console.log("Job updated successfully:", responseData);
 
         // Update local state
         setJobs((prev) =>
@@ -128,7 +140,9 @@ const JobTable = () => {
       }
     } catch (error) {
       console.error("Failed to update job:", error);
-      // You might want to show a toast notification here
+      const errorMessage =
+        error instanceof Error ? error.message : "An unknown error occurred";
+      alert(`Error: ${errorMessage}`);
     }
   };
 

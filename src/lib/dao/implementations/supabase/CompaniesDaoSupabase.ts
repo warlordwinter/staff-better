@@ -42,9 +42,37 @@ export class CompaniesDaoSupabase implements ICompanies {
     return data;
   }
 
-  async getCompanyByManagerId(userId: string): Promise<Company | null> {
+  async getCompanyByManagerId(authUserId: string): Promise<Company | null> {
     const supabase = await createClient();
 
+    // First, get the database user ID from the auth user ID
+    const { data: dbUser, error: userError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("auth_id", authUserId)
+      .single();
+
+    if (userError) {
+      if (userError.code === "PGRST116") {
+        console.log("No database user found for auth user:", authUserId);
+        return null; // No user found
+      }
+      throw new Error(`Failed to get user: ${userError.message}`);
+    }
+
+    if (!dbUser) {
+      console.log("No database user found for auth user:", authUserId);
+      return null;
+    }
+
+    console.log(
+      "Found database user:",
+      dbUser.id,
+      "for auth user:",
+      authUserId
+    );
+
+    // Now get the company for this database user
     const { data, error } = await supabase
       .from("company_managers")
       .select(
@@ -63,11 +91,12 @@ export class CompaniesDaoSupabase implements ICompanies {
         )
       `
       )
-      .eq("user_id", userId)
+      .eq("user_id", dbUser.id)
       .single();
 
     if (error) {
       if (error.code === "PGRST116") {
+        console.log("No company found for database user:", dbUser.id);
         return null; // No rows returned
       }
       throw new Error(`Failed to get company by manager: ${error.message}`);
@@ -77,6 +106,8 @@ export class CompaniesDaoSupabase implements ICompanies {
     const company = Array.isArray(data.companies)
       ? data.companies[0]
       : data.companies;
+
+    console.log("Found company:", company?.id, "for database user:", dbUser.id);
     return company || null;
   }
 

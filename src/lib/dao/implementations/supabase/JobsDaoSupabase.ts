@@ -6,15 +6,37 @@ export class JobsDaoSupabase implements IJobs {
   // Insert jobs
   async insertJobs(jobs: Partial<Job>[]) {
     const supabase = await createClient();
-    console.log("Jobs: ", jobs);
+    console.log("Inserting jobs:", jobs);
+
+    // Validate required fields
+    for (const job of jobs) {
+      if (!job.title || job.title.trim() === "") {
+        throw new Error("Job title is required");
+      }
+      if (!job.company_id) {
+        throw new Error("Company ID is required");
+      }
+    }
 
     const { data, error } = await supabase.from("jobs").insert(jobs).select();
 
     if (error) {
-      console.error("Supabase error (raw):", JSON.stringify(error, null, 2));
-      throw new Error(JSON.stringify(error));
+      console.error("Supabase insert error:", error);
+      console.error("Error details:", JSON.stringify(error, null, 2));
+
+      // Provide more specific error messages
+      if (error.code === "23505") {
+        throw new Error("A job with this information already exists");
+      } else if (error.code === "23503") {
+        throw new Error("Invalid company or associate reference");
+      } else if (error.code === "23502") {
+        throw new Error("Required field is missing");
+      } else {
+        throw new Error(`Database error: ${error.message}`);
+      }
     }
 
+    console.log("Successfully inserted jobs:", data);
     return data;
   }
 

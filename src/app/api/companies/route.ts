@@ -14,19 +14,38 @@ export async function GET() {
       error: userError,
     } = await supabase.auth.getUser();
 
-    if (userError || !user) {
+    if (userError) {
+      console.error("Authentication error in companies API:", userError);
+      return NextResponse.json(
+        { error: "Authentication failed" },
+        { status: 401 }
+      );
+    }
+
+    if (!user) {
+      console.error("No user found in companies API");
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
+
+    console.log("Fetching company for user:", user.id);
 
     // Get the user's company
     const company = await companiesDao.getCompanyByManagerId(user.id);
 
     if (!company) {
-      return NextResponse.json({ error: "No company found" }, { status: 404 });
+      console.error("No company found for user:", user.id);
+      return NextResponse.json(
+        {
+          error: "No company found. Please complete company setup first.",
+        },
+        { status: 404 }
+      );
     }
 
+    console.log("Found company:", company.id, "for user:", user.id);
     return NextResponse.json(company);
   } catch (error: unknown) {
+    console.error("Error in companies API:", error);
     const errorMessage =
       error instanceof Error ? error.message : "An unknown error occurred";
     return NextResponse.json({ error: errorMessage }, { status: 500 });

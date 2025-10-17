@@ -14,7 +14,13 @@ export async function upsertProfile(payload: {
   const supabase = createClient();
   const {
     data: { user },
+    error: userError,
   } = await supabase.auth.getUser();
+
+  if (userError) {
+    console.error("Authentication error:", userError);
+    throw new Error(`Authentication failed: ${userError.message}`);
+  }
 
   if (!user) {
     throw new Error("No authenticated user");
@@ -81,53 +87,127 @@ export async function upsertProfile(payload: {
     existingUser = updatedUser;
   }
 
-  // Create or update company record
-  const companyData = {
-    name: payload.companyName || "",
-    email: payload.email ?? user.email,
-    phone_number: payload.phoneNumber,
-    zip_code: payload.zipCode ?? null,
-    system_readiness: payload.systemReadiness || null, // Use the form value or null
-    referral_source: payload.referralSource ?? null,
-    setup_completed: true,
+  // Helper function to create a new company
+  const createNewCompany = async () => {
+    const companyData = {
+      name: payload.companyName || "",
+      email: payload.email ?? user.email,
+      phone_number: payload.phoneNumber,
+      zip_code: payload.zipCode ?? null,
+      system_readiness: payload.systemReadiness || null,
+      referral_source: payload.referralSource ?? null,
+      setup_completed: true,
+    };
+
+    console.log("Creating company with data:", companyData);
+
+    const { data: newCompany, error: companyError } = await supabase
+      .from("companies")
+      .insert(companyData)
+      .select()
+      .single();
+
+    if (companyError) {
+      console.error("Company creation error:", companyError);
+      // handle transient errors (simple retry once)
+      if (companyError.message && companyError.message.includes("network")) {
+        const retry = await supabase
+          .from("companies")
+          .insert(companyData)
+          .select()
+          .single();
+        if (retry.error) throw retry.error;
+        return retry.data;
+      } else {
+        throw new Error(`Failed to create company: ${companyError.message}`);
+      }
+    }
+    return newCompany;
   };
 
-  console.log("Creating company with data:", companyData);
-
-  const { data: company, error: companyError } = await supabase
-    .from("companies")
-    .insert(companyData)
-    .select()
+  // Check if company already exists for this user
+  const { data: existingCompany } = await supabase
+    .from("company_managers")
+    .select(`
+      companies (
+        id,
+        name,
+        email,
+        phone_number,
+        zip_code,
+        system_readiness,
+        referral_source,
+        setup_completed,
+        created_at,
+        updated_at
+      )
+    `)
+    .eq("user_id", existingUser.id)
     .single();
 
-  if (companyError) {
-    console.error("Company creation error:", companyError);
-    // handle transient errors (simple retry once)
-    if (companyError.message && companyError.message.includes("network")) {
-      const retry = await supabase
+  let company;
+  if (existingCompany && existingCompany.companies) {
+    // Handle the case where companies might be an array or single object
+    const companyData = Array.isArray(existingCompany.companies) 
+      ? existingCompany.companies[0] 
+      : existingCompany.companies;
+    
+    if (companyData) {
+      // Company already exists, update it
+      console.log("Updating existing company:", companyData.id);
+      const updateData = {
+        name: payload.companyName || companyData.name,
+        email: payload.email ?? user.email,
+        phone_number: payload.phoneNumber,
+        zip_code: payload.zipCode ?? companyData.zip_code,
+        system_readiness: payload.systemReadiness || companyData.system_readiness,
+        referral_source: payload.referralSource ?? companyData.referral_source,
+        setup_completed: true,
+      };
+
+      const { data: updatedCompany, error: updateError } = await supabase
         .from("companies")
-        .insert(companyData)
+        .update(updateData)
+        .eq("id", companyData.id)
         .select()
         .single();
-      if (retry.error) throw retry.error;
-      return { user: existingUser, company: retry.data };
+
+      if (updateError) {
+        console.error("Company update error:", updateError);
+        throw new Error(`Failed to update company: ${updateError.message}`);
+      }
+      company = updatedCompany;
+    } else {
+      // No company data found, create new one
+      company = await createNewCompany();
     }
-    throw new Error(`Failed to create company: ${companyError.message}`);
+  } else {
+    // Create new company record
+    company = await createNewCompany();
   }
 
-  // Create the company-manager relationship
+  // Create the company-manager relationship (only if it doesn't exist)
+  console.log("Creating company-manager relationship:", {
+    company_id: company.id,
+    user_id: existingUser.id,
+  });
+
   const { error: relationshipError } = await supabase
     .from("company_managers")
-    .insert({
+    .upsert({
       company_id: company.id,
       user_id: existingUser.id,
+    }, {
+      onConflict: 'company_id,user_id'
     });
 
   if (relationshipError) {
+    console.error("Company-manager relationship error:", relationshipError);
     throw new Error(
       `Failed to create company-manager relationship: ${relationshipError.message}`
     );
   }
 
+  console.log("Successfully created company and user setup");
   return { user: existingUser, company };
 }
