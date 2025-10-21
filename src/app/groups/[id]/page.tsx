@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, use } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import Navbar from "@/components/ui/navBar";
@@ -12,33 +12,43 @@ import { Group } from "@/model/interfaces/Group";
 import { GroupsDataService } from "@/lib/services/groupsDataService";
 
 interface GroupPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export default function GroupPage({ params }: GroupPageProps) {
+  const { id: groupId } = use(params);
   const { loading: authLoading, isAuthenticated } = useAuthCheck();
   const [associates, setAssociates] = useState<AssociateGroup[]>([]);
   const [group, setGroup] = useState<Group | null>(null);
   const [loading, setLoading] = useState(true);
   const [showMassMessageModal, setShowMassMessageModal] = useState(false);
   const [showIndividualMessageModal, setShowIndividualMessageModal] = useState(false);
+  const [showAddExistingModal, setShowAddExistingModal] = useState(false);
   const [selectedAssociate, setSelectedAssociate] = useState<AssociateGroup | null>(null);
   const [messageText, setMessageText] = useState("");
+  const [availableAssociates, setAvailableAssociates] = useState<AssociateGroup[]>([]);
+  const [selectedAssociateIds, setSelectedAssociateIds] = useState<string[]>([]);
+  const [loadingAssociates, setLoadingAssociates] = useState(false);
 
   // Load group and associates data using the data service
   useEffect(() => {
     const loadData = async () => {
       try {
-        // Fetch group and associates data in parallel
-        const [groupData, associatesData] = await Promise.all([
-          GroupsDataService.fetchGroupById(params.id),
-          GroupsDataService.fetchAssociatesByGroupId(params.id)
-        ]);
-        
+        // Fetch group data first
+        const groupData = await GroupsDataService.fetchGroupById(groupId);
         setGroup(groupData);
-        setAssociates(associatesData);
+        
+        // Try to fetch associates, but don't fail if it errors
+        try {
+          const associatesData = await GroupsDataService.fetchAssociatesByGroupId(groupId);
+          setAssociates(associatesData);
+        } catch (membersError) {
+          console.error("Error loading group members (table may not exist yet):", membersError);
+          // Set empty array so the page still renders with the Quick Add form
+          setAssociates([]);
+        }
       } catch (error) {
         console.error("Error loading group data:", error);
         // Handle error appropriately in your app
@@ -50,7 +60,7 @@ export default function GroupPage({ params }: GroupPageProps) {
     if (!authLoading && isAuthenticated) {
       loadData();
     }
-  }, [params.id, authLoading, isAuthenticated]);
+  }, [groupId, authLoading, isAuthenticated]);
 
   // Handle associate actions using the data service
   const handleSaveAssociate = async (updatedAssociate: AssociateGroup) => {
@@ -106,13 +116,69 @@ export default function GroupPage({ params }: GroupPageProps) {
       lastName: "",
       phoneNumber: "",
       emailAddress: "",
-      groupId: params.id,
+      groupId: groupId,
       createdAt: new Date(),
       updatedAt: new Date(),
       isNew: true
     };
 
     setAssociates(prevAssociates => [newAssociateData, ...prevAssociates]);
+  };
+
+  const handleAddExistingAssociates = async () => {
+    setLoadingAssociates(true);
+    setSelectedAssociateIds([]);
+    
+    try {
+      // Fetch all available associates
+      const allAssociates = await GroupsDataService.fetchAllAssociates();
+      
+      // Filter out associates that are already in this group
+      const currentGroupAssociateIds = associates.map(a => a.id);
+      const availableAssociates = allAssociates.filter(
+        associate => !currentGroupAssociateIds.includes(associate.id)
+      );
+      
+      setAvailableAssociates(availableAssociates);
+      setShowAddExistingModal(true);
+    } catch (error) {
+      console.error("Error loading available associates:", error);
+    } finally {
+      setLoadingAssociates(false);
+    }
+  };
+
+  const handleSelectAssociate = (associateId: string, selected: boolean) => {
+    if (selected) {
+      setSelectedAssociateIds(prev => [...prev, associateId]);
+    } else {
+      setSelectedAssociateIds(prev => prev.filter(id => id !== associateId));
+    }
+  };
+
+  const handleAddSelectedAssociates = async () => {
+    if (selectedAssociateIds.length === 0) return;
+
+    try {
+      await GroupsDataService.addExistingAssociatesToGroup(groupId, selectedAssociateIds);
+      
+      // Refresh the group members
+      const updatedAssociates = await GroupsDataService.fetchAssociatesByGroupId(groupId);
+      setAssociates(updatedAssociates);
+      
+      // Close modal and reset state
+      setShowAddExistingModal(false);
+      setSelectedAssociateIds([]);
+      setAvailableAssociates([]);
+    } catch (error) {
+      console.error("Error adding associates to group:", error);
+    }
+  };
+
+  const handleCancelAddExisting = () => {
+    setShowAddExistingModal(false);
+    setSelectedAssociateIds([]);
+    setAvailableAssociates([]);
   };
 
   const handleMessageAssociate = (associate: AssociateGroup) => {
@@ -135,7 +201,7 @@ export default function GroupPage({ params }: GroupPageProps) {
         await GroupsDataService.sendMessageToAssociate(selectedAssociate.id, messageText);
       } else {
         // Send mass message
-        await GroupsDataService.sendMassMessageToGroup(params.id, messageText);
+        await GroupsDataService.sendMassMessageToGroup(groupId, messageText);
       }
 
       // Reset state
@@ -222,14 +288,28 @@ export default function GroupPage({ params }: GroupPageProps) {
           </div>
           
           <div className="flex items-center gap-3">
-            {/* Add Person Button */}
+            {/* Add New Associate Button */}
             <button
               onClick={handleAddNewAssociate}
               className="px-3 py-2 bg-green-600 rounded-xl inline-flex justify-center items-center gap-1 text-white cursor-pointer hover:bg-green-700 transition-colors"
             >
-              <span className="text-sm font-normal font-['Inter']">Add Associate</span>
+              <span className="text-sm font-normal font-['Inter']">Add New</span>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            </button>
+
+            {/* Add Existing Associate Button */}
+            <button
+              onClick={handleAddExistingAssociates}
+              disabled={loadingAssociates}
+              className="px-3 py-2 bg-blue-600 rounded-xl inline-flex justify-center items-center gap-1 text-white cursor-pointer hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span className="text-sm font-normal font-['Inter']">
+                {loadingAssociates ? "Loading..." : "Add Existing"}
+              </span>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
               </svg>
             </button>
             
@@ -242,6 +322,73 @@ export default function GroupPage({ params }: GroupPageProps) {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m-9 0h10m-10 0a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V6a2 2 0 00-2-2M9 9h6M9 13h6M9 17h4" />
               </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Quick Add Form */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h3 className="text-lg font-semibold text-gray-900 mb-3">Quick Add New Associate</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+            <input
+              type="text"
+              placeholder="First Name *"
+              id="quick-first-name"
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <input
+              type="text"
+              placeholder="Last Name *"
+              id="quick-last-name"
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <input
+              type="tel"
+              placeholder="Phone Number"
+              id="quick-phone"
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <input
+              type="email"
+              placeholder="Email"
+              id="quick-email"
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              onClick={() => {
+                const firstName = (document.getElementById('quick-first-name') as HTMLInputElement)?.value.trim();
+                const lastName = (document.getElementById('quick-last-name') as HTMLInputElement)?.value.trim();
+                const phoneNumber = (document.getElementById('quick-phone') as HTMLInputElement)?.value.trim();
+                const emailAddress = (document.getElementById('quick-email') as HTMLInputElement)?.value.trim();
+                
+                if (!firstName || !lastName) {
+                  alert('First name and last name are required');
+                  return;
+                }
+                
+                const newAssociate: AssociateGroup = {
+                  id: Date.now().toString(),
+                  firstName,
+                  lastName,
+                  phoneNumber,
+                  emailAddress,
+                  groupId: groupId,
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                  isNew: true
+                };
+                
+                handleSaveAssociate(newAssociate);
+                
+                // Clear form
+                (document.getElementById('quick-first-name') as HTMLInputElement).value = '';
+                (document.getElementById('quick-last-name') as HTMLInputElement).value = '';
+                (document.getElementById('quick-phone') as HTMLInputElement).value = '';
+                (document.getElementById('quick-email') as HTMLInputElement).value = '';
+              }}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors font-medium"
+            >
+              Add Now
             </button>
           </div>
         </div>
@@ -284,7 +431,7 @@ export default function GroupPage({ params }: GroupPageProps) {
           {/* Empty State */}
           {associates.length === 0 && (
             <div className="text-center py-12">
-              <p className="text-gray-500">No associates found in this group.</p>
+              <p className="text-gray-500">No associates found in this group. Use the form above to add some!</p>
             </div>
           )}
         </div>
@@ -355,6 +502,84 @@ export default function GroupPage({ params }: GroupPageProps) {
               >
                 Send Message
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Existing Associates Modal */}
+      {showAddExistingModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">
+            <h2 className="text-xl font-bold text-black mb-4">Add Existing Associates</h2>
+            <p className="text-sm text-gray-600 mb-4">Select associates to add to this group:</p>
+            
+            {availableAssociates.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-500">No available associates to add to this group.</p>
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto">
+                <div className="space-y-2">
+                  {availableAssociates.map((associate) => (
+                    <div
+                      key={associate.id}
+                      className="flex items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50"
+                    >
+                      <input
+                        type="checkbox"
+                        id={`associate-${associate.id}`}
+                        checked={selectedAssociateIds.includes(associate.id)}
+                        onChange={(e) => handleSelectAssociate(associate.id, e.target.checked)}
+                        className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                      <label
+                        htmlFor={`associate-${associate.id}`}
+                        className="flex-1 cursor-pointer"
+                      >
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <span className="font-medium text-gray-900">
+                              {associate.firstName} {associate.lastName}
+                            </span>
+                            {associate.emailAddress && (
+                              <span className="text-sm text-gray-500 ml-2">
+                                ({associate.emailAddress})
+                              </span>
+                            )}
+                          </div>
+                          {associate.phoneNumber && (
+                            <span className="text-sm text-gray-500">
+                              {associate.phoneNumber}
+                            </span>
+                          )}
+                        </div>
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-200">
+              <span className="text-sm text-gray-600">
+                {selectedAssociateIds.length} associate{selectedAssociateIds.length !== 1 ? 's' : ''} selected
+              </span>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleCancelAddExisting}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddSelectedAssociates}
+                  disabled={selectedAssociateIds.length === 0}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Add Selected ({selectedAssociateIds.length})
+                </button>
+              </div>
             </div>
           </div>
         </div>

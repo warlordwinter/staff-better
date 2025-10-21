@@ -51,8 +51,8 @@ const JobTable = () => {
 
   const handleAddJob = async () => {
     const newJob = {
-      job_title: " Generic Warehouse Job",
-      customer_name: "Generic Company Name",
+      title: " Generic Warehouse Job",
+      client_company: "Generic Company Name",
       job_status: "Active",
       start_date: new Date().toISOString().slice(0, 10),
     };

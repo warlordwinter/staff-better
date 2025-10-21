@@ -5,10 +5,15 @@ export class JobsDaoSupabase implements IJobs {
   // Insert jobs
   async insertJobs(
     jobs: {
-      job_title: string;
-      customer_name: string;
-      job_status: string;
+      title: string;
+      location?: string;
+      company_id: string;
+      associate_id: string;
       start_date: string;
+      end_date?: string;
+      num_reminders?: number;
+      job_status: string;
+      client_company: string;
     }[]
   ) {
     const supabase = await createClient();
@@ -30,7 +35,7 @@ export class JobsDaoSupabase implements IJobs {
 
     const { data, error } = await supabase
       .from("jobs")
-      .select("id, job_title, customer_name, job_status, start_date")
+      .select("id, title, location, company_id, associate_id, start_date, end_date, num_reminders, job_status, client_company")
       .order("start_date", { ascending: false });
 
     if (error) {
@@ -45,10 +50,15 @@ export class JobsDaoSupabase implements IJobs {
   async updateJob(
     id: string,
     updates: Partial<{
-      job_title: string;
-      customer_name: string;
-      job_status: string;
+      title: string;
+      location?: string;
+      company_id: string;
+      associate_id: string;
       start_date: string;
+      end_date?: string;
+      num_reminders?: number;
+      job_status: string;
+      client_company: string;
     }>
   ) {
     const supabase = await createClient();
@@ -87,7 +97,7 @@ export class JobsDaoSupabase implements IJobs {
 
     const { data, error } = await supabase
       .from("jobs")
-      .select("id, job_title, customer_name, job_status, start_date")
+      .select("id, title, location, company_id, associate_id, start_date, end_date, num_reminders, job_status, client_company")
       .eq("id", id)
       .single();
 

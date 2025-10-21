@@ -6,8 +6,8 @@ export interface ReminderAssignment {
   associate_first_name: string;
   associate_last_name: string;
   phone_number: string;
-  job_title: string;
-  customer_name: string;
+  title: string;
+  client_company: string;
   num_reminders: number;
   last_activity_time?: string;
   last_confirmation_time?: Date;

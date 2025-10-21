@@ -3,10 +3,15 @@ import { Job } from "@/model/interfaces/Job";
 export interface IJobs {
   insertJobs(
     jobs: {
-      job_title: string;
-      customer_name: string;
-      job_status: string;
+      title: string;
+      location?: string;
+      company_id: string;
+      associate_id: string;
       start_date: string;
+      end_date?: string;
+      num_reminders?: number;
+      job_status: string;
+      client_company: string;
     }[]
   ): Promise<Job[]>;
 
@@ -15,10 +20,15 @@ export interface IJobs {
   updateJob(
     id: string,
     updates: Partial<{
-      job_title: string;
-      customer_name: string;
-      job_status: string;
+      title: string;
+      location?: string;
+      company_id: string;
+      associate_id: string;
       start_date: string;
+      end_date?: string;
+      num_reminders?: number;
+      job_status: string;
+      client_company: string;
     }>
   ): Promise<Job[]>;
 

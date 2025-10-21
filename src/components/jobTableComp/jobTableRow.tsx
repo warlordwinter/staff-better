@@ -72,28 +72,28 @@ const JobTableRow: React.FC<Props> = ({ job, onUpdate, onDelete }) => {
       <td className="px-4">
         {isEditing ? (
           <input
-            name="job_title"
-            value={editedJob.job_title}
+            name="title"
+            value={editedJob.title}
             onChange={handleChange}
             onClick={(e) => e.stopPropagation()}
             className="border border-gray-300 rounded px-2 w-full"
           />
         ) : (
-          job.job_title
+          job.title
         )}
       </td>
 
       <td className="px-4 text-blue-600">
         {isEditing ? (
           <input
-            name="customer_name"
-            value={editedJob.customer_name}
+            name="client_company"
+            value={editedJob.client_company}
             onChange={handleChange}
             onClick={(e) => e.stopPropagation()}
             className="border border-gray-300 rounded px-2 w-full"
           />
         ) : (
-          job.customer_name
+          job.client_company
         )}
       </td>
 

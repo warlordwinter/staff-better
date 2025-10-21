@@ -5,238 +5,375 @@ import { AssociateGroup } from "@/model/interfaces/AssociateGroup";
  * Groups Data Service
  * 
  * This service handles all data operations for groups and associates.
- * Currently uses mock data, but is structured for easy database integration.
- * 
- * TODO FOR DATABASE INTEGRATION:
- * 1. Replace mock data with actual API calls
- * 2. Add proper error handling
- * 3. Add loading states
- * 4. Add caching if needed
- * 5. Add optimistic updates for better UX
+ * Connects to the backend API for database operations.
  */
 
-// Mock data - Replace with actual database calls
-const MOCK_GROUPS: Group[] = [
-  {
-    id: "1",
-    name: "All Associates",
-    description: "All company associates",
-    totalAssociates: 107,
-    createdAt: new Date("2024-01-01"),
-    updatedAt: new Date("2024-01-01")
-  },
-  {
-    id: "2", 
-    name: "Forklift Drivers",
-    description: "Certified forklift operators",
-    totalAssociates: 107,
-    createdAt: new Date("2024-01-01"),
-    updatedAt: new Date("2024-01-01")
-  },
-  {
-    id: "3",
-    name: "Welders", 
-    description: "Skilled welding professionals",
-    totalAssociates: 107,
-    createdAt: new Date("2024-01-01"),
-    updatedAt: new Date("2024-01-01")
-  }
-];
-
-const MOCK_ASSOCIATES: AssociateGroup[] = [
-  {
-    id: "1",
-    firstName: "John",
-    lastName: "Gilbert",
-    phoneNumber: "+1(801)-364-7666",
-    emailAddress: "example@example.com",
-    groupId: "1", // All Associates
-    createdAt: new Date("2024-01-01"),
-    updatedAt: new Date("2024-01-01")
-  },
-  {
-    id: "2",
-    firstName: "Henrietta",
-    lastName: "Whitney",
-    phoneNumber: "+1(801)-321-4456",
-    emailAddress: "john@mailinator.com",
-    groupId: "1", // All Associates
-    createdAt: new Date("2024-01-01"),
-    updatedAt: new Date("2024-01-01")
-  },
-  {
-    id: "3",
-    firstName: "Seth",
-    lastName: "McDaniel",
-    phoneNumber: "+1(385)-165-4625",
-    emailAddress: "mark@gmail.com",
-    groupId: "2", // Forklift Drivers
-    createdAt: new Date("2024-01-01"),
-    updatedAt: new Date("2024-01-01")
-  },
-  {
-    id: "4",
-    firstName: "Edward",
-    lastName: "King",
-    phoneNumber: "+1(480)-608-5985",
-    emailAddress: "zuchman@gmail.com",
-    groupId: "3", // Welders
-    createdAt: new Date("2024-01-01"),
-    updatedAt: new Date("2024-01-01")
-  }
-];
-
 /**
- * Groups API - Replace with actual API calls
+ * Groups API Service
  */
 export class GroupsDataService {
   /**
-   * Fetch all groups
-   * TODO: Replace with: const response = await fetch('/api/groups');
+   * Fetch all groups for the authenticated user's company
    */
   static async fetchGroups(): Promise<Group[]> {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 100));
-    return [...MOCK_GROUPS];
+    const response = await fetch('/api/groups');
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch groups');
+    }
+    
+    const data = await response.json();
+    
+    // Transform the API response to match the Group interface
+    return data.map((group: any) => ({
+      id: group.id,
+      name: group.name,
+      description: group.description,
+      totalAssociates: group.member_count || 0,
+      createdAt: new Date(group.created_at),
+      updatedAt: new Date(group.updated_at)
+    }));
   }
 
   /**
    * Fetch a specific group by ID
-   * TODO: Replace with: const response = await fetch(`/api/groups/${id}`);
    */
   static async fetchGroupById(id: string): Promise<Group | null> {
-    await new Promise(resolve => setTimeout(resolve, 100));
-    return MOCK_GROUPS.find(group => group.id === id) || null;
+    const response = await fetch(`/api/groups/${id}`);
+    
+    if (response.status === 404) {
+      return null;
+    }
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch group');
+    }
+    
+    const group = await response.json();
+    
+    return {
+      id: group.id,
+      name: group.name,
+      description: group.description,
+      totalAssociates: group.member_count || 0,
+      createdAt: new Date(group.created_at),
+      updatedAt: new Date(group.updated_at)
+    };
   }
 
   /**
    * Fetch associates for a specific group
-   * TODO: Replace with: const response = await fetch(`/api/groups/${groupId}/associates`);
    */
   static async fetchAssociatesByGroupId(groupId: string): Promise<AssociateGroup[]> {
-    await new Promise(resolve => setTimeout(resolve, 100));
-    return MOCK_ASSOCIATES.filter(associate => associate.groupId === groupId);
+    const response = await fetch(`/api/groups/${groupId}/members`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch group members');
+    }
+    
+    const members = await response.json();
+    
+    // Transform the API response to match the AssociateGroup interface
+    return members.map((member: any) => ({
+      id: member.id,
+      firstName: member.first_name || '',
+      lastName: member.last_name || '',
+      phoneNumber: member.phone_number || '',
+      emailAddress: member.email_address || '',
+      groupId: groupId,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }));
   }
 
   /**
    * Create a new group
-   * TODO: Replace with: await fetch('/api/groups', { method: 'POST', body: JSON.stringify(groupData) });
    */
   static async createGroup(groupData: Omit<Group, 'id' | 'createdAt' | 'updatedAt'>): Promise<Group> {
-    await new Promise(resolve => setTimeout(resolve, 200));
+    const response = await fetch('/api/groups', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: groupData.name,
+        description: groupData.description,
+      }),
+    });
     
-    const newGroup: Group = {
-      ...groupData,
-      id: Date.now().toString(),
-      createdAt: new Date(),
-      updatedAt: new Date()
+    if (!response.ok) {
+      throw new Error('Failed to create group');
+    }
+    
+    const group = await response.json();
+    
+    return {
+      id: group.id,
+      name: group.name,
+      description: group.description,
+      totalAssociates: 0,
+      createdAt: new Date(group.created_at),
+      updatedAt: new Date(group.updated_at)
     };
-    
-    MOCK_GROUPS.push(newGroup);
-    return newGroup;
   }
 
   /**
    * Update an existing group
-   * TODO: Replace with: await fetch(`/api/groups/${id}`, { method: 'PUT', body: JSON.stringify(updates) });
    */
   static async updateGroup(id: string, updates: Partial<Group>): Promise<Group | null> {
-    await new Promise(resolve => setTimeout(resolve, 200));
+    const response = await fetch(`/api/groups/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: updates.name,
+        description: updates.description,
+      }),
+    });
     
-    const groupIndex = MOCK_GROUPS.findIndex(group => group.id === id);
-    if (groupIndex === -1) return null;
+    if (response.status === 404) {
+      return null;
+    }
     
-    MOCK_GROUPS[groupIndex] = {
-      ...MOCK_GROUPS[groupIndex],
-      ...updates,
-      updatedAt: new Date()
+    if (!response.ok) {
+      throw new Error('Failed to update group');
+    }
+    
+    const group = await response.json();
+    
+    return {
+      id: group.id,
+      name: group.name,
+      description: group.description,
+      totalAssociates: group.member_count || 0,
+      createdAt: new Date(group.created_at),
+      updatedAt: new Date(group.updated_at)
     };
-    
-    return MOCK_GROUPS[groupIndex];
   }
 
   /**
    * Delete a group
-   * TODO: Replace with: await fetch(`/api/groups/${id}`, { method: 'DELETE' });
    */
   static async deleteGroup(id: string): Promise<boolean> {
-    await new Promise(resolve => setTimeout(resolve, 200));
+    const response = await fetch(`/api/groups/${id}`, {
+      method: 'DELETE',
+    });
     
-    const groupIndex = MOCK_GROUPS.findIndex(group => group.id === id);
-    if (groupIndex === -1) return false;
+    if (!response.ok) {
+      throw new Error('Failed to delete group');
+    }
     
-    MOCK_GROUPS.splice(groupIndex, 1);
     return true;
   }
 
   /**
-   * Create a new associate
-   * TODO: Replace with: await fetch('/api/associates', { method: 'POST', body: JSON.stringify(associateData) });
+   * Create a new associate and add to group
    */
   static async createAssociate(associateData: Omit<AssociateGroup, 'id' | 'createdAt' | 'updatedAt'>): Promise<AssociateGroup> {
-    await new Promise(resolve => setTimeout(resolve, 200));
+    // First, create the user in the users table
+    const createResponse = await fetch('/api/users', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        first_name: associateData.firstName,
+        last_name: associateData.lastName,
+        phone_number: associateData.phoneNumber || "",
+        email: associateData.emailAddress || null,
+      }),
+    });
     
-    const newAssociate: AssociateGroup = {
-      ...associateData,
-      id: Date.now().toString(),
+    if (!createResponse.ok) {
+      throw new Error('Failed to create user');
+    }
+    
+    const newUser = await createResponse.json();
+    const userId = newUser.id;
+    
+    // Then, add the user to the group
+    const addToGroupResponse = await fetch(`/api/groups/${associateData.groupId}/members`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        user_ids: [userId],
+      }),
+    });
+    
+    if (!addToGroupResponse.ok) {
+      throw new Error('Failed to add user to group');
+    }
+    
+    return {
+      id: userId,
+      firstName: associateData.firstName,
+      lastName: associateData.lastName,
+      phoneNumber: associateData.phoneNumber,
+      emailAddress: associateData.emailAddress,
+      groupId: associateData.groupId,
       createdAt: new Date(),
       updatedAt: new Date()
     };
-    
-    MOCK_ASSOCIATES.push(newAssociate);
-    return newAssociate;
   }
 
   /**
    * Update an existing associate
-   * TODO: Replace with: await fetch(`/api/associates/${id}`, { method: 'PUT', body: JSON.stringify(updates) });
    */
   static async updateAssociate(id: string, updates: Partial<AssociateGroup>): Promise<AssociateGroup | null> {
-    await new Promise(resolve => setTimeout(resolve, 200));
+    const response = await fetch(`/api/associates/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        first_name: updates.firstName,
+        last_name: updates.lastName,
+        phone_number: updates.phoneNumber,
+        email_address: updates.emailAddress,
+      }),
+    });
     
-    const associateIndex = MOCK_ASSOCIATES.findIndex(associate => associate.id === id);
-    if (associateIndex === -1) return null;
+    if (response.status === 404) {
+      return null;
+    }
     
-    MOCK_ASSOCIATES[associateIndex] = {
-      ...MOCK_ASSOCIATES[associateIndex],
-      ...updates,
+    if (!response.ok) {
+      throw new Error('Failed to update associate');
+    }
+    
+    const associate = await response.json();
+    const updatedAssociate = Array.isArray(associate) ? associate[0] : associate;
+    
+    return {
+      id: updatedAssociate.id,
+      firstName: updatedAssociate.first_name || '',
+      lastName: updatedAssociate.last_name || '',
+      phoneNumber: updatedAssociate.phone_number || '',
+      emailAddress: updatedAssociate.email_address || '',
+      groupId: updates.groupId || '',
+      createdAt: new Date(updatedAssociate.created_at || Date.now()),
       updatedAt: new Date()
     };
-    
-    return MOCK_ASSOCIATES[associateIndex];
   }
 
   /**
-   * Delete an associate
-   * TODO: Replace with: await fetch(`/api/associates/${id}`, { method: 'DELETE' });
+   * Delete an associate (from the database, not just the group)
    */
   static async deleteAssociate(id: string): Promise<boolean> {
-    await new Promise(resolve => setTimeout(resolve, 200));
+    const response = await fetch(`/api/associates/${id}`, {
+      method: 'DELETE',
+    });
     
-    const associateIndex = MOCK_ASSOCIATES.findIndex(associate => associate.id === id);
-    if (associateIndex === -1) return false;
+    if (!response.ok) {
+      throw new Error('Failed to delete associate');
+    }
     
-    MOCK_ASSOCIATES.splice(associateIndex, 1);
     return true;
   }
 
   /**
    * Send message to individual associate
-   * TODO: Replace with: await fetch('/api/messages', { method: 'POST', body: JSON.stringify({ associateId, message }) });
    */
   static async sendMessageToAssociate(associateId: string, message: string): Promise<boolean> {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    console.log(`Sending message to associate ${associateId}:`, message);
+    const response = await fetch(`/api/associates/${associateId}/message`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ message }),
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to send message');
+    }
+    
     return true;
   }
 
   /**
    * Send message to all associates in a group
-   * TODO: Replace with: await fetch('/api/messages/mass', { method: 'POST', body: JSON.stringify({ groupId, message }) });
    */
   static async sendMassMessageToGroup(groupId: string, message: string): Promise<boolean> {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    console.log(`Sending mass message to group ${groupId}:`, message);
+    const response = await fetch(`/api/groups/${groupId}/message`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ message }),
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to send mass message');
+    }
+    
+    return true;
+  }
+
+  /**
+   * Fetch all associates in the company
+   */
+  static async fetchAllAssociates(): Promise<AssociateGroup[]> {
+    const response = await fetch('/api/users');
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch users');
+    }
+    
+    const users = await response.json();
+    
+    // Transform the API response to match the AssociateGroup interface
+    return users.map((user: any) => ({
+      id: user.id,
+      firstName: user.first_name || '',
+      lastName: user.last_name || '',
+      phoneNumber: user.phone_number || '',
+      emailAddress: user.email || '',
+      groupId: '', // Will be set when adding to a specific group
+      createdAt: new Date(user.created_at || Date.now()),
+      updatedAt: new Date(user.updated_at || Date.now())
+    }));
+  }
+
+  /**
+   * Add existing associates to a group
+   */
+  static async addExistingAssociatesToGroup(groupId: string, userIds: string[]): Promise<boolean> {
+    const response = await fetch(`/api/groups/${groupId}/members`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        user_ids: userIds,
+      }),
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to add users to group');
+    }
+    
+    return true;
+  }
+
+  /**
+   * Remove an associate from a group (but keep them in the database)
+   */
+  static async removeAssociateFromGroup(groupId: string, userId: string): Promise<boolean> {
+    const response = await fetch(`/api/groups/${groupId}/members?user_id=${userId}`, {
+      method: 'DELETE',
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to remove user from group');
+    }
+    
     return true;
   }
 }
