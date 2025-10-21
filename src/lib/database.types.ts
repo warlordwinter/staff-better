@@ -22,7 +22,7 @@ export type Database = {
           last_name: string | null
           phone_number: string
           sms_opt_out: boolean | null
-          start_date: string
+          start_date: string | null
           work_date: string | null
         }
         Insert: {
@@ -32,7 +32,7 @@ export type Database = {
           last_name?: string | null
           phone_number: string
           sms_opt_out?: boolean | null
-          start_date?: string
+          start_date?: string | null
           work_date?: string | null
         }
         Update: {
@@ -42,7 +42,7 @@ export type Database = {
           last_name?: string | null
           phone_number?: string
           sms_opt_out?: boolean | null
-          start_date?: string
+          start_date?: string | null
           work_date?: string | null
         }
         Relationships: []
@@ -50,7 +50,7 @@ export type Database = {
       companies: {
         Row: {
           company_name: string
-          created_at: string
+          created_at: string | null
           email: string
           id: string
           non_temp_employees: number | null
@@ -63,7 +63,7 @@ export type Database = {
         }
         Insert: {
           company_name: string
-          created_at?: string
+          created_at?: string | null
           email: string
           id?: string
           non_temp_employees?: number | null
@@ -76,7 +76,7 @@ export type Database = {
         }
         Update: {
           company_name?: string
-          created_at?: string
+          created_at?: string | null
           email?: string
           id?: string
           non_temp_employees?: number | null
@@ -89,32 +89,32 @@ export type Database = {
         }
         Relationships: []
       }
-      group_members: {
+      group_associates: {
         Row: {
           associate_id: string
-          created_at: string
+          created_at: string | null
           group_id: string
         }
         Insert: {
           associate_id: string
-          created_at?: string
+          created_at?: string | null
           group_id: string
         }
         Update: {
           associate_id?: string
-          created_at?: string
+          created_at?: string | null
           group_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "group_members_associate_id_fkey"
+            foreignKeyName: "ga_associate_id_fkey"
             columns: ["associate_id"]
             isOneToOne: false
             referencedRelation: "associates"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "group_members_group_id_fkey"
+            foreignKeyName: "ga_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
             referencedRelation: "groups"
@@ -125,27 +125,24 @@ export type Database = {
       groups: {
         Row: {
           company_id: string
-          created_at: string
+          created_at: string | null
           description: string | null
+          group_name: string
           id: string
-          name: string
-          updated_at: string
         }
         Insert: {
           company_id: string
-          created_at?: string
+          created_at?: string | null
           description?: string | null
+          group_name: string
           id?: string
-          name: string
-          updated_at?: string
         }
         Update: {
           company_id?: string
-          created_at?: string
+          created_at?: string | null
           description?: string | null
+          group_name?: string
           id?: string
-          name?: string
-          updated_at?: string
         }
         Relationships: [
           {
@@ -196,14 +193,14 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "jobassignments_associate_id_fkey"
+            foreignKeyName: "job_assignments_associate_id_fkey"
             columns: ["associate_id"]
             isOneToOne: false
             referencedRelation: "associates"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "jobassignments_job_id_fkey"
+            foreignKeyName: "job_assignments_job_id_fkey"
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
