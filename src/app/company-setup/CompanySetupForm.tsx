@@ -6,8 +6,8 @@ import { markSetupComplete } from "@/lib/auth/actions";
 
 interface CompanyFormData {
   companyName: string;
-  nonTempEmployees: string;
   email: string;
+  phoneNumber: string;
   zipCode: string;
   systemReadiness: string;
   referralSource: string;
@@ -21,8 +21,8 @@ export default function CompanySetupForm({ userEmail }: CompanySetupFormProps) {
   const router = useRouter();
   const [formData, setFormData] = useState<CompanyFormData>({
     companyName: "",
-    nonTempEmployees: "",
     email: userEmail,
+    phoneNumber: "",
     zipCode: "",
     systemReadiness: "",
     referralSource: "",
@@ -31,15 +31,6 @@ export default function CompanySetupForm({ userEmail }: CompanySetupFormProps) {
   const [formError, setFormError] = useState<string | null>(null);
 
   const handleInputChange = (field: keyof CompanyFormData, value: string) => {
-    if (field === "nonTempEmployees") {
-      // Prevent negative numbers
-      if (Number(value) < 0) {
-        setFormError("Number of employees cannot be negative.");
-        value = "";
-      } else {
-        setFormError(null);
-      }
-    }
     setFormData((prev) => ({
       ...prev,
       [field]: value,
@@ -48,11 +39,6 @@ export default function CompanySetupForm({ userEmail }: CompanySetupFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Validate nonTempEmployees is not negative
-    if (Number(formData.nonTempEmployees) < 0) {
-      setFormError("Number of employees cannot be negative.");
-      return;
-    }
     setIsSubmitting(true);
 
     try {
@@ -94,26 +80,23 @@ export default function CompanySetupForm({ userEmail }: CompanySetupFormProps) {
           />
         </div>
 
-        {/* Non-Temp Employees */}
+        {/* Phone Number */}
         <div>
           <label
-            htmlFor="nonTempEmployees"
+            htmlFor="phoneNumber"
             className="block text-sm font-medium text-gray-700"
           >
-            Number of Non-Temporary Employees
+            Phone Number
           </label>
           <input
-            id="nonTempEmployees"
-            name="nonTempEmployees"
-            type="number"
-            min="0"
+            id="phoneNumber"
+            name="phoneNumber"
+            type="tel"
             required
-            value={formData.nonTempEmployees}
-            onChange={(e) =>
-              handleInputChange("nonTempEmployees", e.target.value)
-            }
+            value={formData.phoneNumber}
+            onChange={(e) => handleInputChange("phoneNumber", e.target.value)}
             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
-            placeholder="50"
+            placeholder="(555) 123-4567"
           />
         </div>
 

@@ -1,16 +1,22 @@
 import { createClient } from "../../../supabase/server";
 import { IJobs } from "../../interfaces/IJobs";
+import { Job } from "@/model/interfaces/Job";
 
 export class JobsDaoSupabase implements IJobs {
   // Insert jobs
   async insertJobs(
     jobs: {
-      job_title: string;
-      customer_name: string;
-      job_status: string;
-      start_date: string;
+      title?: string | null;
+      location?: string | null;
+      company_id: string;
+      associate_id?: string | null;
+      start_date?: string | null;
+      end_date?: string | null;
+      num_reminders?: number | null;
+      job_status?: "UPCOMING" | "ONGOING" | "COMPLETED" | "CANCELLED" | null;
+      client_company?: string | null;
     }[]
-  ) {
+  ): Promise<Job[]> {
     const supabase = await createClient();
     console.log("Jobs: ", jobs);
 
@@ -21,16 +27,16 @@ export class JobsDaoSupabase implements IJobs {
       throw new Error(JSON.stringify(error));
     }
 
-    return data;
+    return data || [];
   }
 
   // Get jobs
-  async getJobs() {
+  async getJobs(): Promise<Job[]> {
     const supabase = await createClient();
 
     const { data, error } = await supabase
       .from("jobs")
-      .select("id, job_title, customer_name, job_status, start_date")
+      .select("*")
       .order("start_date", { ascending: false });
 
     if (error) {
@@ -38,19 +44,60 @@ export class JobsDaoSupabase implements IJobs {
       throw new Error("Failed to fetch jobs");
     }
 
-    return data;
+    return data || [];
+  }
+
+  // Get jobs by company ID
+  async getJobsByCompanyId(companyId: string): Promise<Job[]> {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+      .from("jobs")
+      .select("*")
+      .eq("company_id", companyId)
+      .order("start_date", { ascending: false });
+
+    if (error) {
+      console.error("Supabase fetch error:", error);
+      throw new Error("Failed to fetch jobs by company");
+    }
+
+    return data || [];
+  }
+
+  // Get jobs by associate ID
+  async getJobsByAssociateId(associateId: string): Promise<Job[]> {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+      .from("jobs")
+      .select("*")
+      .eq("associate_id", associateId)
+      .order("start_date", { ascending: false });
+
+    if (error) {
+      console.error("Supabase fetch error:", error);
+      throw new Error("Failed to fetch jobs by associate");
+    }
+
+    return data || [];
   }
 
   // Update job
   async updateJob(
     id: string,
     updates: Partial<{
-      job_title: string;
-      customer_name: string;
-      job_status: string;
-      start_date: string;
+      title: string | null;
+      location: string | null;
+      company_id: string;
+      associate_id: string | null;
+      start_date: string | null;
+      end_date: string | null;
+      num_reminders: number | null;
+      job_status: "UPCOMING" | "ONGOING" | "COMPLETED" | "CANCELLED" | null;
+      client_company: string | null;
     }>
-  ) {
+  ): Promise<Job[]> {
     const supabase = await createClient();
 
     const { data, error } = await supabase
@@ -64,11 +111,11 @@ export class JobsDaoSupabase implements IJobs {
       throw new Error("Failed to update job");
     }
 
-    return data;
+    return data || [];
   }
 
   // Delete job
-  async deleteJob(id: string) {
+  async deleteJob(id: string): Promise<{ success: boolean }> {
     const supabase = await createClient();
 
     const { error } = await supabase.from("jobs").delete().eq("id", id);
@@ -82,12 +129,12 @@ export class JobsDaoSupabase implements IJobs {
   }
 
   // Get single job by ID
-  async getJobById(id: string) {
+  async getJobById(id: string): Promise<Job> {
     const supabase = await createClient();
 
     const { data, error } = await supabase
       .from("jobs")
-      .select("id, job_title, customer_name, job_status, start_date")
+      .select("*")
       .eq("id", id)
       .single();
 

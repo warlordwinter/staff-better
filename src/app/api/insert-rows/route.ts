@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { AssociatesDaoSupabase } from "@/lib/dao/implementations/supabase/AssociatesDaoSupabase";
+import { UsersDaoSupabase } from "@/lib/dao/implementations/supabase/UsersDaoSupabase";
 import { JobsDaoSupabase } from "@/lib/dao/implementations/supabase/JobsDaoSupabase";
 import { JobsAssignmentsDaoSupabase } from "@/lib/dao/implementations/supabase/JobsAssignmentsDaoSupabase";
 import { formatPhoneToE164 } from "@/utils/phoneUtils";
-import { Associate } from "@/model/interfaces/Associate";
+import { User } from "@/model/interfaces/User";
 import { Job } from "@/model/interfaces/Job";
-import { JobAssignment } from "@/model/interfaces/JobAssignment";
 
-const associatesDao = new AssociatesDaoSupabase();
+const usersDao = new UsersDaoSupabase();
 const jobsDao = new JobsDaoSupabase();
 const jobAssignmentsDao = new JobsAssignmentsDaoSupabase();
 
@@ -16,8 +15,8 @@ export async function POST(req: NextRequest) {
   const rows = body.rows;
 
   try {
-    // Prepare associate data for insertion with phone formatting
-    const associateData = rows.map((r: Associate) => {
+    // Prepare user data for insertion with phone formatting
+    const userData = rows.map((r: any) => {
       let formattedPhone = r.phone_number;
 
       // Format phone number to E.164 if provided
@@ -30,56 +29,55 @@ export async function POST(req: NextRequest) {
             `Could not format phone number "${r.phone_number}":`,
             error
           );
-          // Keep original if formatting fails - you might want to handle this differently
+          // Keep original if formatting fails
         }
       }
 
       return {
         first_name: r.first_name,
         last_name: r.last_name,
-        work_date: r.work_date,
-        start_time: r.start_time,
+        role: r.role || "ASSOCIATE", // Default to ASSOCIATE if not specified
+        email: r.email_address || null,
         phone_number: formattedPhone,
-        email_address: r.email_address,
+        sms_opt_out: r.sms_opt_out || false,
+        whatsapp: r.whatsapp || null,
+        auth_id: r.auth_id || null,
       };
     });
 
     // Prepare job data for insertion
-    const jobData = rows.map((r: Job) => ({
-      job_title: r.job_title,
-      customer_name: r.customer_name,
-      job_status: "Upcoming", // or map accordingly if the status needs transformation
+    const jobData = rows.map((r: any) => ({
+      title: r.job_title || r.title,
+      location: r.location || null,
+      company_id: r.company_id, // This should be provided in the request
+      associate_id: null, // Will be set after user creation
       start_date: r.start_date,
+      end_date: r.end_date || null,
+      num_reminders: r.num_reminders || 3,
+      job_status: "UPCOMING" as const,
+      client_company: r.customer_name || r.client_company,
     }));
 
     // Log the data to be inserted for debugging
-    console.log("Sending to Supabase (Associates):", associateData);
+    console.log("Sending to Supabase (Users):", userData);
     console.log("Sending to Supabase (Jobs):", jobData);
 
-    // Insert data into both DAOs
-    const insertedAssociates = await associatesDao.insertAssociates(
-      associateData
-    );
-    const insertedJobs = await jobsDao.insertJobs(jobData);
+    // Insert users first
+    const insertedUsers = await usersDao.insertUsers(userData);
 
-    // Create job assignments using the returned IDs
-    const jobAssignmentsData = rows.map((r: JobAssignment, index: number) => ({
-      job_id: insertedJobs[index].id,
-      associate_id: insertedAssociates[index].id,
-      confirmation_status: "Unconfirmed" as const,
-      last_confirmation_time: null,
-      work_date: r.work_date,
-      start_time: r.start_time,
+    // Update job data with user IDs
+    const updatedJobData = jobData.map((job, index) => ({
+      ...job,
+      associate_id: insertedUsers[index].id,
     }));
 
-    const jobAssignmentInsertion =
-      await jobAssignmentsDao.insertJobsAssignments(jobAssignmentsData);
+    // Insert jobs
+    const insertedJobs = await jobsDao.insertJobs(updatedJobData);
 
     // Return the results of both insertions
     return NextResponse.json({
-      associateInsertion: insertedAssociates,
+      userInsertion: insertedUsers,
       jobInsertion: insertedJobs,
-      jobAssignmentInsertion,
     });
   } catch (err: unknown) {
     let parsedError = err;

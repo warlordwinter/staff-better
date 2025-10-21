@@ -27,11 +27,11 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const data = await jobAssignmentsDao.updateJobAssignment(
-      jobId,
-      associateId,
-      updates
-    );
+    // Update the job assignment with the new associate_id and other fields
+    const data = await jobAssignmentsDao.updateJobAssignment(jobId, {
+      associate_id: associateId,
+      ...updates,
+    });
 
     return NextResponse.json(data);
   } catch (error) {
@@ -43,22 +43,17 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   }
 }
 
-// Delete a specific job assignment
+// Delete a specific job assignment (remove associate from job)
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
-    const { jobId, associateId } = await params;
+    const { jobId } = await params;
 
-    if (!jobId || !associateId) {
-      return NextResponse.json(
-        { error: "Invalid job ID or associate ID" },
-        { status: 400 }
-      );
+    if (!jobId) {
+      return NextResponse.json({ error: "Invalid job ID" }, { status: 400 });
     }
 
-    const result = await jobAssignmentsDao.deleteJobAssignment(
-      jobId,
-      associateId
-    );
+    // Remove associate from job by setting associate_id to null
+    const result = await jobAssignmentsDao.removeAssociateFromJob(jobId);
 
     return NextResponse.json(result);
   } catch (error) {

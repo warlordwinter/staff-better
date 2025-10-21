@@ -1,139 +1,101 @@
 import { createClient } from "../../../supabase/server";
-import { ConfirmationStatus } from "@/model/enums/ConfirmationStatus";
 import { IJobAssignments } from "../../interfaces/IJobAssignments";
+import { Job } from "@/model/interfaces/Job";
 
 export class JobsAssignmentsDaoSupabase implements IJobAssignments {
-  async insertJobsAssignments(
-    jobsAssignments: {
-      job_id: string;
-      associate_id: string;
-      confirmation_status:
-        | "Unconfirmed"
-        | "Soft Confirmed"
-        | "Likely Confirmed"
-        | "Confirmed"
-        | "Declined";
-      work_date: string;
-      start_time: string;
-      num_reminders?: number;
-    }[]
-  ) {
+  // Assign associate to job (updates the associate_id field in jobs table)
+  async assignAssociateToJob(jobId: string, associateId: string): Promise<Job> {
     const supabase = await createClient();
-    console.log("Job Assignment Creation: ", jobsAssignments);
 
-    // Use the correct table name (lowercase in Supabase by default)
     const { data, error } = await supabase
-      .from("jobassignments")
-      .insert(
-        jobsAssignments.map((assignment) => ({
-          ...assignment,
-          num_reminders: assignment.num_reminders || 0,
-        }))
-      )
-      .select();
+      .from("jobs")
+      .update({ associate_id: associateId })
+      .eq("id", jobId)
+      .select()
+      .single();
 
     if (error) {
-      console.error("Error in JobAssignmentsDao:", error);
+      console.error("Error assigning associate to job:", error);
       throw new Error(JSON.stringify(error));
     }
 
     return data;
   }
 
-  async getJobAssignmentsByJobId(jobId: string) {
+  // Remove associate from job (sets associate_id to null)
+  async removeAssociateFromJob(jobId: string): Promise<Job> {
     const supabase = await createClient();
 
     const { data, error } = await supabase
-      .from("jobassignments")
-      .select(
-        `
-        *,
-        associates!inner (
-          id,
-          first_name,
-          last_name,
-          work_date,
-          start_time,
-          phone_number,
-          email_address
-        )
-      `
-      )
-      .eq("job_id", jobId);
+      .from("jobs")
+      .update({ associate_id: null })
+      .eq("id", jobId)
+      .select()
+      .single();
 
     if (error) {
-      console.error("Error fetching job assignments:", error);
+      console.error("Error removing associate from job:", error);
       throw new Error(JSON.stringify(error));
     }
 
     return data;
   }
 
-  async insertSingleJobAssignment(
-    jobId: string,
-    assignmentData: {
-      associate_id: string;
-      confirmation_status?:
-        | "unconfirmed"
-        | "soft confirmed"
-        | "likely confirmed"
-        | "confirmed"
-        | "declined";
-      work_date: string;
-      start_time: string;
-      num_reminders?: number;
-    }
-  ) {
+  // Get jobs assigned to a specific associate
+  async getJobsByAssociate(associateId: string): Promise<Job[]> {
     const supabase = await createClient();
 
     const { data, error } = await supabase
-      .from("jobassignments")
-      .insert({
-        job_id: jobId,
-        associate_id: assignmentData.associate_id,
-        confirmation_status:
-          assignmentData.confirmation_status || "unconfirmed",
-        work_date: assignmentData.work_date,
-        start_time: assignmentData.start_time,
-        num_reminders: assignmentData.num_reminders || 0,
-      })
-      .select();
+      .from("jobs")
+      .select("*")
+      .eq("associate_id", associateId)
+      .order("start_date", { ascending: false });
 
     if (error) {
-      console.error("Error creating job assignment:", error);
+      console.error("Error fetching jobs by associate:", error);
       throw new Error(JSON.stringify(error));
     }
 
-    return data;
+    return data || [];
   }
 
+  // Get the associate assigned to a specific job
+  async getAssociateByJob(jobId: string): Promise<string | null> {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+      .from("jobs")
+      .select("associate_id")
+      .eq("id", jobId)
+      .single();
+
+    if (error) {
+      console.error("Error fetching associate by job:", error);
+      return null;
+    }
+
+    return data?.associate_id || null;
+  }
+
+  // Update job assignment details
   async updateJobAssignment(
     jobId: string,
-    associateId: string,
     updates: {
-      confirmation_status?: ConfirmationStatus;
-      work_date?: string;
-      start_time?: string;
-      num_reminders?: number;
-      last_reminder_time?: string;
-      last_confirmation_time?: string;
+      associate_id?: string | null;
+      start_date?: string | null;
+      end_date?: string | null;
+      num_reminders?: number | null;
+      job_status?: "UPCOMING" | "ONGOING" | "COMPLETED" | "CANCELLED" | null;
     }
-  ) {
+  ): Promise<Job> {
     const supabase = await createClient();
-    console.log("Job Assignment jobid:", jobId);
-    console.log("Job Assignment AssociateId:", associateId);
-    console.log("Job Assignment updates:", updates);
-
-    const cleanedUpdates = Object.fromEntries(
-      Object.entries(updates).filter(([, value]) => value !== "")
-    );
 
     const { data, error } = await supabase
-      .from("jobassignments")
-      .update(cleanedUpdates)
-      .eq("job_id", jobId)
-      .eq("associate_id", associateId)
-      .select();
+      .from("jobs")
+      .update(updates)
+      .eq("id", jobId)
+      .select()
+      .single();
 
     if (error) {
       console.error("Error updating job assignment:", error);
@@ -143,124 +105,49 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
     return data;
   }
 
-  async deleteJobAssignment(jobId: string, associateId: string) {
+  // Get jobs that need reminders (based on num_reminders and dates)
+  async getJobsNeedingReminders(): Promise<Job[]> {
     const supabase = await createClient();
-
-    const { error } = await supabase
-      .from("jobassignments")
-      .delete()
-      .eq("job_id", jobId)
-      .eq("associate_id", associateId);
-
-    if (error) {
-      console.error("Error deleting job assignment:", error);
-      throw new Error(JSON.stringify(error));
-    }
-
-    return { success: true };
-  }
-
-  async getNumberOfReminders(jobId: string, associateId: string) {
-    const supabase = await createClient();
+    const now = new Date().toISOString();
 
     const { data, error } = await supabase
-      .from("jobassignments")
-      .select("num_reminders")
-      .eq("job_id", jobId)
-      .eq("associate_id", associateId);
-
-    if (error) {
-      console.error("Error grabbing number of reminders remaining:", error);
-      throw new Error(JSON.stringify(error));
-    }
-
-    if (data && data.length > 0) {
-      return data[0].num_reminders;
-    }
-
-    return 0;
-  }
-
-  async getJobAssignment(jobId: string, associateId: string) {
-    const supabase = await createClient();
-
-    const { data, error } = await supabase
-      .from("jobassignments")
+      .from("jobs")
       .select("*")
-      .eq("job_id", jobId)
-      .eq("associate_id", associateId);
-
-    if (error) {
-      console.error("Error grabbing job assignment:", error);
-      throw new Error(JSON.stringify(error));
-    }
-
-    return data?.[0] || null;
-  }
-
-  /**
-   * This method gets all the job assignments that still need reminders
-   *
-   * @returns jobassignment with needed reminders to be sent
-   */
-  async getAssignmentsNeedingReminders() {
-    const supabase = await createClient();
-
-    const { data, error } = await supabase
-      .from("jobassignments")
-      .select("*")
+      .not("associate_id", "is", null)
+      .not("num_reminders", "is", null)
       .gt("num_reminders", 0)
-      .neq("confirmation_status", "Confirmed");
+      .lte("start_date", now)
+      .in("job_status", ["UPCOMING", "ONGOING"]);
 
     if (error) {
-      console.error(
-        "Error fetching job assignments that need reminders:",
-        error
-      );
+      console.error("Error fetching jobs needing reminders:", error);
       throw new Error(JSON.stringify(error));
     }
 
-    return data;
+    return data || [];
   }
 
-  async getActiveAssignmentsFromDatabase(
-    todayString: string,
-    daysFromNow: string,
-    associateId: string
-  ) {
+  // Get active jobs for an associate within a date range
+  async getActiveJobsForAssociate(
+    associateId: string,
+    startDate: string,
+    endDate: string
+  ): Promise<Job[]> {
     const supabase = await createClient();
 
     const { data, error } = await supabase
-      .from("jobassignments")
-      .select(
-        "job_id, associate_id, work_date, start_time, confirmation_status"
-      )
+      .from("jobs")
+      .select("*")
       .eq("associate_id", associateId)
-      .gte("work_date", todayString)
-      .lte("work_date", daysFromNow)
-      .neq("confirmation_status", "Declined")
-      .order("work_date", { ascending: true })
-      .order("start_time", { ascending: true });
+      .gte("start_date", startDate)
+      .lte("end_date", endDate)
+      .in("job_status", ["UPCOMING", "ONGOING"]);
 
     if (error) {
-      console.error("Error fetching active assignment:", error);
-      throw new Error(`Failed to fetch active assignments: ${error.message}`);
+      console.error("Error fetching active jobs for associate:", error);
+      throw new Error(JSON.stringify(error));
     }
 
-    if (!data || data.length === 0) {
-      console.log(`No active assignments found for associate: ${associateId}`);
-      return [];
-    }
-
-    // Transform the data to match JobAssignment interface
-    return data.map((assignment) => ({
-      job_id: assignment.job_id,
-      associate_id: assignment.associate_id,
-      confirmation_status: assignment.confirmation_status,
-      last_activity_time: new Date().toISOString(), // Default to current time
-      work_date: assignment.work_date,
-      start_time: assignment.start_time,
-      num_reminders: 0, // Default value
-    }));
+    return data || [];
   }
 }

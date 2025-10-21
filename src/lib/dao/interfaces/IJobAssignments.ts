@@ -1,71 +1,37 @@
-import { ConfirmationStatus } from "@/model/enums/ConfirmationStatus";
-import { JobAssignment } from "@/model/interfaces/JobAssignment";
+import { Job } from "@/model/interfaces/Job";
 
 export interface IJobAssignments {
-  insertJobsAssignments(
-    jobsAssignments: {
-      job_id: string;
-      associate_id: string;
-      confirmation_status:
-        | "Unconfirmed"
-        | "Soft Confirmed"
-        | "Likely Confirmed"
-        | "Confirmed"
-        | "Declined";
-      work_date: string;
-      start_time: string;
-      num_reminders?: number;
-    }[]
-  ): Promise<JobAssignment[]>;
+  // Assign associate to job (updates the associate_id field in jobs table)
+  assignAssociateToJob(jobId: string, associateId: string): Promise<Job>;
 
-  getJobAssignmentsByJobId(jobId: string): Promise<JobAssignment[]>;
+  // Remove associate from job (sets associate_id to null)
+  removeAssociateFromJob(jobId: string): Promise<Job>;
 
-  insertSingleJobAssignment(
-    jobId: string,
-    assignmentData: {
-      associate_id: string;
-      confirmation_status?:
-        | "unconfirmed"
-        | "soft confirmed"
-        | "likely confirmed"
-        | "confirmed"
-        | "declined";
-      work_date: string;
-      start_time: string;
-      num_reminders?: number;
-    }
-  ): Promise<JobAssignment[]>;
+  // Get jobs assigned to a specific associate
+  getJobsByAssociate(associateId: string): Promise<Job[]>;
 
+  // Get the associate assigned to a specific job
+  getAssociateByJob(jobId: string): Promise<string | null>; // Returns user ID or null
+
+  // Update job assignment details
   updateJobAssignment(
     jobId: string,
-    associateId: string,
     updates: {
-      confirmation_status?: ConfirmationStatus;
-      work_date?: string;
-      start_time?: string;
-      num_reminders?: number;
-      last_reminder_time?: string;
-      last_confirmation_time?: string;
+      associate_id?: string | null;
+      start_date?: string | null;
+      end_date?: string | null;
+      num_reminders?: number | null;
+      job_status?: "UPCOMING" | "ONGOING" | "COMPLETED" | "CANCELLED" | null;
     }
-  ): Promise<JobAssignment[]>;
+  ): Promise<Job>;
 
-  deleteJobAssignment(
-    jobId: string,
-    associateId: string
-  ): Promise<{ success: boolean }>;
+  // Get jobs that need reminders (based on num_reminders and dates)
+  getJobsNeedingReminders(): Promise<Job[]>;
 
-  getNumberOfReminders(jobId: string, associateId: string): Promise<number>;
-
-  getJobAssignment(
-    jobId: string,
-    associateId: string
-  ): Promise<JobAssignment | null>;
-
-  getAssignmentsNeedingReminders(): Promise<JobAssignment[]>;
-
-  getActiveAssignmentsFromDatabase(
-    todayString: string,
-    daysFromNow: string,
-    associateId: string
-  ): Promise<JobAssignment[]>;
+  // Get active jobs for an associate within a date range
+  getActiveJobsForAssociate(
+    associateId: string,
+    startDate: string,
+    endDate: string
+  ): Promise<Job[]>;
 }
