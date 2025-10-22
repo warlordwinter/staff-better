@@ -176,8 +176,8 @@ export class GroupsDataService {
   static async createAssociate(
     associateData: Omit<AssociateGroup, "id" | "createdAt" | "updatedAt">
   ): Promise<AssociateGroup> {
-    // First, create the user in the users table
-    const createResponse = await fetch("/api/users", {
+    // First, create the associate in the associates table
+    const createResponse = await fetch("/api/associates", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -185,19 +185,38 @@ export class GroupsDataService {
       body: JSON.stringify({
         first_name: associateData.firstName,
         last_name: associateData.lastName,
-        phone_number: associateData.phoneNumber || "",
-        email: associateData.emailAddress || null,
+        phone_number: associateData.phoneNumber || "000-000-0000", // Required field, provide default
+        email_address: associateData.emailAddress || null,
+        work_date: new Date().toISOString().split("T")[0], // Default to today
+        start_date: new Date().toISOString().split("T")[0], // Default to today
       }),
     });
 
     if (!createResponse.ok) {
-      throw new Error("Failed to create user");
+      const errorText = await createResponse.text();
+      console.error("Failed to create associate:", errorText);
+      throw new Error("Failed to create associate");
     }
 
-    const newUser = await createResponse.json();
-    const userId = newUser.id;
+    const newAssociates = await createResponse.json();
 
-    // Then, add the user to the group
+    // Debug logging
+    console.log("Created associates:", newAssociates);
+
+    // The API returns an array, so get the first (and only) associate
+    if (!Array.isArray(newAssociates) || newAssociates.length === 0) {
+      throw new Error("No associate was created");
+    }
+
+    const newAssociate = newAssociates[0];
+    const associateId = newAssociate.id;
+
+    console.log("Associate ID:", associateId, "Type:", typeof associateId);
+
+    // Ensure associateId is a string
+    const associateIdString = String(associateId);
+
+    // Then, add the associate to the group
     const addToGroupResponse = await fetch(
       `/api/groups/${associateData.groupId}/members`,
       {
@@ -206,17 +225,19 @@ export class GroupsDataService {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          associate_ids: [userId],
+          associate_ids: [associateIdString],
         }),
       }
     );
 
     if (!addToGroupResponse.ok) {
-      throw new Error("Failed to add user to group");
+      const errorText = await addToGroupResponse.text();
+      console.error("Failed to add associate to group:", errorText);
+      throw new Error("Failed to add associate to group");
     }
 
     return {
-      id: userId,
+      id: associateId,
       firstName: associateData.firstName,
       lastName: associateData.lastName,
       phoneNumber: associateData.phoneNumber,
@@ -337,24 +358,24 @@ export class GroupsDataService {
    * Fetch all associates in the company
    */
   static async fetchAllAssociates(): Promise<AssociateGroup[]> {
-    const response = await fetch("/api/users");
+    const response = await fetch("/api/associates");
 
     if (!response.ok) {
-      throw new Error("Failed to fetch users");
+      throw new Error("Failed to fetch associates");
     }
 
-    const users = await response.json();
+    const associates = await response.json();
 
     // Transform the API response to match the AssociateGroup interface
-    return users.map((user: any) => ({
-      id: user.id,
-      firstName: user.first_name || "",
-      lastName: user.last_name || "",
-      phoneNumber: user.phone_number || "",
-      emailAddress: user.email || "",
+    return associates.map((associate: any) => ({
+      id: associate.id,
+      firstName: associate.first_name || "",
+      lastName: associate.last_name || "",
+      phoneNumber: associate.phone_number || "",
+      emailAddress: associate.email_address || "",
       groupId: "", // Will be set when adding to a specific group
-      createdAt: new Date(user.created_at || Date.now()),
-      updatedAt: new Date(user.updated_at || Date.now()),
+      createdAt: new Date(associate.created_at || Date.now()),
+      updatedAt: new Date(associate.updated_at || Date.now()),
     }));
   }
 

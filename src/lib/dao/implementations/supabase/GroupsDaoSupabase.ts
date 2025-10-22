@@ -198,10 +198,10 @@ export class GroupsDaoSupabase implements IGroups {
       throw new Error("Group not found or access denied");
     }
 
-    // Get member IDs first
+    // Get member IDs first from the correct table
     const { data: groupMembers, error: membersError } = await supabase
-      .from("group_members")
-      .select("user_id")
+      .from("group_associates")
+      .select("associate_id")
       .eq("group_id", groupId);
 
     if (membersError) {
@@ -214,26 +214,28 @@ export class GroupsDaoSupabase implements IGroups {
       return [];
     }
 
-    // Get user details for all members
-    const userIds = groupMembers.map((m) => m.user_id);
-    const { data: users, error: usersError } = await supabase
-      .from("users")
-      .select("id, first_name, last_name, phone_number, email, sms_opt_out")
-      .in("id", userIds);
+    // Get associate details for all members
+    const associateIds = groupMembers.map((m) => m.associate_id);
+    const { data: associates, error: associatesError } = await supabase
+      .from("associates")
+      .select(
+        "id, first_name, last_name, phone_number, email_address, sms_opt_out"
+      )
+      .in("id", associateIds);
 
-    if (usersError) {
-      console.error("Supabase fetch users error:", usersError);
-      throw new Error("Failed to fetch user details");
+    if (associatesError) {
+      console.error("Supabase fetch associates error:", associatesError);
+      throw new Error("Failed to fetch associate details");
     }
 
-    // Map to the expected format (using email instead of email_address)
-    return (users || []).map((user) => ({
-      id: user.id,
-      first_name: user.first_name,
-      last_name: user.last_name,
-      phone_number: user.phone_number,
-      email_address: user.email, // Map email to email_address for consistency
-      sms_opt_out: user.sms_opt_out,
+    // Map to the expected format
+    return (associates || []).map((associate) => ({
+      id: associate.id,
+      first_name: associate.first_name,
+      last_name: associate.last_name,
+      phone_number: associate.phone_number,
+      email_address: associate.email_address,
+      sms_opt_out: associate.sms_opt_out,
     }));
   }
 

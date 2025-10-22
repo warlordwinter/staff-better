@@ -121,8 +121,8 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
           // Convert UTC times to local times for display
           const localAssociates = utcAssociates.map((associate: Associate) => ({
             ...associate,
-            start_time: associate.start_time
-              ? convertUTCTimeToLocal(associate.start_time, associate.work_date)
+            start_date: associate.start_date
+              ? convertUTCTimeToLocal(associate.start_date, associate.work_date)
               : "",
           }));
 

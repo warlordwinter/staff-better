@@ -11,7 +11,7 @@ export class AssociatesDaoSupabase implements IAssociates {
     const { data, error } = await supabase
       .from("associates")
       .select(
-        "id, first_name, last_name, work_date, start_time, phone_number, email_address"
+        "id, first_name, last_name, work_date, start_date, phone_number, email_address"
       )
       .order("last_name", { ascending: true });
 
@@ -30,7 +30,7 @@ export class AssociatesDaoSupabase implements IAssociates {
       first_name: string;
       last_name: string;
       work_date: string;
-      start_time: string; // Should already be in UTC format from API layer
+      start_date: string; // Date field, not time
       phone_number: string;
       email_address: string;
     }[]
@@ -156,7 +156,7 @@ export class AssociatesDaoSupabase implements IAssociates {
     let { data, error } = await supabase
       .from("associates")
       .select(
-        "id, first_name, last_name, work_date, start_time, phone_number, email_address, sms_opt_out"
+        "id, first_name, last_name, work_date, start_date, phone_number, email_address, sms_opt_out"
       )
       .eq("phone_number", normalizedPhone)
       .single();
@@ -170,7 +170,7 @@ export class AssociatesDaoSupabase implements IAssociates {
       const result = await supabase
         .from("associates")
         .select(
-          "id, first_name, last_name, work_date, start_time, phone_number, email_address, sms_opt_out"
+          "id, first_name, last_name, work_date, start_date, phone_number, email_address, sms_opt_out"
         )
         .eq("phone_number", phoneNumber)
         .single();

@@ -7,7 +7,7 @@ export interface IAssociates {
       first_name: string;
       last_name: string;
       work_date: string;
-      start_time: string;
+      start_date: string;
       phone_number: string;
       email_address: string;
     }[]
@@ -18,7 +18,7 @@ export interface IAssociates {
       first_name: string;
       last_name: string;
       work_date: string;
-      start_time: string;
+      start_date: string;
       phone_number: string;
       email_address: string;
     }>
