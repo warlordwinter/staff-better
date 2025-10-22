@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     // Create the group
     const newGroup = await groupsDao.createGroup({
       company_id: companyId,
-      name: body.name.trim(),
+      group_name: body.name.trim(),
       description: body.description || null,
     });
 

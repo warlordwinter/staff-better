@@ -15,10 +15,9 @@ export class GroupsDaoSupabase implements IGroups {
         `
         id,
         company_id,
-        name,
+        group_name,
         description,
-        created_at,
-        updated_at
+        created_at
       `
       )
       .eq("company_id", companyId)
@@ -33,12 +32,15 @@ export class GroupsDaoSupabase implements IGroups {
     const groupsWithCounts = await Promise.all(
       (groups || []).map(async (group) => {
         const { count, error: countError } = await supabase
-          .from("group_members")
+          .from("group_associates")
           .select("*", { count: "exact", head: true })
           .eq("group_id", group.id);
 
         if (countError) {
-          console.warn(`Error counting members for group ${group.id}:`, countError);
+          console.warn(
+            `Error counting members for group ${group.id}:`,
+            countError
+          );
         }
 
         return {
@@ -63,10 +65,9 @@ export class GroupsDaoSupabase implements IGroups {
         `
         id,
         company_id,
-        name,
+        group_name,
         description,
-        created_at,
-        updated_at
+        created_at
       `
       )
       .eq("id", groupId)
@@ -84,7 +85,7 @@ export class GroupsDaoSupabase implements IGroups {
 
     // Get member count
     const { count, error: countError } = await supabase
-      .from("group_members")
+      .from("group_associates")
       .select("*", { count: "exact", head: true })
       .eq("group_id", groupId);
 
@@ -103,7 +104,7 @@ export class GroupsDaoSupabase implements IGroups {
    */
   async createGroup(group: {
     company_id: string;
-    name: string;
+    group_name: string;
     description?: string | null;
   }) {
     const supabase = await createClient();
@@ -112,7 +113,7 @@ export class GroupsDaoSupabase implements IGroups {
       .from("groups")
       .insert({
         company_id: group.company_id,
-        name: group.name,
+        group_name: group.group_name,
         description: group.description || null,
       })
       .select()
@@ -239,15 +240,13 @@ export class GroupsDaoSupabase implements IGroups {
   /**
    * Add a member to a group
    */
-  async addMember(groupId: string, userId: string) {
+  async addMember(groupId: string, associateId: string) {
     const supabase = await createClient();
 
-    const { error } = await supabase
-      .from("group_members")
-      .insert({
-        group_id: groupId,
-        user_id: userId,
-      });
+    const { error } = await supabase.from("group_associates").insert({
+      group_id: groupId,
+      associate_id: associateId,
+    });
 
     if (error) {
       // Check if it's a duplicate key error (member already in group)
@@ -265,14 +264,14 @@ export class GroupsDaoSupabase implements IGroups {
   /**
    * Remove a member from a group
    */
-  async removeMember(groupId: string, userId: string) {
+  async removeMember(groupId: string, associateId: string) {
     const supabase = await createClient();
 
     const { error } = await supabase
-      .from("group_members")
+      .from("group_associates")
       .delete()
       .eq("group_id", groupId)
-      .eq("user_id", userId);
+      .eq("associate_id", associateId);
 
     if (error) {
       console.error("Supabase remove member error:", error);
@@ -285,16 +284,16 @@ export class GroupsDaoSupabase implements IGroups {
   /**
    * Add multiple members to a group
    */
-  async addMembers(groupId: string, userIds: string[]) {
+  async addMembers(groupId: string, associateIds: string[]) {
     const supabase = await createClient();
 
-    const membersToInsert = userIds.map((userId) => ({
+    const membersToInsert = associateIds.map((associateId) => ({
       group_id: groupId,
-      user_id: userId,
+      associate_id: associateId,
     }));
 
     const { error } = await supabase
-      .from("group_members")
+      .from("group_associates")
       .insert(membersToInsert);
 
     if (error) {
@@ -310,5 +309,3 @@ export class GroupsDaoSupabase implements IGroups {
     return { success: true };
   }
 }
-
-

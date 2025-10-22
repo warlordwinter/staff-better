@@ -27,11 +27,10 @@ export class GroupsDataService {
     // Transform the API response to match the Group interface
     return data.map((group: any) => ({
       id: group.id,
-      name: group.name,
+      group_name: group.group_name,
       description: group.description,
       totalAssociates: group.member_count || 0,
-      createdAt: new Date(group.created_at),
-      updatedAt: new Date(group.updated_at)
+      createdAt: new Date(group.created_at)
     }));
   }
 
@@ -53,11 +52,10 @@ export class GroupsDataService {
     
     return {
       id: group.id,
-      name: group.name,
+      group_name: group.group_name,
       description: group.description,
       totalAssociates: group.member_count || 0,
-      createdAt: new Date(group.created_at),
-      updatedAt: new Date(group.updated_at)
+      createdAt: new Date(group.created_at)
     };
   }
 
@@ -96,7 +94,7 @@ export class GroupsDataService {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        name: groupData.name,
+        group_name: groupData.group_name,
         description: groupData.description,
       }),
     });
@@ -127,7 +125,7 @@ export class GroupsDataService {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        name: updates.name,
+        group_name: updates.group_name,
         description: updates.description,
       }),
     });
@@ -144,11 +142,10 @@ export class GroupsDataService {
     
     return {
       id: group.id,
-      name: group.name,
+      group_name: group.group_name,
       description: group.description,
       totalAssociates: group.member_count || 0,
-      createdAt: new Date(group.created_at),
-      updatedAt: new Date(group.updated_at)
+      createdAt: new Date(group.created_at)
     };
   }
 
@@ -199,7 +196,7 @@ export class GroupsDataService {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        user_ids: [userId],
+        associate_ids: [userId],
       }),
     });
     
@@ -349,7 +346,7 @@ export class GroupsDataService {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        user_ids: userIds,
+        associate_ids: userIds,
       }),
     });
     
@@ -364,8 +361,8 @@ export class GroupsDataService {
   /**
    * Remove an associate from a group (but keep them in the database)
    */
-  static async removeAssociateFromGroup(groupId: string, userId: string): Promise<boolean> {
-    const response = await fetch(`/api/groups/${groupId}/members?user_id=${userId}`, {
+  static async removeAssociateFromGroup(groupId: string, associateId: string): Promise<boolean> {
+    const response = await fetch(`/api/groups/${groupId}/members?associate_id=${associateId}`, {
       method: 'DELETE',
     });
     

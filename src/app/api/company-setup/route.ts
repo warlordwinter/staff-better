@@ -12,10 +12,7 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (userError || !user) {
-      return NextResponse.json(
-        { error: "Not authenticated" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
     const body = await request.json();
@@ -29,7 +26,13 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Validate required fields
-    if (!companyName || !email || !zipCode || !systemReadiness || !referralSource) {
+    if (
+      !companyName ||
+      !email ||
+      !zipCode ||
+      !systemReadiness ||
+      !referralSource
+    ) {
       return NextResponse.json(
         { error: "All fields are required" },
         { status: 400 }
@@ -40,9 +43,9 @@ export async function POST(request: NextRequest) {
     const { data: company, error: companyError } = await supabase
       .from("companies")
       .insert({
-        name: companyName,
+        company_name: companyName,
         email: email,
-        phone_number: "", // You might want to add this field to the form
+        non_temp_employees: nonTempEmployees,
         zip_code: zipCode,
         system_readiness: systemReadiness,
         referral_source: referralSource,
@@ -67,7 +70,9 @@ export async function POST(request: NextRequest) {
   } catch (error: unknown) {
     console.error("Company setup error:", error);
     const errorMessage =
-      error instanceof Error ? error.message : "Failed to complete company setup";
+      error instanceof Error
+        ? error.message
+        : "Failed to complete company setup";
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

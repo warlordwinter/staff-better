@@ -60,7 +60,7 @@ export async function PUT(
       );
     }
 
-    const updates: { name?: string; description?: string | null } = {};
+    const updates: { group_name?: string; description?: string | null } = {};
 
     if (body.name) {
       if (typeof body.name !== "string" || !body.name.trim()) {
@@ -69,14 +69,18 @@ export async function PUT(
           { status: 400 }
         );
       }
-      updates.name = body.name.trim();
+      updates.group_name = body.name.trim();
     }
 
     if (body.description !== undefined) {
       updates.description = body.description || null;
     }
 
-    const updatedGroup = await groupsDao.updateGroup(groupId, companyId, updates);
+    const updatedGroup = await groupsDao.updateGroup(
+      groupId,
+      companyId,
+      updates
+    );
 
     if (!updatedGroup) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
@@ -129,5 +133,3 @@ export async function DELETE(
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
-
-

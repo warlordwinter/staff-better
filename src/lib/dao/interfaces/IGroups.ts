@@ -6,10 +6,9 @@ export interface IGroups {
     {
       id: string;
       company_id: string;
-      name: string;
+      group_name: string;
       description: string | null;
       created_at: string;
-      updated_at: string;
       member_count?: number;
     }[]
   >;
@@ -23,10 +22,9 @@ export interface IGroups {
   ): Promise<{
     id: string;
     company_id: string;
-    name: string;
+    group_name: string;
     description: string | null;
     created_at: string;
-    updated_at: string;
     member_count?: number;
   } | null>;
 
@@ -35,15 +33,14 @@ export interface IGroups {
    */
   createGroup(group: {
     company_id: string;
-    name: string;
+    group_name: string;
     description?: string | null;
   }): Promise<{
     id: string;
     company_id: string;
-    name: string;
+    group_name: string;
     description: string | null;
     created_at: string;
-    updated_at: string;
   }>;
 
   /**
@@ -53,22 +50,24 @@ export interface IGroups {
     groupId: string,
     companyId: string,
     updates: {
-      name?: string;
+      group_name?: string;
       description?: string | null;
     }
   ): Promise<{
     id: string;
     company_id: string;
-    name: string;
+    group_name: string;
     description: string | null;
     created_at: string;
-    updated_at: string;
   } | null>;
 
   /**
    * Delete a group
    */
-  deleteGroup(groupId: string, companyId: string): Promise<{ success: boolean }>;
+  deleteGroup(
+    groupId: string,
+    companyId: string
+  ): Promise<{ success: boolean }>;
 
   /**
    * Get all members of a group
@@ -90,17 +89,24 @@ export interface IGroups {
   /**
    * Add a member to a group
    */
-  addMember(groupId: string, associateId: string): Promise<{ success: boolean }>;
+  addMember(
+    groupId: string,
+    associateId: string
+  ): Promise<{ success: boolean }>;
 
   /**
    * Remove a member from a group
    */
-  removeMember(groupId: string, associateId: string): Promise<{ success: boolean }>;
+  removeMember(
+    groupId: string,
+    associateId: string
+  ): Promise<{ success: boolean }>;
 
   /**
    * Add multiple members to a group
    */
-  addMembers(groupId: string, associateIds: string[]): Promise<{ success: boolean }>;
+  addMembers(
+    groupId: string,
+    associateIds: string[]
+  ): Promise<{ success: boolean }>;
 }
-
-
