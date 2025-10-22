@@ -18,14 +18,14 @@ export async function GET() {
     console.error("Failed to fetch groups:", error);
     const errorMessage =
       error instanceof Error ? error.message : "Failed to fetch groups";
-    
+
     if (errorMessage.includes("Company not found")) {
       return NextResponse.json(
         { error: "Not authenticated or company not found" },
         { status: 401 }
       );
     }
-    
+
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
@@ -40,7 +40,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     // Validate required fields
-    if (!body.name || typeof body.name !== "string" || !body.name.trim()) {
+    if (
+      !body.group_name ||
+      typeof body.group_name !== "string" ||
+      !body.group_name.trim()
+    ) {
       return NextResponse.json(
         { error: "Group name is required" },
         { status: 400 }
@@ -50,7 +54,7 @@ export async function POST(request: NextRequest) {
     // Create the group
     const newGroup = await groupsDao.createGroup({
       company_id: companyId,
-      group_name: body.name.trim(),
+      group_name: body.group_name.trim(),
       description: body.description || null,
     });
 
@@ -59,16 +63,14 @@ export async function POST(request: NextRequest) {
     console.error("Failed to create group:", error);
     const errorMessage =
       error instanceof Error ? error.message : "Failed to create group";
-    
+
     if (errorMessage.includes("Company not found")) {
       return NextResponse.json(
         { error: "Not authenticated or company not found" },
         { status: 401 }
       );
     }
-    
+
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
-
-

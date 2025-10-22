@@ -53,7 +53,7 @@ export async function PUT(
     const body = await request.json();
 
     // Validate that at least one field is being updated
-    if (!body.name && body.description === undefined) {
+    if (!body.group_name && body.description === undefined) {
       return NextResponse.json(
         { error: "No fields to update" },
         { status: 400 }
@@ -62,14 +62,14 @@ export async function PUT(
 
     const updates: { group_name?: string; description?: string | null } = {};
 
-    if (body.name) {
-      if (typeof body.name !== "string" || !body.name.trim()) {
+    if (body.group_name) {
+      if (typeof body.group_name !== "string" || !body.group_name.trim()) {
         return NextResponse.json(
           { error: "Group name must be a non-empty string" },
           { status: 400 }
         );
       }
-      updates.group_name = body.name.trim();
+      updates.group_name = body.group_name.trim();
     }
 
     if (body.description !== undefined) {

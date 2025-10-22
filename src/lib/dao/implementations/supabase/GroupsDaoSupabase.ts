@@ -134,7 +134,7 @@ export class GroupsDaoSupabase implements IGroups {
     groupId: string,
     companyId: string,
     updates: {
-      name?: string;
+      group_name?: string;
       description?: string | null;
     }
   ) {

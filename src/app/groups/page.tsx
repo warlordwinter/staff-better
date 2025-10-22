@@ -43,14 +43,17 @@ export default function GroupsPage() {
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setDropdownOpen(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
@@ -60,12 +63,12 @@ export default function GroupsPage() {
 
     try {
       const newGroup = await GroupsDataService.createGroup({
-        name: newGroupName.trim(),
+        group_name: newGroupName.trim(),
         description: newGroupDescription.trim() || undefined,
         totalAssociates: 0, // New groups start with 0 associates
       });
 
-      setGroups(prevGroups => [...prevGroups, newGroup]);
+      setGroups((prevGroups) => [...prevGroups, newGroup]);
       setNewGroupName("");
       setNewGroupDescription("");
       setShowAddForm(false);
@@ -82,7 +85,9 @@ export default function GroupsPage() {
       try {
         const success = await GroupsDataService.deleteGroup(groupId);
         if (success) {
-          setGroups(prevGroups => prevGroups.filter(group => group.id !== groupId));
+          setGroups((prevGroups) =>
+            prevGroups.filter((group) => group.id !== groupId)
+          );
         }
       } catch (error) {
         console.error("Error deleting group:", error);
@@ -99,9 +104,9 @@ export default function GroupsPage() {
 
   // Handle form submission with Enter key
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && newGroupName.trim()) {
+    if (e.key === "Enter" && newGroupName.trim()) {
       handleAddGroup();
-    } else if (e.key === 'Escape') {
+    } else if (e.key === "Escape") {
       setShowAddForm(false);
       setNewGroupName("");
       setNewGroupDescription("");
@@ -141,8 +146,10 @@ export default function GroupsPage() {
       <main className="flex-1 flex flex-col gap-6 w-full max-w-6xl mx-auto px-4 mt-24">
         {/* Header Section - matching jobs page style */}
         <div className="relative flex justify-between items-center">
-          <h1 className="text-black text-5xl font-semibold font-['Inter']">Groups</h1>
-          
+          <h1 className="text-black text-5xl font-semibold font-['Inter']">
+            Groups
+          </h1>
+
           {/* Add Button with Plus Icon - matching jobs page style */}
           <div className="relative" ref={dropdownRef}>
             <button
@@ -160,16 +167,26 @@ export default function GroupsPage() {
                 />
               </div>
             </button>
-            
+
             {/* Dropdown Menu */}
             {dropdownOpen && (
               <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 py-1 z-50">
-                <button 
+                <button
                   onClick={handleAddManually}
                   className="flex items-center gap-3 w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 transition-colors"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v16m8-8H4"
+                    />
                   </svg>
                   Add Manually
                 </button>
@@ -182,7 +199,10 @@ export default function GroupsPage() {
         <div className="flex justify-center">
           <div className="flex flex-wrap gap-6 justify-center max-w-6xl">
             {groups.map((group) => (
-              <div key={group.id} className="relative flex-shrink-0 w-80 h-48 border border-gray-300 rounded-lg p-6 bg-white hover:shadow-md transition-shadow">
+              <div
+                key={group.id}
+                className="relative flex-shrink-0 w-80 h-48 border border-gray-300 rounded-lg p-6 bg-white hover:shadow-md transition-shadow"
+              >
                 {/* Delete Button */}
                 <button
                   onClick={(e) => {
@@ -193,18 +213,34 @@ export default function GroupsPage() {
                   className="absolute top-2 right-2 p-1 text-gray-400 hover:text-red-500 transition-colors z-10"
                   title="Delete group"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    />
                   </svg>
                 </button>
-                
+
                 {/* Clickable Link */}
                 <Link href={`/groups/${group.id}`} className="block h-full">
                   <div className="text-center h-full flex flex-col justify-center cursor-pointer">
-                    <h3 className="text-lg font-bold text-black mb-2">{group.name}</h3>
-                    <p className="text-sm text-gray-600">Total: {group.totalAssociates}</p>
+                    <h3 className="text-lg font-bold text-black mb-2">
+                      {group.group_name}
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      Total: {group.totalAssociates}
+                    </p>
                     {group.description && (
-                      <p className="text-xs text-gray-500 mt-1">{group.description}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {group.description}
+                      </p>
                     )}
                   </div>
                 </Link>
@@ -217,11 +253,16 @@ export default function GroupsPage() {
         {showAddForm && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 w-96 max-w-md mx-4">
-              <h2 className="text-xl font-bold text-black mb-4">Add New Group</h2>
-              
+              <h2 className="text-xl font-bold text-black mb-4">
+                Add New Group
+              </h2>
+
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="groupName" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label
+                    htmlFor="groupName"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
                     Group Name *
                   </label>
                   <input
@@ -235,9 +276,12 @@ export default function GroupsPage() {
                     autoFocus
                   />
                 </div>
-                
+
                 <div>
-                  <label htmlFor="groupDescription" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label
+                    htmlFor="groupDescription"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
                     Description (Optional)
                   </label>
                   <input
@@ -250,7 +294,7 @@ export default function GroupsPage() {
                   />
                 </div>
               </div>
-              
+
               <div className="flex justify-end gap-3 mt-6">
                 <button
                   onClick={() => {
