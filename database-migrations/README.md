@@ -89,3 +89,4 @@ DROP FUNCTION IF EXISTS update_updated_at_column();
 - All timestamps use `TIMESTAMP WITH TIME ZONE` for proper timezone handling
 
 
+
