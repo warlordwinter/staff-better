@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 
 const Navbar = () => {
@@ -10,8 +11,14 @@ const Navbar = () => {
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const { user, signOut } = useAuth();
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
 
   const isLoggedIn = !!user;
+
+  // Helper function to determine if a link is active
+  const isActiveLink = (path: string) => {
+    return pathname === path;
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -61,15 +68,29 @@ const Navbar = () => {
         </button>
 
         {/* Desktop Nav */}
-        <div className="hidden sm:flex items-center gap-6">
+        <div className="hidden sm:flex items-center gap-8">
           {isLoggedIn ? (
             <>
-              <a href="/jobs" className="text-white text-lg hover:underline">
+              <Link 
+                href="/jobs" 
+                className={`text-white text-lg font-medium transition-colors ${
+                  isActiveLink('/jobs') 
+                    ? 'text-white font-semibold' 
+                    : 'hover:underline hover:text-gray-200'
+                }`}
+              >
                 Jobs
-              </a>
-              <a href="/groups" className="text-white text-lg hover:underline">
+              </Link>
+              <Link 
+                href="/groups" 
+                className={`text-white text-lg font-medium transition-colors ${
+                  isActiveLink('/groups') 
+                    ? 'text-white font-semibold' 
+                    : 'hover:underline hover:text-gray-200'
+                }`}
+              >
                 Groups
-              </a>
+              </Link>
               <div className="relative" ref={dropdownRef}>
                 <div className="flex items-center gap-3">
                   <button
@@ -134,12 +155,26 @@ const Navbar = () => {
         <div className="sm:hidden flex flex-col mt-4 gap-3">
           {isLoggedIn ? (
             <>
-              <a href="/jobs" className="text-white text-lg hover:underline">
+              <Link 
+                href="/jobs" 
+                className={`text-white text-lg font-medium transition-colors ${
+                  isActiveLink('/jobs') 
+                    ? 'text-white font-semibold' 
+                    : 'hover:underline hover:text-gray-200'
+                }`}
+              >
                 Jobs
-              </a>
-              <a href="/groups" className="text-white text-lg hover:underline">
+              </Link>
+              <Link 
+                href="/groups" 
+                className={`text-white text-lg font-medium transition-colors ${
+                  isActiveLink('/groups') 
+                    ? 'text-white font-semibold' 
+                    : 'hover:underline hover:text-gray-200'
+                }`}
+              >
                 Groups
-              </a>
+              </Link>
               <div className="flex items-center gap-3">
                 <button
                   onClick={handleSignOut}

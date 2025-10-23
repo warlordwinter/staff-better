@@ -4,9 +4,10 @@ export interface IJobs {
   insertJobs(
     jobs: {
       job_title: string;
-      customer_name: string;
-      job_status: string;
+      company_id: string;
       start_date: string;
+      job_status: string;
+      customer_name: string;
     }[]
   ): Promise<Job[]>;
 
@@ -16,9 +17,10 @@ export interface IJobs {
     id: string,
     updates: Partial<{
       job_title: string;
-      customer_name: string;
-      job_status: string;
+      company_id: string;
       start_date: string;
+      job_status: string;
+      customer_name: string;
     }>
   ): Promise<Job[]>;
 

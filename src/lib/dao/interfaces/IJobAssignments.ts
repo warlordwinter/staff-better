@@ -7,13 +7,13 @@ export interface IJobAssignments {
       job_id: string;
       associate_id: string;
       confirmation_status:
-        | "Unconfirmed"
-        | "Soft Confirmed"
-        | "Likely Confirmed"
-        | "Confirmed"
-        | "Declined";
-      work_date: string;
-      start_time: string;
+        | "UNCONFIRMED"
+        | "SOFT_CONFIRMED"
+        | "LIKELY_CONFIRMED"
+        | "CONFIRMED"
+        | "DECLINED";
+      work_date: string | null;
+      start_time: string | null;
       num_reminders?: number;
     }[]
   ): Promise<JobAssignment[]>;
@@ -25,13 +25,13 @@ export interface IJobAssignments {
     assignmentData: {
       associate_id: string;
       confirmation_status?:
-        | "unconfirmed"
-        | "soft confirmed"
-        | "likely confirmed"
-        | "confirmed"
-        | "declined";
-      work_date: string;
-      start_time: string;
+        | "UNCONFIRMED"
+        | "SOFT_CONFIRMED"
+        | "LIKELY_CONFIRMED"
+        | "CONFIRMED"
+        | "DECLINED";
+      work_date: string | null;
+      start_time: string | null;
       num_reminders?: number;
     }
   ): Promise<JobAssignment[]>;

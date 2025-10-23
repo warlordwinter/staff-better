@@ -139,10 +139,7 @@ export class ReminderService {
     console.log("Hours difference:", hoursDifference);
     console.log("========================");
 
-    console.log(
-      "Assignment for determinng reminder type",
-      assignment.job_title
-    );
+    console.log("Assignment for determinng reminder type", assignment.title);
 
     console.log("Assignment's hour difference", hoursDifference);
 
@@ -173,8 +170,8 @@ export class ReminderService {
   ): string {
     const {
       associate_first_name,
-      job_title,
-      customer_name,
+      title: job_title,
+      client_company: customer_name,
       work_date,
       start_time,
     } = assignment;

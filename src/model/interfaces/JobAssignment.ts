@@ -3,7 +3,7 @@ export interface JobAssignment {
   associate_id: string;
   confirmation_status: string;
   last_activity_time: string;
-  work_date: string;
-  start_time: string;
+  work_date: string | null;
+  start_time: string | null;
   num_reminders: number;
 }

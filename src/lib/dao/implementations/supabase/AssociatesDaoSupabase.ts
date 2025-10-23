@@ -11,7 +11,7 @@ export class AssociatesDaoSupabase implements IAssociates {
     const { data, error } = await supabase
       .from("associates")
       .select(
-        "id, first_name, last_name, work_date, start_time, phone_number, email_address"
+        "id, first_name, last_name, work_date, start_date, phone_number, email_address"
       )
       .order("last_name", { ascending: true });
 
@@ -20,24 +20,27 @@ export class AssociatesDaoSupabase implements IAssociates {
       throw new Error("Failed to fetch associates");
     }
 
-    // Return raw UTC data - no timezone conversion here
-    return data;
+    // Format work_date to return only the date portion (YYYY-MM-DD)
+    return data.map((associate) => ({
+      ...associate,
+      work_date: associate.work_date ? associate.work_date.split("T")[0] : null,
+    }));
   }
 
   // Insert associates - expects UTC times from API layer
   async insertAssociates(
     associates: {
-      first_name: string;
-      last_name: string;
-      work_date: string;
-      start_time: string; // Should already be in UTC format from API layer
+      first_name: string | null;
+      last_name: string | null;
+      work_date: string | null;
+      start_date: string | null; // Date field, not time
       phone_number: string;
-      email_address: string;
+      email_address: string | null;
     }[]
   ) {
     const supabase = await createClient();
 
-    // Format phone numbers before insertion - no time conversion here
+    // Format phone numbers and validate date fields before insertion
     const formattedAssociates = associates.map((associate) => {
       let formattedPhone = associate.phone_number;
 
@@ -53,12 +56,67 @@ export class AssociatesDaoSupabase implements IAssociates {
         }
       }
 
+      // Validate and format start_date - ensure it's a proper date or null
+      let formattedStartDate = associate.start_date;
+      if (formattedStartDate && formattedStartDate.trim()) {
+        // Check if it's a time value (like "14:00") and convert to null
+        if (/^\d{1,2}:\d{2}$/.test(formattedStartDate.trim())) {
+          console.warn(
+            `start_date contains time value "${formattedStartDate}", setting to null`
+          );
+          formattedStartDate = null;
+        } else {
+          // Try to parse as a date
+          const date = new Date(formattedStartDate);
+          if (isNaN(date.getTime())) {
+            console.warn(
+              `Invalid start_date value "${formattedStartDate}", setting to null`
+            );
+            formattedStartDate = null;
+          } else {
+            // Format as ISO date string
+            formattedStartDate = date.toISOString().split("T")[0];
+          }
+        }
+      }
+
+      // Validate and format work_date - ensure it's a proper date or null
+      let formattedWorkDate = associate.work_date;
+      if (formattedWorkDate && formattedWorkDate.trim()) {
+        // Check if it's a time value (like "14:00") and convert to null
+        if (/^\d{1,2}:\d{2}$/.test(formattedWorkDate.trim())) {
+          console.warn(
+            `work_date contains time value "${formattedWorkDate}", setting to null`
+          );
+          formattedWorkDate = null;
+        } else {
+          // Try to parse as a date
+          const date = new Date(formattedWorkDate);
+          if (isNaN(date.getTime())) {
+            console.warn(
+              `Invalid work_date value "${formattedWorkDate}", setting to null`
+            );
+            formattedWorkDate = null;
+          } else {
+            // Format as ISO date string
+            formattedWorkDate = date.toISOString().split("T")[0];
+          }
+        }
+      }
+
       return {
         ...associate,
         phone_number: formattedPhone,
-        // start_time is already UTC from API layer, so no conversion needed
+        start_date: formattedStartDate,
+        work_date: formattedWorkDate,
       };
     });
+
+    // Log the data being inserted for debugging
+    console.log(
+      "Inserting associates data:",
+      JSON.stringify(formattedAssociates, null, 2)
+    );
 
     const { data, error } = await supabase
       .from("associates")
@@ -67,22 +125,30 @@ export class AssociatesDaoSupabase implements IAssociates {
 
     if (error) {
       console.error("Supabase insert error:", error);
+      console.error(
+        "Data that caused the error:",
+        JSON.stringify(formattedAssociates, null, 2)
+      );
       throw new Error("Failed to insert associates");
     }
 
-    return data;
+    // Format work_date to return only the date portion (YYYY-MM-DD)
+    return data.map((associate) => ({
+      ...associate,
+      work_date: associate.work_date ? associate.work_date.split("T")[0] : null,
+    }));
   }
 
   // Update associate - expects UTC times from API layer
   async updateAssociate(
     id: string,
     updates: Partial<{
-      first_name: string;
-      last_name: string;
-      work_date: string;
-      start_time: string; // Should already be in UTC format from API layer
+      first_name: string | null;
+      last_name: string | null;
+      work_date: string | null;
+      start_date: string | null; // Should already be in UTC format from API layer
       phone_number: string;
-      email_address: string;
+      email_address: string | null;
     }>
   ) {
     const supabase = await createClient();
@@ -122,7 +188,11 @@ export class AssociatesDaoSupabase implements IAssociates {
       throw new Error("Failed to update associate");
     }
 
-    return data;
+    // Format work_date to return only the date portion (YYYY-MM-DD)
+    return data.map((associate) => ({
+      ...associate,
+      work_date: associate.work_date ? associate.work_date.split("T")[0] : null,
+    }));
   }
 
   // Delete associate
@@ -156,7 +226,7 @@ export class AssociatesDaoSupabase implements IAssociates {
     let { data, error } = await supabase
       .from("associates")
       .select(
-        "id, first_name, last_name, work_date, start_time, phone_number, email_address, sms_opt_out"
+        "id, first_name, last_name, work_date, start_date, phone_number, email_address, sms_opt_out"
       )
       .eq("phone_number", normalizedPhone)
       .single();
@@ -170,7 +240,7 @@ export class AssociatesDaoSupabase implements IAssociates {
       const result = await supabase
         .from("associates")
         .select(
-          "id, first_name, last_name, work_date, start_time, phone_number, email_address, sms_opt_out"
+          "id, first_name, last_name, work_date, start_date, phone_number, email_address, sms_opt_out"
         )
         .eq("phone_number", phoneNumber)
         .single();
@@ -191,8 +261,15 @@ export class AssociatesDaoSupabase implements IAssociates {
       throw new Error("Failed to retrieve Associate by phone number");
     }
 
-    // Return raw UTC data - timezone conversion will happen in components
-    return data as Associate;
+    // Format work_date to return only the date portion (YYYY-MM-DD)
+    if (!data) {
+      return null;
+    }
+
+    return {
+      ...data,
+      work_date: data.work_date ? data.work_date.split("T")[0] : null,
+    } as Associate;
   }
 
   async optOutAssociate(associateId: string): Promise<void> {

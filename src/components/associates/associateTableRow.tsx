@@ -40,12 +40,12 @@ export function AssociateTableRow({
     last_name: data.last_name || "",
     num_reminders: (data.num_reminders || 0).toString(),
     work_date: data.work_date || "",
-    start_time: data.start_time || "", // local time for display
+    start_date: data.start_date || "", // local time for display
     phone_number: data.phone_number || "",
     email_address: data.email_address || "",
-    confirmation_status: data.confirmation_status || "Unconfirmed",
+    confirmation_status: data.confirmation_status || "UNCONFIRMED",
     job_work_date: data.job_work_date || data.work_date || "",
-    job_start_time: data.job_start_time || data.start_time || "", // local time for display
+    job_start_time: data.job_start_time || data.start_date || "", // local time for display
   });
 
   const handleEdit = () => {
@@ -70,7 +70,7 @@ export function AssociateTableRow({
         first_name: editData.first_name,
         last_name: editData.last_name,
         work_date: editData.work_date,
-        start_time: editData.start_time, // local; parent converts to UTC
+        start_date: editData.start_date, // local; parent converts to UTC
         phone_number: editData.phone_number,
         email_address: editData.email_address,
         num_reminders: Number(editData.num_reminders) || 0,
@@ -100,12 +100,12 @@ export function AssociateTableRow({
       last_name: data.last_name || "",
       num_reminders: (data.num_reminders || 0).toString(),
       work_date: data.work_date || "",
-      start_time: data.start_time || "", // keep local time for display
+      start_date: data.start_date || "", // keep local time for display
       phone_number: data.phone_number || "",
       email_address: data.email_address || "",
-      confirmation_status: data.confirmation_status || "Unconfirmed",
+      confirmation_status: data.confirmation_status || "UNCONFIRMED",
       job_work_date: data.job_work_date || data.work_date || "",
-      job_start_time: data.job_start_time || data.start_time || "", // keep local time
+      job_start_time: data.job_start_time || data.start_date || "", // keep local time
     });
     setInternalIsEditing(false);
     setPhoneError("");
@@ -130,15 +130,15 @@ export function AssociateTableRow({
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "Unconfirmed":
+      case "UNCONFIRMED":
         return "bg-gray-100 text-gray-800";
-      case "Soft Confirmed":
+      case "SOFT_CONFIRMED":
         return "bg-yellow-100 text-yellow-800";
-      case "Likely Confirmed":
+      case "LIKELY_CONFIRMED":
         return "bg-blue-100 text-blue-800";
-      case "Confirmed":
+      case "CONFIRMED":
         return "bg-green-100 text-green-800";
-      case "Declined":
+      case "DECLINED":
         return "bg-red-100 text-red-800";
       default:
         return "bg-gray-100 text-gray-800";
@@ -220,8 +220,8 @@ export function AssociateTableRow({
           <AssociateDateDisplay
             value={
               showJobAssignmentColumns
-                ? data.job_work_date || data.work_date
-                : data.work_date
+                ? data.job_work_date || data.work_date || ""
+                : data.work_date || ""
             }
             isFilled={
               !!(showJobAssignmentColumns
@@ -240,11 +240,11 @@ export function AssociateTableRow({
               value={
                 showJobAssignmentColumns
                   ? editData.job_start_time
-                  : editData.start_time
+                  : editData.start_date
               }
               onChange={(e) =>
                 handleInputChange(
-                  showJobAssignmentColumns ? "job_start_time" : "start_time",
+                  showJobAssignmentColumns ? "job_start_time" : "start_date",
                   e.target.value
                 )
               }
@@ -255,8 +255,8 @@ export function AssociateTableRow({
         ) : (
           displayTime(
             showJobAssignmentColumns
-              ? data.job_start_time || data.start_time
-              : data.start_time
+              ? data.job_start_time || data.start_date || ""
+              : data.start_date || ""
           )
         )}
       </TableCell>
@@ -310,19 +310,19 @@ export function AssociateTableRow({
               }
               className="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-blue-500"
             >
-              <option value="Unconfirmed">Unconfirmed</option>
-              <option value="Soft Confirmed">Soft Confirmed</option>
-              <option value="Likely Confirmed">Likely Confirmed</option>
-              <option value="Confirmed">Confirmed</option>
-              <option value="Declined">Declined</option>
+              <option value="UNCONFIRMED">Unconfirmed</option>
+              <option value="SOFT_CONFIRMED">Soft Confirmed</option>
+              <option value="LIKELY_CONFIRMED">Likely Confirmed</option>
+              <option value="CONFIRMED">Confirmed</option>
+              <option value="DECLINED">Declined</option>
             </select>
           ) : (
             <span
               className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                data.confirmation_status || "Unconfirmed"
+                data.confirmation_status || "UNCONFIRMED"
               )}`}
             >
-              {data.confirmation_status || "Unconfirmed"}
+              {data.confirmation_status || "UNCONFIRMED"}
             </span>
           )}
         </TableCell>

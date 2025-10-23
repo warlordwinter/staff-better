@@ -6,9 +6,10 @@ export class JobsDaoSupabase implements IJobs {
   async insertJobs(
     jobs: {
       job_title: string;
-      customer_name: string;
-      job_status: string;
+      company_id: string;
       start_date: string;
+      job_status: string;
+      customer_name: string;
     }[]
   ) {
     const supabase = await createClient();
@@ -21,7 +22,11 @@ export class JobsDaoSupabase implements IJobs {
       throw new Error(JSON.stringify(error));
     }
 
-    return data;
+    // Format start_date to return only the date portion (YYYY-MM-DD)
+    return data.map((job) => ({
+      ...job,
+      start_date: job.start_date ? job.start_date.split("T")[0] : null,
+    }));
   }
 
   // Get jobs
@@ -30,7 +35,9 @@ export class JobsDaoSupabase implements IJobs {
 
     const { data, error } = await supabase
       .from("jobs")
-      .select("id, job_title, customer_name, job_status, start_date")
+      .select(
+        "id, job_title, customer_name, company_id, start_date, job_status"
+      )
       .order("start_date", { ascending: false });
 
     if (error) {
@@ -38,7 +45,11 @@ export class JobsDaoSupabase implements IJobs {
       throw new Error("Failed to fetch jobs");
     }
 
-    return data;
+    // Format start_date to return only the date portion (YYYY-MM-DD)
+    return data.map((job) => ({
+      ...job,
+      start_date: job.start_date ? job.start_date.split("T")[0] : null,
+    }));
   }
 
   // Update job
@@ -46,9 +57,10 @@ export class JobsDaoSupabase implements IJobs {
     id: string,
     updates: Partial<{
       job_title: string;
-      customer_name: string;
-      job_status: string;
+      company_id: string;
       start_date: string;
+      job_status: string;
+      customer_name: string;
     }>
   ) {
     const supabase = await createClient();
@@ -64,7 +76,11 @@ export class JobsDaoSupabase implements IJobs {
       throw new Error("Failed to update job");
     }
 
-    return data;
+    // Format start_date to return only the date portion (YYYY-MM-DD)
+    return data.map((job) => ({
+      ...job,
+      start_date: job.start_date ? job.start_date.split("T")[0] : null,
+    }));
   }
 
   // Delete job
@@ -87,7 +103,9 @@ export class JobsDaoSupabase implements IJobs {
 
     const { data, error } = await supabase
       .from("jobs")
-      .select("id, job_title, customer_name, job_status, start_date")
+      .select(
+        "id, job_title, company_id, start_date, job_status, customer_name"
+      )
       .eq("id", id)
       .single();
 
@@ -96,6 +114,10 @@ export class JobsDaoSupabase implements IJobs {
       throw new Error("Failed to fetch job");
     }
 
-    return data;
+    // Format start_date to return only the date portion (YYYY-MM-DD)
+    return {
+      ...data,
+      start_date: data.start_date ? data.start_date.split("T")[0] : null,
+    };
   }
 }

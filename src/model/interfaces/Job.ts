@@ -1,7 +1,8 @@
 export interface Job {
   id: string;
   job_title: string;
-  customer_name: string;
-  job_status: string;
+  company_id: string;
   start_date: string;
+  job_status: string;
+  customer_name: string;
 }

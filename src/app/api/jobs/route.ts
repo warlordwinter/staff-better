@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { JobsDaoSupabase } from "@/lib/dao/implementations/supabase/JobsDaoSupabase";
+import { requireCompanyId } from "@/lib/auth/getCompanyId";
 
 const jobsDao = new JobsDaoSupabase();
 
@@ -16,11 +17,18 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const companyId = await requireCompanyId();
     const body = await request.json();
 
     const jobsToInsert = Array.isArray(body) ? body : [body];
 
-    const insertedJobs = await jobsDao.insertJobs(jobsToInsert);
+    // Add company_id to each job
+    const jobsWithCompanyId = jobsToInsert.map((job) => ({
+      ...job,
+      company_id: companyId,
+    }));
+
+    const insertedJobs = await jobsDao.insertJobs(jobsWithCompanyId);
     return NextResponse.json(insertedJobs, { status: 201 });
   } catch (error: unknown) {
     console.error("Failed to create job:", error);

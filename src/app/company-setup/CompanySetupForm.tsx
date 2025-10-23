@@ -56,8 +56,19 @@ export default function CompanySetupForm({ userEmail }: CompanySetupFormProps) {
     setIsSubmitting(true);
 
     try {
-      // TODO: Save company information to database
-      console.log("Company setup data:", formData);
+      // Save company information to database
+      const response = await fetch("/api/company-setup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to create company");
+      }
 
       // Mark user as having completed company setup
       await markSetupComplete();
@@ -65,7 +76,7 @@ export default function CompanySetupForm({ userEmail }: CompanySetupFormProps) {
       router.push("/jobs");
     } catch (error) {
       console.error("Error saving company information:", error);
-      setFormError("Failed to complete setup. Please try again.");
+      setFormError(error instanceof Error ? error.message : "Failed to complete setup. Please try again.");
     } finally {
       setIsSubmitting(false);
     }

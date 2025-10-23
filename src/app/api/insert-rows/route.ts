@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
         first_name: r.first_name,
         last_name: r.last_name,
         work_date: r.work_date,
-        start_time: r.start_time,
+        start_date: r.start_date,
         phone_number: formattedPhone,
         email_address: r.email_address,
       };
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     const jobData = rows.map((r: Job) => ({
       job_title: r.job_title,
       customer_name: r.customer_name,
-      job_status: "Upcoming", // or map accordingly if the status needs transformation
+      job_status: "UPCOMING", // or map accordingly if the status needs transformation
       start_date: r.start_date,
     }));
 
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
     const jobAssignmentsData = rows.map((r: JobAssignment, index: number) => ({
       job_id: insertedJobs[index].id,
       associate_id: insertedAssociates[index].id,
-      confirmation_status: "Unconfirmed" as const,
+      confirmation_status: "UNCONFIRMED" as const,
       last_confirmation_time: null,
       work_date: r.work_date,
       start_time: r.start_time,
