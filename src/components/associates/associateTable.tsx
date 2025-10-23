@@ -1,11 +1,12 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { AssociateTableHeader } from "./associateTableHeader";
-import { AssociateTableRow } from "./associateTableRow";
-import { AssociateTableTitle } from "./associateTableTitle";
+import JobAssociateTableRow from "../shared/JobAssociateTableRow";
+import AssociateTableTitle from "../shared/AssociateTableTitle";
 import { Associate } from "@/model/interfaces/Associate";
 import { Job } from "@/model/interfaces/Job";
 import LoadingSpinner from "../ui/loadingSpinner";
+import AddAssociateButton from "../shared/AddAssociateButton";
 import {
   convertLocalTimeToUTC,
   convertUTCTimeToLocal,
@@ -370,12 +371,7 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
             ? "No associates assigned to this job yet."
             : "No associates found."}
           <br />
-          <button
-            onClick={handleAdd}
-            className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            Add Associate
-          </button>
+          <AddAssociateButton onAdd={handleAdd} className="mt-2" />
         </div>
       ) : (
         <>
@@ -385,7 +381,7 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
             </thead>
             <tbody>
               {associatesData.map((associate, index) => (
-                <AssociateTableRow
+                <JobAssociateTableRow
                   key={associate.id}
                   data={associate}
                   index={index}
