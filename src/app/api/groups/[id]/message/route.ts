@@ -11,15 +11,19 @@ const groupsDao = new GroupsDaoSupabase();
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const companyId = await requireCompanyId();
-    const groupId = params.id;
+    const { id: groupId } = await params;
     const body = await request.json();
 
     // Validate message
-    if (!body.message || typeof body.message !== "string" || !body.message.trim()) {
+    if (
+      !body.message ||
+      typeof body.message !== "string" ||
+      !body.message.trim()
+    ) {
       return NextResponse.json(
         { error: "Message is required" },
         { status: 400 }
@@ -49,10 +53,11 @@ export async function POST(
 
     if (eligibleMembers.length === 0) {
       return NextResponse.json(
-        { 
-          error: "No eligible members to message (all opted out or missing phone numbers)",
+        {
+          error:
+            "No eligible members to message (all opted out or missing phone numbers)",
           total_members: members.length,
-          eligible_members: 0
+          eligible_members: 0,
         },
         { status: 400 }
       );
@@ -80,14 +85,17 @@ export async function POST(
           errors.push({
             member_id: member.id,
             phone: member.phone_number,
-            error: 'error' in result ? result.error : 'Unknown error',
+            error: "error" in result ? result.error : "Unknown error",
           });
         }
 
         // Small delay between messages to avoid rate limiting
         await new Promise((resolve) => setTimeout(resolve, 100));
       } catch (error) {
-        console.error(`Error sending message to ${member.phone_number}:`, error);
+        console.error(
+          `Error sending message to ${member.phone_number}:`,
+          error
+        );
         errors.push({
           member_id: member.id,
           phone: member.phone_number,
@@ -121,5 +129,3 @@ export async function POST(
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
-
-

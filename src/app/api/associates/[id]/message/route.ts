@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { AssociatesDaoSupabase } from "@/lib/dao/implementations/supabase/AssociatesDaoSupabase";
 import { requireCompanyId } from "@/lib/auth/getCompanyId";
 import { sendSMS, formatPhoneNumber } from "@/lib/twilio/sms";
-
-const associatesDao = new AssociatesDaoSupabase();
 
 /**
  * POST /api/associates/[id]/message
@@ -11,17 +8,21 @@ const associatesDao = new AssociatesDaoSupabase();
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verify user is authenticated and has a company
     await requireCompanyId();
-    
-    const associateId = params.id;
+
+    const { id: associateId } = await params;
     const body = await request.json();
 
     // Validate message
-    if (!body.message || typeof body.message !== "string" || !body.message.trim()) {
+    if (
+      !body.message ||
+      typeof body.message !== "string" ||
+      !body.message.trim()
+    ) {
       return NextResponse.json(
         { error: "Message is required" },
         { status: 400 }
@@ -31,8 +32,10 @@ export async function POST(
     // Get the associate details
     // Note: We need to get the associate to check their phone and opt-out status
     // For now, we'll use a simple select query
-    const supabase = await (await import("@/lib/supabase/server")).createClient();
-    
+    const supabase = await (
+      await import("@/lib/supabase/server")
+    ).createClient();
+
     const { data: associate, error: associateError } = await supabase
       .from("associates")
       .select("id, first_name, last_name, phone_number, sms_opt_out")
@@ -72,9 +75,9 @@ export async function POST(
 
       if (!result.success) {
         return NextResponse.json(
-          { 
+          {
             error: "Failed to send message",
-            details: 'error' in result ? result.error : 'Unknown error'
+            details: "error" in result ? result.error : "Unknown error",
           },
           { status: 500 }
         );
@@ -88,9 +91,10 @@ export async function POST(
     } catch (smsError) {
       console.error("Error sending SMS:", smsError);
       return NextResponse.json(
-        { 
+        {
           error: "Failed to send message",
-          details: smsError instanceof Error ? smsError.message : "Unknown error"
+          details:
+            smsError instanceof Error ? smsError.message : "Unknown error",
         },
         { status: 500 }
       );
@@ -110,5 +114,3 @@ export async function POST(
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
-
-

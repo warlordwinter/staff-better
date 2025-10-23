@@ -4,13 +4,14 @@ import { requireCompanyId } from "@/lib/auth/getCompanyId";
 
 export async function GET() {
   try {
-    const companyId = await requireCompanyId();
     const supabase = await createClient();
 
     // Get all users (associates) for this company
     const { data: users, error } = await supabase
       .from("users")
-      .select("id, first_name, last_name, phone_number, email, role, sms_opt_out")
+      .select(
+        "id, first_name, last_name, phone_number, email, role, sms_opt_out"
+      )
       .eq("role", "ASSOCIATE"); // Only get associates, not managers
 
     if (error) {
@@ -80,4 +81,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
