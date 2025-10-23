@@ -36,10 +36,29 @@ const JobTable = () => {
   const fetchJobs = async () => {
     try {
       const res = await fetch("/api/jobs");
+
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+
       const data = await res.json();
+
+      // Check if the response is an error object
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      // Ensure data is an array
+      if (!Array.isArray(data)) {
+        console.error("Expected array but got:", data);
+        setJobs([]);
+        return;
+      }
+
       setJobs(data);
     } catch (err) {
       console.error("Failed to fetch jobs", err);
+      setJobs([]); // Set empty array on error
     } finally {
       setLoading(false);
     }
@@ -51,9 +70,9 @@ const JobTable = () => {
 
   const handleAddJob = async () => {
     const newJob = {
-      title: " Generic Warehouse Job",
-      client_company: "Generic Company Name",
-      job_status: "Active",
+      job_title: " Generic Warehouse Job",
+      customer_name: "Generic Company Name",
+      job_status: "ACTIVE",
       start_date: new Date().toISOString().slice(0, 10),
     };
 
@@ -67,14 +86,29 @@ const JobTable = () => {
       });
 
       if (!res.ok) {
-        throw new Error("Failed to create job");
+        const errorData = await res.json();
+        console.error("API Error:", errorData);
+        throw new Error(
+          `Failed to create job: ${errorData.error || res.statusText}`
+        );
       }
 
       const createdJob = await res.json();
-      setJobs([createdJob[0], ...jobs]);
+      console.log("Created job:", createdJob);
+
+      // Handle both single job and array response
+      if (Array.isArray(createdJob)) {
+        setJobs([createdJob[0], ...jobs]);
+      } else {
+        setJobs([createdJob, ...jobs]);
+      }
     } catch (error) {
       console.error("Failed to add job:", error);
-      // You might want to show a toast notification here
+      alert(
+        `Failed to create job: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     }
   };
 

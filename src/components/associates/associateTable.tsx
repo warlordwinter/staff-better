@@ -83,10 +83,6 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
               }
 
               // Convert UTC times from database to local times for display (pass date strings)
-              const localAssociateTime = convertUTCTimeToLocal(
-                assignment.associates.start_time,
-                assignment.associates.work_date
-              );
               const localJobTime = convertUTCTimeToLocal(
                 assignment.start_time,
                 assignment.work_date
@@ -96,8 +92,8 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
                 id: assignment.associates.id,
                 first_name: assignment.associates.first_name,
                 last_name: assignment.associates.last_name,
-                work_date: assignment.associates.work_date,
-                start_time: localAssociateTime, // Local time for display
+                work_date: assignment.work_date,
+                start_date: localJobTime, // Local time for display
                 phone_number: assignment.associates.phone_number,
                 email_address: assignment.associates.email_address,
                 // Job assignment specific fields
@@ -122,7 +118,10 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
           const localAssociates = utcAssociates.map((associate: Associate) => ({
             ...associate,
             start_date: associate.start_date
-              ? convertUTCTimeToLocal(associate.start_date, associate.work_date)
+              ? convertUTCTimeToLocal(
+                  associate.start_date,
+                  associate.work_date || ""
+                )
               : "",
           }));
 
@@ -148,8 +147,8 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
 
       // Convert local times to UTC before sending to API
       const utcAssociateTime = convertLocalTimeToUTC(
-        updatedData.start_time,
-        updatedData.work_date
+        updatedData.start_date ?? undefined,
+        updatedData.work_date ?? new Date().toISOString().split("T")[0]
       );
 
       let savedAssociate;
@@ -163,7 +162,7 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
             first_name: updatedData.first_name,
             last_name: updatedData.last_name,
             work_date: updatedData.work_date,
-            start_time: utcAssociateTime, // UTC for API
+            start_date: utcAssociateTime, // UTC for API
             phone_number: updatedData.phone_number,
             email_address: updatedData.email_address,
           }),
@@ -175,8 +174,9 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
         // Create job assignment if in job context
         if (jobId) {
           const utcJobTime = convertLocalTimeToUTC(
-            updatedData.job_start_time || updatedData.start_time,
-            updatedData.job_work_date || updatedData.work_date
+            updatedData.job_start_time || (updatedData.start_date ?? undefined),
+            updatedData.job_work_date ||
+              (updatedData.work_date ?? new Date().toISOString().split("T")[0])
           );
 
           const assignmentRes = await fetch(`/api/job-assignments/${jobId}`, {
@@ -186,7 +186,7 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
               job_id: jobId,
               associate_id: savedAssociate.id,
               confirmation_status:
-                updatedData.confirmation_status || "Unconfirmed",
+                updatedData.confirmation_status || "UNCONFIRMED",
               work_date: updatedData.job_work_date || updatedData.work_date,
               start_time: utcJobTime, // UTC for API
               num_reminders: updatedData.num_reminders || 0,
@@ -201,7 +201,7 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
           first_name: updatedData.first_name,
           last_name: updatedData.last_name,
           work_date: updatedData.work_date,
-          start_time: utcAssociateTime, // UTC for API
+          start_date: utcAssociateTime, // UTC for API
           phone_number: updatedData.phone_number,
           email_address: updatedData.email_address,
         };
@@ -222,8 +222,9 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
             updatedData.job_start_time)
         ) {
           const utcJobTime = convertLocalTimeToUTC(
-            updatedData.job_start_time || updatedData.start_time,
-            updatedData.job_work_date || updatedData.work_date
+            updatedData.job_start_time || (updatedData.start_date ?? undefined),
+            updatedData.job_work_date ||
+              (updatedData.work_date ?? new Date().toISOString().split("T")[0])
           );
 
           const assignmentUpdates = {
@@ -328,13 +329,13 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
       first_name: "",
       last_name: "",
       work_date: workDateISO,
-      start_time: localTime,
+      start_date: localTime,
       phone_number: "",
       email_address: "",
       isNew: true, // Mark as new unsaved associate
       // Job assignment fields if in job context
       ...(jobId && {
-        confirmation_status: "Unconfirmed",
+        confirmation_status: "UNCONFIRMED",
         num_reminders: 0,
         job_work_date: workDateISO,
         job_start_time: localTime,

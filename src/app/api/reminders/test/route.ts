@@ -78,7 +78,7 @@ async function createTestJobAssignment(phoneNumber: string) {
     id: "test-job-id",
     job_title: "Test Cleaning Job",
     customer_name: "Test Customer",
-    job_status: "Upcoming" as const,
+    job_status: "UPCOMING" as const,
     start_date: tomorrow,
   };
 

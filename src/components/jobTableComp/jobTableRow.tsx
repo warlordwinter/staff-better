@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState } from 'react';
-import Image from 'next/image';
-import { Job } from '@/model/interfaces/Job';
-import { useRouter } from 'next/navigation';
+import React, { useState } from "react";
+import Image from "next/image";
+import { Job } from "@/model/interfaces/Job";
+import { useRouter } from "next/navigation";
 
 interface Props {
   job: Job;
@@ -13,14 +13,14 @@ interface Props {
 
 const getStatusStyle = (status: string) => {
   switch (status.toLowerCase()) {
-    case 'active':
-      return 'bg-emerald-50 text-green-600';
-    case 'past':
-      return 'bg-gray-100 text-gray-500';
-    case 'upcoming':
-      return 'bg-yellow-50 text-yellow-600';
+    case "active":
+      return "bg-emerald-50 text-green-600";
+    case "past":
+      return "bg-gray-100 text-gray-500";
+    case "upcoming":
+      return "bg-yellow-50 text-yellow-600";
     default:
-      return 'bg-gray-50 text-gray-600';
+      return "bg-gray-50 text-gray-600";
   }
 };
 
@@ -33,20 +33,22 @@ const JobTableRow: React.FC<Props> = ({ job, onUpdate, onDelete }) => {
     e.stopPropagation(); // Prevent row click when editing
     setIsEditing(true);
   };
-  
+
   const handleSave = (e: React.MouseEvent) => {
     e.stopPropagation();
     onUpdate(job.id, editedJob);
     setIsEditing(false);
   };
-  
+
   const handleCancel = (e: React.MouseEvent) => {
     e.stopPropagation();
     setEditedJob(job);
     setIsEditing(false);
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     const { name, value } = e.target;
     setEditedJob((prev) => ({ ...prev, [name]: value }));
   };
@@ -63,37 +65,37 @@ const JobTableRow: React.FC<Props> = ({ job, onUpdate, onDelete }) => {
   };
 
   return (
-    <tr 
+    <tr
       className={`text-sm text-black border-b border-zinc-100 h-10 ${
-        !isEditing ? 'hover:bg-gray-50 cursor-pointer' : ''
+        !isEditing ? "hover:bg-gray-50 cursor-pointer" : ""
       }`}
       onClick={handleRowClick}
     >
       <td className="px-4">
         {isEditing ? (
           <input
-            name="title"
-            value={editedJob.title}
+            name="job_title"
+            value={editedJob.job_title}
             onChange={handleChange}
             onClick={(e) => e.stopPropagation()}
             className="border border-gray-300 rounded px-2 w-full"
           />
         ) : (
-          job.title
+          job.job_title
         )}
       </td>
 
       <td className="px-4 text-blue-600">
         {isEditing ? (
           <input
-            name="client_company"
-            value={editedJob.client_company}
+            name="customer_name"
+            value={editedJob.customer_name}
             onChange={handleChange}
             onClick={(e) => e.stopPropagation()}
             className="border border-gray-300 rounded px-2 w-full"
           />
         ) : (
-          job.client_company
+          job.customer_name
         )}
       </td>
 
@@ -106,12 +108,16 @@ const JobTableRow: React.FC<Props> = ({ job, onUpdate, onDelete }) => {
             onClick={(e) => e.stopPropagation()}
             className="border border-gray-300 rounded px-2 w-full"
           >
-            <option value="Active">Active</option>
-            <option value="Upcoming">Upcoming</option>
-            <option value="Past">Past</option>
+            <option value="ACTIVE">Active</option>
+            <option value="UPCOMING">Upcoming</option>
+            <option value="PAST">Past</option>
           </select>
         ) : (
-          <span className={`px-2 py-0.5 rounded-sm text-xs font-bold uppercase ${getStatusStyle(job.job_status)}`}>
+          <span
+            className={`px-2 py-0.5 rounded-sm text-xs font-bold uppercase ${getStatusStyle(
+              job.job_status
+            )}`}
+          >
             {job.job_status}
           </span>
         )}

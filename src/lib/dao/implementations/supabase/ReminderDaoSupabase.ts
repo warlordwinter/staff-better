@@ -4,11 +4,11 @@ import { IReminder } from "../../interfaces/IReminder";
 
 // Add this helper near the top of the file (below imports is fine)
 type Confirmation =
-  | "Unconfirmed"
-  | "Soft Confirmed"
-  | "Likely Confirmed"
-  | "Confirmed"
-  | "Declined";
+  | "UNCONFIRMED"
+  | "SOFT_CONFIRMED"
+  | "LIKELY_CONFIRMED"
+  | "CONFIRMED"
+  | "DECLINED";
 
 function toConfirmationStatus(
   value: string | null | undefined
@@ -16,15 +16,15 @@ function toConfirmationStatus(
   if (!value) return undefined;
   switch (value.trim().toLowerCase()) {
     case "unconfirmed":
-      return "Unconfirmed";
+      return "UNCONFIRMED";
     case "soft confirmed":
-      return "Soft Confirmed";
+      return "SOFT_CONFIRMED";
     case "likely confirmed":
-      return "Likely Confirmed";
+      return "LIKELY_CONFIRMED";
     case "confirmed":
-      return "Confirmed";
+      return "CONFIRMED";
     case "declined":
-      return "Declined";
+      return "DECLINED";
     default:
       // Unknown string -> treat as undefined (or throw if you prefer)
       return undefined;
@@ -70,8 +70,8 @@ function transformReminderData(data: RawReminderRow[]): ReminderAssignment[] {
       associate_first_name: associate.first_name,
       associate_last_name: associate.last_name,
       phone_number: associate.phone_number,
-      job_title: job.job_title,
-      customer_name: job.customer_name,
+      title: job.job_title,
+      client_company: job.customer_name,
       num_reminders: item.num_reminders,
       last_confirmation_time: item.last_confirmation_time
         ? new Date(item.last_confirmation_time)
@@ -93,7 +93,7 @@ export class ReminderDaoSupabase implements IReminder {
     const supabase = await createClient();
 
     const { data, error } = await supabase
-      .from("jobassignments")
+      .from("job_assignments")
       .select(
         `
             job_id,
@@ -154,8 +154,8 @@ export class ReminderDaoSupabase implements IReminder {
       associate_first_name: associate.first_name,
       associate_last_name: associate.last_name,
       phone_number: associate.phone_number,
-      job_title: job.job_title,
-      customer_name: job.customer_name,
+      title: job.job_title,
+      client_company: job.customer_name,
       num_reminders: data.num_reminders,
       last_confirmation_time: data.last_confirmation_time
         ? new Date(data.last_confirmation_time)
@@ -172,7 +172,7 @@ export class ReminderDaoSupabase implements IReminder {
     const supabase = await createClient();
 
     const { data, error } = await supabase
-      .from("jobassignments")
+      .from("job_assignments")
       .select(
         `
             job_id,
@@ -224,8 +224,8 @@ export class ReminderDaoSupabase implements IReminder {
         associate_first_name: associate.first_name,
         associate_last_name: associate.last_name,
         phone_number: associate.phone_number,
-        job_title: job.job_title,
-        customer_name: job.customer_name,
+        title: job.job_title,
+        client_company: job.customer_name,
         num_reminders: item.num_reminders,
         last_confirmation_time: item.last_confirmation_time
           ? new Date(item.last_confirmation_time)
@@ -240,7 +240,7 @@ export class ReminderDaoSupabase implements IReminder {
     const dateString = date.toISOString().split("T")[0]; // Convert to YYYY-MM-DD
 
     const { data, error } = await supabase
-      .from("jobassignments")
+      .from("job_assignments")
       .select(
         `
             job_id,
@@ -293,8 +293,8 @@ export class ReminderDaoSupabase implements IReminder {
         associate_first_name: associate.first_name,
         associate_last_name: associate.last_name,
         phone_number: associate.phone_number,
-        job_title: job.job_title,
-        customer_name: job.customer_name,
+        title: job.job_title,
+        client_company: job.customer_name,
         num_reminders: item.num_reminders,
         last_confirmation_time: item.last_confirmation_time
           ? new Date(item.last_confirmation_time)
@@ -309,7 +309,7 @@ export class ReminderDaoSupabase implements IReminder {
     const dateString = targetDate.toISOString().split("T")[0];
 
     const { data, error } = await supabase
-      .from("jobassignments")
+      .from("job_assignments")
       .select(
         `
             job_id,
@@ -355,7 +355,7 @@ export class ReminderDaoSupabase implements IReminder {
     const dateString = targetDate.toISOString().split("T")[0]; // Convert to YYYY-MM-DD
 
     const { data, error } = await supabase
-      .from("jobassignments")
+      .from("job_assignments")
       .select(
         `
             job_id,
@@ -408,8 +408,8 @@ export class ReminderDaoSupabase implements IReminder {
     return assignments.filter((assignment) => {
       // Skip if confirmation status is Confirmed or Declined
       if (
-        assignment.confirmation_status === "Confirmed" ||
-        assignment.confirmation_status === "Declined"
+        assignment.confirmation_status === "CONFIRMED" ||
+        assignment.confirmation_status === "DECLINED"
       ) {
         return false;
       }
@@ -449,7 +449,7 @@ export class ReminderDaoSupabase implements IReminder {
       .split(" ")[0];
 
     const { data, error } = await supabase
-      .from("jobassignments")
+      .from("job_assignments")
       .select(
         `
             job_id,
