@@ -30,16 +30,38 @@ export function convertUTCTimeToLocal(
   workDate: string | Date
 ): string {
   if (!utcTime || !workDate) return "";
+
+  // Handle full timestamp format (e.g., "2025-10-22T19:14:00+00:00")
+  if (utcTime.includes("T")) {
+    const ts = new Date(utcTime);
+    if (isNaN(ts.getTime())) {
+      console.warn(`Invalid timestamp format: "${utcTime}"`);
+      return "";
+    }
+
+    // Convert UTC to Mountain Time for display
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Denver",
+      hour12: false,
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(ts);
+  }
+
+  // Handle time-only format (e.g., "19:14")
   const [uh, um] = utcTime.split(":").map(Number); // seconds ignored if present
   const { y, m, d } = normalizeDateInput(workDate);
 
   // Timestamp representing that UTC time on that calendar day
   const ts = new Date(Date.UTC(y, m - 1, d, uh, um, 0));
 
-  // READ as local wall clock (viewer’s zone)
-  // If you must force Mountain Time everywhere:
-  // return new Intl.DateTimeFormat('en-US', { timeZone: 'America/Denver', hour12: false, hour: '2-digit', minute: '2-digit' }).format(ts);
-  return toHHmm(ts.getHours(), ts.getMinutes());
+  // Convert UTC to Mountain Time for display
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Denver",
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(ts);
 }
 
 /**
@@ -70,9 +92,19 @@ export function convertLocalTimeToUTC(
 
   const { y, m, d } = normalizeDateInput(workDate);
 
-  // Build a timestamp at that local wall clock time on that date (viewer's zone)
-  // If you must force Mountain Time even for users outside MT, you need a TZ library; the plain Date constructor can't build "America/Denver" times on a non-MT machine reliably.
-  const localTs = new Date(y, m - 1, d, lh, lm, 0);
+  // Create a date string in Mountain Time format
+  const dateStr = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(
+    2,
+    "0"
+  )}`;
+  const timeStr = `${String(lh).padStart(2, "0")}:${String(lm).padStart(
+    2,
+    "0"
+  )}:00`;
+  const mountainDateTime = `${dateStr}T${timeStr}`;
+
+  // Parse as Mountain Time and convert to UTC
+  const localTs = new Date(mountainDateTime + "-07:00"); // Mountain Time is UTC-7
 
   // Read UTC HH:mm for storage
   return toHHmm(localTs.getUTCHours(), localTs.getUTCMinutes());

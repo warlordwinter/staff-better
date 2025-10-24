@@ -8,7 +8,6 @@ export interface AssociateFormData {
   phoneNumber: string;
   emailAddress: string;
   workDate?: string;
-  startTime?: string;
 }
 
 interface AssociateFormProps {
@@ -36,7 +35,6 @@ export default function AssociateForm({
     phoneNumber: initialData.phoneNumber || "",
     emailAddress: initialData.emailAddress || "",
     workDate: initialData.workDate || "",
-    startTime: initialData.startTime || "",
   });
 
   const [phoneError, setPhoneError] = useState("");
@@ -50,7 +48,6 @@ export default function AssociateForm({
       phoneNumber: initialData.phoneNumber || "",
       emailAddress: initialData.emailAddress || "",
       workDate: initialData.workDate || "",
-      startTime: initialData.startTime || "",
     }),
     [
       initialData.firstName,
@@ -58,7 +55,6 @@ export default function AssociateForm({
       initialData.phoneNumber,
       initialData.emailAddress,
       initialData.workDate,
-      initialData.startTime,
     ]
   );
 
@@ -130,9 +126,6 @@ export default function AssociateForm({
     if (showWorkFields) {
       if (!formData.workDate) {
         newErrors.workDate = "Work date is required";
-      }
-      if (!formData.startTime) {
-        newErrors.startTime = "Start time is required";
       }
     }
 
@@ -240,15 +233,9 @@ export default function AssociateForm({
               <input
                 type="time"
                 placeholder="Start Time *"
-                value={formData.startTime}
-                onChange={(e) => handleInputChange("startTime", e.target.value)}
-                className={`px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.startTime ? "border-red-500" : "border-gray-300"
-                }`}
+                value={new Date().toISOString().split("T")[1].substring(0, 5)}
+                className={`px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300`}
               />
-              {errors.startTime && (
-                <p className="text-red-500 text-xs mt-1">{errors.startTime}</p>
-              )}
             </div>
           </>
         )}

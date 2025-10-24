@@ -11,8 +11,6 @@ export function associateToFormData(associate: Associate): AssociateFormData {
     lastName: associate.last_name || "",
     phoneNumber: associate.phone_number || "",
     emailAddress: associate.email_address || "",
-    workDate: associate.work_date || "",
-    startTime: associate.start_date || "",
   };
 }
 
@@ -38,13 +36,11 @@ export function formDataToAssociate(
   id?: string
 ): Associate {
   return {
-    id: id || Date.now().toString(),
+    id: id || crypto.randomUUID(),
     first_name: formData.firstName,
     last_name: formData.lastName,
     phone_number: formData.phoneNumber,
     email_address: formData.emailAddress,
-    work_date: formData.workDate || null,
-    start_date: formData.startTime || null,
   };
 }
 
@@ -57,7 +53,7 @@ export function formDataToAssociateGroup(
   id?: string
 ): AssociateGroup {
   return {
-    id: id || Date.now().toString(),
+    id: id || crypto.randomUUID(),
     firstName: formData.firstName,
     lastName: formData.lastName,
     phoneNumber: formData.phoneNumber,
@@ -78,7 +74,5 @@ export function createEmptyAssociateFormData(): AssociateFormData {
     lastName: "",
     phoneNumber: "",
     emailAddress: "",
-    workDate: "",
-    startTime: "",
   };
 }

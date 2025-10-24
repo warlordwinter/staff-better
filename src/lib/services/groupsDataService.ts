@@ -187,8 +187,6 @@ export class GroupsDataService {
         last_name: associateData.lastName,
         phone_number: associateData.phoneNumber || "000-000-0000", // Required field, provide default
         email_address: associateData.emailAddress || null,
-        work_date: new Date().toISOString().split("T")[0], // Default to today
-        start_date: new Date().toISOString().split("T")[0], // Default to today
       }),
     });
 

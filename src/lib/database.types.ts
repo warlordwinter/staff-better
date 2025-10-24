@@ -22,8 +22,6 @@ export type Database = {
           last_name: string | null
           phone_number: string
           sms_opt_out: boolean | null
-          start_date: string | null
-          work_date: string | null
         }
         Insert: {
           email_address?: string | null
@@ -32,8 +30,6 @@ export type Database = {
           last_name?: string | null
           phone_number: string
           sms_opt_out?: boolean | null
-          start_date?: string | null
-          work_date?: string | null
         }
         Update: {
           email_address?: string | null
@@ -42,8 +38,6 @@ export type Database = {
           last_name?: string | null
           phone_number?: string
           sms_opt_out?: boolean | null
-          start_date?: string | null
-          work_date?: string | null
         }
         Relationships: []
       }
