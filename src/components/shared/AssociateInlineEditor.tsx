@@ -116,14 +116,13 @@ export default function AssociateInlineEditor({
         <>
           <input
             type="date"
-            value={editData.workDate || ""}
+            value={new Date().toISOString().split("T")[0]}
             onChange={(e) => handleInputChange("workDate", e.target.value)}
             className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
           />
           <input
             type="time"
-            value={editData.startTime || ""}
-            onChange={(e) => handleInputChange("startTime", e.target.value)}
+            value={new Date().toISOString().split("T")[1].substring(0, 5)}
             className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
           />
         </>
