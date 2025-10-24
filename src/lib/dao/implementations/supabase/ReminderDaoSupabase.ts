@@ -88,7 +88,6 @@ export class ReminderDaoSupabase implements IReminder {
   // Get all reminders that are due to be sent
   async getDueReminders(): Promise<ReminderAssignment[]> {
     console.log("🔍 [DEBUG] Starting getDueReminders...");
-    const supabase = await createClient();
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);

@@ -343,7 +343,7 @@ export class ReminderService {
         }
         hours = isoDate.getUTCHours();
         minutes = isoDate.getUTCMinutes();
-      } catch (error) {
+      } catch {
         return timeString; // Return original if parsing fails
       }
     } else {
