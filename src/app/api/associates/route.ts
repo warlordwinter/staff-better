@@ -23,8 +23,13 @@ export async function POST(request: NextRequest) {
     // Handle single associate or array of associates
     const associatesToInsert = Array.isArray(body) ? body : [body];
 
+    // Filter out work_date and start_date fields since they no longer exist in the database
+    const filteredAssociates = associatesToInsert.map(
+      ({ work_date, start_date, ...associate }) => associate
+    );
+
     const insertedAssociates = await associatesDao.insertAssociates(
-      associatesToInsert
+      filteredAssociates
     );
     return NextResponse.json(insertedAssociates, { status: 201 });
   } catch (error) {
