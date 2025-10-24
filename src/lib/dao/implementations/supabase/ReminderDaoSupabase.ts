@@ -448,6 +448,7 @@ export class ReminderDaoSupabase implements IReminder {
       .toTimeString()
       .split(" ")[0];
 
+    // Use PostgreSQL's time functions to properly compare time strings
     const { data, error } = await supabase
       .from("job_assignments")
       .select(
@@ -472,8 +473,8 @@ export class ReminderDaoSupabase implements IReminder {
         `
       )
       .eq("work_date", todayString)
-      .gte("start_time", currentTime) // Start time is after now
-      .lte("start_time", futureTime) // Start time is within the next X hours
+      .gte("start_time::time", currentTime) // Cast to time type for proper comparison
+      .lte("start_time::time", futureTime) // Cast to time type for proper comparison
       .gt("num_reminders", 0)
       .order("start_time", { ascending: true });
 

@@ -49,15 +49,17 @@ it("Processes Scheduled Reminders", async () => {
       phone_number: "+11234567890",
       associate_first_name: "Test",
       associate_last_name: "User",
-      job_title: "Electrician",
-      customer_name: "Acme Co",
+      title: "Electrician",
+      client_company: "Acme Co",
       work_date: new Date(),
       start_time: "09:00",
       num_reminders: 0,
       last_activity_time: new Date().toISOString(),
     },
   ];
-  mockReminderRepository.getDueReminders.mockResolvedValue(mockReminders);
+  mockReminderRepository.getDueReminders.mockResolvedValue(
+    mockReminders as ReminderAssignment[]
+  );
   mockMessageService.sendSMS.mockResolvedValue({
     success: true,
     messageId: "msg-123",
@@ -110,8 +112,8 @@ it("Sends a reminder to an associate", async () => {
     start_time: "09:00",
     associate_first_name: "Test",
     associate_last_name: "User",
-    job_title: "Electrician",
-    customer_name: "Acme Co",
+    title: "Electrician",
+    client_company: "Acme Co",
     num_reminders: 0,
   };
   const result = await service.sendReminderToAssociate(
@@ -147,8 +149,8 @@ it("Handles error when sending reminder to associate", async () => {
     start_time: "09:00",
     associate_first_name: "Test",
     associate_last_name: "User",
-    job_title: "Electrician",
-    customer_name: "Acme Co",
+    title: "Electrician",
+    client_company: "Acme Co",
     num_reminders: 0,
   };
 
@@ -180,8 +182,8 @@ it("Handles exception when sending reminder to associate", async () => {
     start_time: "09:00",
     associate_first_name: "Test",
     associate_last_name: "User",
-    job_title: "Electrician",
-    customer_name: "Acme Co",
+    title: "Electrician",
+    client_company: "Acme Co",
     num_reminders: 0,
   };
 
