@@ -39,13 +39,11 @@ export default function JobAssociateTableRow({
     first_name: data.first_name || "",
     last_name: data.last_name || "",
     num_reminders: (data.num_reminders || 0).toString(),
-    work_date: data.work_date || "",
-    start_date: data.start_date || "", // local time for display
     phone_number: data.phone_number || "",
     email_address: data.email_address || "",
     confirmation_status: data.confirmation_status || "UNCONFIRMED",
-    job_work_date: data.job_work_date || data.work_date || "",
-    job_start_time: data.job_start_time || data.start_date || "", // local time for display
+    job_work_date: data.job_work_date || "",
+    job_start_time: data.job_start_time || "", // local time for display
   });
 
   const handleEdit = () => {
@@ -75,8 +73,6 @@ export default function JobAssociateTableRow({
         ...data,
         first_name: editData.first_name,
         last_name: editData.last_name,
-        work_date: editData.work_date,
-        start_date: editData.start_date, // local; parent converts to UTC
         phone_number: editData.phone_number,
         email_address: editData.email_address,
         num_reminders: Number(editData.num_reminders) || 0,
@@ -103,13 +99,11 @@ export default function JobAssociateTableRow({
       first_name: data.first_name || "",
       last_name: data.last_name || "",
       num_reminders: (data.num_reminders || 0).toString(),
-      work_date: data.work_date || "",
-      start_date: data.start_date || "",
       phone_number: data.phone_number || "",
       email_address: data.email_address || "",
       confirmation_status: data.confirmation_status || "UNCONFIRMED",
-      job_work_date: data.job_work_date || data.work_date || "",
-      job_start_time: data.job_start_time || data.start_date || "",
+      job_work_date: data.job_work_date || "",
+      job_start_time: data.job_start_time || "",
     });
     setInternalIsEditing(false);
     setPhoneError("");
@@ -211,7 +205,7 @@ export default function JobAssociateTableRow({
             value={
               showJobAssignmentColumns
                 ? editData.job_work_date
-                : editData.work_date
+                : new Date().toISOString().split("T")[0]
             }
             onChange={(e) =>
               handleInputChange(
@@ -225,13 +219,15 @@ export default function JobAssociateTableRow({
           <AssociateDateDisplay
             value={
               showJobAssignmentColumns
-                ? data.job_work_date || data.work_date || ""
-                : data.work_date || ""
+                ? data.job_work_date ||
+                  new Date().toISOString().split("T")[0] ||
+                  ""
+                : new Date().toISOString().split("T")[0] || ""
             }
             isFilled={
               !!(showJobAssignmentColumns
-                ? data.job_work_date || data.work_date
-                : data.work_date)
+                ? data.job_work_date || new Date().toISOString().split("T")[0]
+                : new Date().toISOString().split("T")[0])
             }
           />
         )}
@@ -245,11 +241,11 @@ export default function JobAssociateTableRow({
               value={
                 showJobAssignmentColumns
                   ? editData.job_start_time
-                  : editData.start_date
+                  : new Date().toISOString().split("T")[0]
               }
               onChange={(e) =>
                 handleInputChange(
-                  showJobAssignmentColumns ? "job_start_time" : "start_date",
+                  showJobAssignmentColumns ? "job_start_time" : "start_time",
                   e.target.value
                 )
               }
@@ -259,8 +255,10 @@ export default function JobAssociateTableRow({
         ) : (
           displayTime(
             showJobAssignmentColumns
-              ? data.job_start_time || data.start_date || ""
-              : data.start_date || ""
+              ? data.job_start_time ||
+                  new Date().toISOString().split("T")[0] ||
+                  ""
+              : new Date().toISOString().split("T")[0] || ""
           )
         )}
       </TableCell>

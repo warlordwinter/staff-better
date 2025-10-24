@@ -26,14 +26,7 @@ export default function GroupAssociateTableRow({
   // Memoize the form data to prevent infinite re-renders
   const initialFormData = useMemo(
     () => associateGroupToFormData(associate),
-    [
-      associate.id,
-      associate.firstName,
-      associate.lastName,
-      associate.phoneNumber,
-      associate.emailAddress,
-      associate.groupId,
-    ]
+    [associate]
   );
 
   const [formData, setFormData] = useState(initialFormData);

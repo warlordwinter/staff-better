@@ -14,13 +14,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const { id } = await params;
     const updates = await request.json();
 
-    // Filter out work_date and start_date fields since they no longer exist in the database
-    const { work_date, start_date, ...filteredUpdates } = updates;
-
-    const updatedAssociate = await associatesDao.updateAssociate(
-      id,
-      filteredUpdates
-    );
+    const updatedAssociate = await associatesDao.updateAssociate(id, updates);
     return NextResponse.json(updatedAssociate[0]);
   } catch (error) {
     console.error("Failed to update associate:", error);

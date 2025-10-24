@@ -104,12 +104,12 @@ export class ReminderDaoSupabase implements IReminder {
             last_confirmation_time,
             last_reminder_time,
             confirmation_status,
-            associates:associate_id (
+            associates!inner (
                 first_name,
                 last_name,
                 phone_number
             ),
-            jobs:job_id (
+            jobs!inner (
                 job_title,
                 customer_name
             )

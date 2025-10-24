@@ -92,19 +92,6 @@ export function convertLocalTimeToUTC(
 
   const { y, m, d } = normalizeDateInput(workDate);
 
-  // Build a timestamp at that Mountain Time on that date
-  // Use Intl.DateTimeFormat to properly handle Mountain Time
-  const mountainTime = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Denver",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
-
   // Create a date string in Mountain Time format
   const dateStr = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(
     2,

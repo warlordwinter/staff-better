@@ -37,8 +37,6 @@ export async function POST(req: NextRequest) {
       return {
         first_name: r.first_name,
         last_name: r.last_name,
-        work_date: r.work_date,
-        start_date: r.start_date,
         phone_number: formattedPhone,
         email_address: r.email_address,
       };
