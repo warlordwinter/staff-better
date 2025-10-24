@@ -38,7 +38,7 @@ export function formDataToAssociate(
   id?: string
 ): Associate {
   return {
-    id: id || Date.now().toString(),
+    id: id || crypto.randomUUID(),
     first_name: formData.firstName,
     last_name: formData.lastName,
     phone_number: formData.phoneNumber,
@@ -57,7 +57,7 @@ export function formDataToAssociateGroup(
   id?: string
 ): AssociateGroup {
   return {
-    id: id || Date.now().toString(),
+    id: id || crypto.randomUUID(),
     firstName: formData.firstName,
     lastName: formData.lastName,
     phoneNumber: formData.phoneNumber,

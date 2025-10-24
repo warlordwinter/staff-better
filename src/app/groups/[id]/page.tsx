@@ -130,7 +130,7 @@ export default function GroupPage({ params }: GroupPageProps) {
 
   const handleAddNewAssociate = () => {
     const newAssociateData: AssociateGroup = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       firstName: "",
       lastName: "",
       phoneNumber: "",

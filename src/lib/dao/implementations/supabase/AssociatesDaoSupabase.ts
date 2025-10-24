@@ -175,6 +175,43 @@ export class AssociatesDaoSupabase implements IAssociates {
       }
     }
 
+    // Process start_date if it's being updated
+    if (cleanedUpdates.start_date) {
+      let formattedStartDate = cleanedUpdates.start_date;
+      if (
+        formattedStartDate &&
+        typeof formattedStartDate === "string" &&
+        formattedStartDate.trim()
+      ) {
+        // Check if it's a time value (like "20:14") and format it properly
+        if (/^\d{1,2}:\d{2}$/.test(formattedStartDate.trim())) {
+          // If it's just a time, we need to combine it with a date
+          // Use the work_date if available, otherwise use today's date
+          const workDate =
+            cleanedUpdates.work_date || new Date().toISOString().split("T")[0];
+          formattedStartDate = `${workDate} ${formattedStartDate}:00`;
+          console.log(
+            `Formatted start_date: "${cleanedUpdates.start_date}" -> "${formattedStartDate}" (using work_date: ${workDate})`
+          );
+          // Assign the formatted time back to cleanedUpdates
+          cleanedUpdates.start_date = formattedStartDate;
+        } else {
+          // Try to parse as a full timestamp
+          const date = new Date(formattedStartDate);
+          if (isNaN(date.getTime())) {
+            console.warn(
+              `Invalid start_date value "${formattedStartDate}", keeping original value`
+            );
+            // Don't delete or modify - keep the original value
+          } else {
+            formattedStartDate = date.toISOString();
+            // Assign the formatted time back to cleanedUpdates
+            cleanedUpdates.start_date = formattedStartDate;
+          }
+        }
+      }
+    }
+
     console.log("Cleaned Updates:", cleanedUpdates);
 
     const { data, error } = await supabase
