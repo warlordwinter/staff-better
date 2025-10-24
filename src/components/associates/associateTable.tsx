@@ -1,11 +1,12 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { AssociateTableHeader } from "./associateTableHeader";
-import { AssociateTableRow } from "./associateTableRow";
-import { AssociateTableTitle } from "./associateTableTitle";
+import JobAssociateTableRow from "../shared/JobAssociateTableRow";
+import AssociateTableTitle from "../shared/AssociateTableTitle";
 import { Associate } from "@/model/interfaces/Associate";
 import { Job } from "@/model/interfaces/Job";
 import LoadingSpinner from "../ui/loadingSpinner";
+import AddAssociateButton from "../shared/AddAssociateButton";
 import {
   convertLocalTimeToUTC,
   convertUTCTimeToLocal,
@@ -147,7 +148,9 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
 
       // Convert local times to UTC before sending to API
       const utcAssociateTime = convertLocalTimeToUTC(
-        updatedData.start_date ?? undefined,
+        updatedData.start_date && updatedData.start_date.trim()
+          ? updatedData.start_date
+          : undefined,
         updatedData.work_date ?? new Date().toISOString().split("T")[0]
       );
 
@@ -173,8 +176,10 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
 
         // Create job assignment if in job context
         if (jobId) {
+          const jobTimeValue =
+            updatedData.job_start_time || updatedData.start_date;
           const utcJobTime = convertLocalTimeToUTC(
-            updatedData.job_start_time || (updatedData.start_date ?? undefined),
+            jobTimeValue && jobTimeValue.trim() ? jobTimeValue : undefined,
             updatedData.job_work_date ||
               (updatedData.work_date ?? new Date().toISOString().split("T")[0])
           );
@@ -221,8 +226,10 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
             updatedData.job_work_date ||
             updatedData.job_start_time)
         ) {
+          const jobTimeValue =
+            updatedData.job_start_time || updatedData.start_date;
           const utcJobTime = convertLocalTimeToUTC(
-            updatedData.job_start_time || (updatedData.start_date ?? undefined),
+            jobTimeValue && jobTimeValue.trim() ? jobTimeValue : undefined,
             updatedData.job_work_date ||
               (updatedData.work_date ?? new Date().toISOString().split("T")[0])
           );
@@ -249,17 +256,24 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
 
       // Update local state with saved data (keep local times for display)
       const finalData = isNewAssociate
-        ? { ...savedAssociate, ...updatedData, isNew: false }
+        ? {
+            ...updatedData,
+            id: savedAssociate.id, // Use the real database ID
+            isNew: false,
+            // Preserve the local time values for display
+            start_date: updatedData.start_date,
+            job_start_time: updatedData.job_start_time,
+          }
         : { ...associate, ...updatedData };
 
       setAssociatesData((prev) =>
         prev.map((a, i) => (i === index ? finalData : a))
       );
 
-      // Remove from newly added list since it's been saved
+      // Remove from newly added list and add the real ID
       setNewlyAddedIds((prev) => {
         const newSet = new Set(prev);
-        newSet.delete(associate.id);
+        newSet.delete(associate.id); // Remove temp ID
         return newSet;
       });
 
@@ -315,7 +329,7 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
   };
 
   const handleAdd = () => {
-    const localTime = "08:00"; // default local
+    const localTime = "10:00"; // default local
     const workDate = new Date();
     const yyyy = workDate.getFullYear();
     const mm = String(workDate.getMonth() + 1).padStart(2, "0");
@@ -370,12 +384,7 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
             ? "No associates assigned to this job yet."
             : "No associates found."}
           <br />
-          <button
-            onClick={handleAdd}
-            className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            Add Associate
-          </button>
+          <AddAssociateButton onAdd={handleAdd} className="mt-2" />
         </div>
       ) : (
         <>
@@ -385,7 +394,7 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
             </thead>
             <tbody>
               {associatesData.map((associate, index) => (
-                <AssociateTableRow
+                <JobAssociateTableRow
                   key={associate.id}
                   data={associate}
                   index={index}

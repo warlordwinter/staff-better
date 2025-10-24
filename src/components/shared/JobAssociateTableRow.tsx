@@ -1,10 +1,11 @@
 "use client";
+
 import React, { useState } from "react";
-import { AssociateDateDisplay } from "./associateTableCell";
-import Image from "next/image";
 import { Associate } from "@/model/interfaces/Associate";
-import { formatPhoneForDisplay, formatPhoneToE164 } from "@/utils/phoneUtils";
+import AssociateActions from "./AssociateActions";
+import { formatPhoneForDisplay } from "@/utils/phoneUtils";
 import { to12HourDisplay } from "@/utils/timezoneUtils";
+import { AssociateDateDisplay } from "../associates/associateTableCell";
 
 interface AssociateDisplay extends Associate {
   confirmation_status?: string;
@@ -14,23 +15,22 @@ interface AssociateDisplay extends Associate {
   isNew?: boolean; // Track if this is a new unsaved associate
 }
 
-interface AssociateTableRowProps {
+interface JobAssociateTableRowProps {
   data: AssociateDisplay;
-  index: number;
+  index?: number;
   onSave?: (updatedData: AssociateDisplay) => void;
   onDelete?: () => void;
   showJobAssignmentColumns?: boolean;
   isEditing?: boolean; // External control of editing state
 }
 
-export function AssociateTableRow({
+export default function JobAssociateTableRow({
   data,
-  index,
   onSave,
   onDelete,
   showJobAssignmentColumns = false,
   isEditing: externalIsEditing = false,
-}: AssociateTableRowProps) {
+}: JobAssociateTableRowProps) {
   const [internalIsEditing, setInternalIsEditing] = useState(false);
   const isEditing = externalIsEditing || internalIsEditing;
   const [phoneError, setPhoneError] = useState("");
@@ -56,8 +56,14 @@ export function AssociateTableRow({
   const handleSave = () => {
     if (editData.phone_number.trim()) {
       try {
-        formatPhoneToE164(editData.phone_number);
-        setPhoneError("");
+        import("@/utils/phoneUtils").then(({ isValidPhoneNumber }) => {
+          if (isValidPhoneNumber(editData.phone_number)) {
+            setPhoneError("");
+          } else {
+            setPhoneError("Please enter a valid phone number");
+            return;
+          }
+        });
       } catch {
         setPhoneError("Please enter a valid phone number");
         return;
@@ -87,25 +93,23 @@ export function AssociateTableRow({
 
   const handleCancel = () => {
     if (data.isNew) {
-      // For new associates, trigger delete to remove from table
       if (onDelete) {
         onDelete();
       }
       return;
     }
 
-    // For existing associates, reset to original data
     setEditData({
       first_name: data.first_name || "",
       last_name: data.last_name || "",
       num_reminders: (data.num_reminders || 0).toString(),
       work_date: data.work_date || "",
-      start_date: data.start_date || "", // keep local time for display
+      start_date: data.start_date || "",
       phone_number: data.phone_number || "",
       email_address: data.email_address || "",
       confirmation_status: data.confirmation_status || "UNCONFIRMED",
       job_work_date: data.job_work_date || data.work_date || "",
-      job_start_time: data.job_start_time || data.start_date || "", // keep local time
+      job_start_time: data.job_start_time || data.start_date || "",
     });
     setInternalIsEditing(false);
     setPhoneError("");
@@ -119,8 +123,13 @@ export function AssociateTableRow({
         setPhoneError("");
       } else {
         try {
-          formatPhoneToE164(value);
-          setPhoneError("");
+          import("@/utils/phoneUtils").then(({ isValidPhoneNumber }) => {
+            if (isValidPhoneNumber(value)) {
+              setPhoneError("");
+            } else {
+              setPhoneError("Invalid phone format");
+            }
+          });
         } catch {
           setPhoneError("Invalid phone format");
         }
@@ -148,10 +157,6 @@ export function AssociateTableRow({
   const displayTime = (time: string) => (
     <span className="font-medium">{to12HourDisplay(time) || ""}</span>
   );
-
-  // Suppress the ESLint warning for unused index since it's used in parent
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _index = index;
 
   return (
     <tr className="text-xs text-neutral-700">
@@ -250,7 +255,6 @@ export function AssociateTableRow({
               }
               className="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-blue-500"
             />
-            {/* Intentionally no timezone label */}
           </div>
         ) : (
           displayTime(
@@ -350,27 +354,11 @@ export function AssociateTableRow({
             </button>
           </div>
         ) : (
-          <div className="flex gap-2 items-center">
-            <button
-              onClick={handleEdit}
-              className="hover:bg-gray-100 p-1 rounded focus:outline-none"
-              title="Edit"
-            >
-              <Image src="/icons/edit.svg" alt="Edit" width={16} height={16} />
-            </button>
-            <button
-              onClick={onDelete}
-              className="hover:bg-gray-100 p-1 rounded focus:outline-none"
-              title="Delete"
-            >
-              <Image
-                src="/icons/trash.svg"
-                alt="Delete"
-                width={16}
-                height={16}
-              />
-            </button>
-          </div>
+          <AssociateActions
+            onEdit={handleEdit}
+            onDelete={onDelete || (() => {})}
+            size="sm"
+          />
         )}
       </TableCell>
     </tr>
