@@ -4,6 +4,10 @@ on:
   # Run every 15 minutes
   schedule:
     - cron: "*/15 * * * *"
+  # Run on push to current branch
+  push:
+    branches:
+      - reminder-repair
 
   # Allow manual triggering
   workflow_dispatch:

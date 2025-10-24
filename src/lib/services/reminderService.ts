@@ -272,14 +272,103 @@ export class ReminderService {
     const year = date.getUTCFullYear();
     const month = date.getUTCMonth();
     const day = date.getUTCDate();
-    const [hours, minutes] = timeString.split(":").map(Number);
+
+    let hours: number;
+    let minutes: number;
+
+    // Check if timeString is an ISO datetime string (e.g., "2025-10-24T19:00:00+00:00")
+    if (timeString.includes("T")) {
+      try {
+        const isoDate = new Date(timeString);
+        if (isNaN(isoDate.getTime())) {
+          throw new Error(`Invalid ISO datetime: ${timeString}`);
+        }
+        hours = isoDate.getUTCHours();
+        minutes = isoDate.getUTCMinutes();
+      } catch (error) {
+        throw new Error(
+          `Failed to parse ISO datetime: ${timeString}. Error: ${error}`
+        );
+      }
+    } else {
+      // Parse time string with validation (e.g., "19:00:00")
+      const timeParts = timeString.split(":");
+      if (timeParts.length < 2) {
+        throw new Error(
+          `Invalid time format: ${timeString}. Expected HH:MM or HH:MM:SS`
+        );
+      }
+
+      hours = parseInt(timeParts[0], 10);
+      minutes = parseInt(timeParts[1], 10);
+
+      // Validate time values
+      if (
+        isNaN(hours) ||
+        isNaN(minutes) ||
+        hours < 0 ||
+        hours > 23 ||
+        minutes < 0 ||
+        minutes > 59
+      ) {
+        throw new Error(
+          `Invalid time values: hours=${hours}, minutes=${minutes} from time string: ${timeString}`
+        );
+      }
+    }
 
     // Create UTC datetime since timeString is UTC from database
-    return new Date(Date.UTC(year, month, day, hours, minutes, 0, 0));
+    const result = new Date(Date.UTC(year, month, day, hours, minutes, 0, 0));
+
+    // Validate the resulting date
+    if (isNaN(result.getTime())) {
+      throw new Error(
+        `Invalid date created from date=${date.toISOString()}, time=${timeString}`
+      );
+    }
+
+    return result;
   }
 
   private formatTime(timeString: string): string {
-    const [hours, minutes] = timeString.split(":").map(Number);
+    let hours: number;
+    let minutes: number;
+
+    // Check if timeString is an ISO datetime string (e.g., "2025-10-24T19:00:00+00:00")
+    if (timeString.includes("T")) {
+      try {
+        const isoDate = new Date(timeString);
+        if (isNaN(isoDate.getTime())) {
+          return timeString; // Return original if invalid
+        }
+        hours = isoDate.getUTCHours();
+        minutes = isoDate.getUTCMinutes();
+      } catch (error) {
+        return timeString; // Return original if parsing fails
+      }
+    } else {
+      // Parse time string (e.g., "19:00:00")
+      const timeParts = timeString.split(":");
+      if (timeParts.length < 2) {
+        return timeString; // Return original if invalid format
+      }
+
+      hours = parseInt(timeParts[0], 10);
+      minutes = parseInt(timeParts[1], 10);
+
+      // Validate time values
+      if (
+        isNaN(hours) ||
+        isNaN(minutes) ||
+        hours < 0 ||
+        hours > 23 ||
+        minutes < 0 ||
+        minutes > 59
+      ) {
+        return timeString; // Return original if invalid values
+      }
+    }
+
     const period = hours >= 12 ? "PM" : "AM";
     const displayHours = hours > 12 ? hours - 12 : hours || 12;
     return `${displayHours}:${minutes.toString().padStart(2, "0")} ${period}`;
