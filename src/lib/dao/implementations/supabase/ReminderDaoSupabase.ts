@@ -85,6 +85,122 @@ function transformReminderData(data: RawReminderRow[]): ReminderAssignment[] {
 }
 
 export class ReminderDaoSupabase implements IReminder {
+  // Get all reminders that are due to be sent
+  async getDueReminders(): Promise<ReminderAssignment[]> {
+    console.log("🔍 [DEBUG] Starting getDueReminders...");
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+    const dayAfterTomorrow = new Date(today.getTime() + 48 * 60 * 60 * 1000);
+
+    console.log("🔍 [DEBUG] Date calculations:");
+    console.log(`  - Now: ${now.toISOString()}`);
+    console.log(`  - Today: ${today.toISOString()}`);
+    console.log(`  - Tomorrow: ${tomorrow.toISOString()}`);
+    console.log(`  - Day after tomorrow: ${dayAfterTomorrow.toISOString()}`);
+
+    // Get all assignments that need reminders
+    const allAssignments: ReminderAssignment[] = [];
+
+    try {
+      console.log(
+        "🔍 [DEBUG] Getting day-before reminders (tomorrow's jobs)..."
+      );
+      // Get day-before reminders (tomorrow's jobs)
+      const dayBeforeReminders = await this.getDayBeforeReminders(tomorrow);
+      console.log(
+        `🔍 [DEBUG] Found ${dayBeforeReminders.length} day-before reminders`
+      );
+      allAssignments.push(...dayBeforeReminders);
+
+      console.log("🔍 [DEBUG] Getting two-days-before reminders...");
+      // Get two-days-before reminders (day after tomorrow's jobs)
+      const twoDaysBeforeReminders = await this.getTwoDaysBeforeReminders(
+        dayAfterTomorrow
+      );
+      console.log(
+        `🔍 [DEBUG] Found ${twoDaysBeforeReminders.length} two-days-before reminders`
+      );
+      allAssignments.push(...twoDaysBeforeReminders);
+
+      console.log(
+        "🔍 [DEBUG] Getting morning-of reminders (today's jobs within next 2 hours)..."
+      );
+      // Get morning-of reminders (today's jobs within next 2 hours)
+      const morningOfReminders = await this.getMorningOfReminders(2);
+      console.log(
+        `🔍 [DEBUG] Found ${morningOfReminders.length} morning-of reminders`
+      );
+      allAssignments.push(...morningOfReminders);
+
+      console.log("🔍 [DEBUG] Getting today's jobs that need reminders...");
+      // Get today's jobs that need reminders (any time today)
+      const todayJobs = await this.getAssignmentsByDate(today);
+      console.log(
+        `🔍 [DEBUG] Found ${todayJobs.length} jobs for today:`,
+        todayJobs.map((j) => ({
+          job_id: j.job_id,
+          associate_id: j.associate_id,
+          work_date: j.work_date,
+          start_time: j.start_time,
+          num_reminders: j.num_reminders,
+        }))
+      );
+
+      const todayReminders = todayJobs.filter((assignment) => {
+        // Include jobs that haven't been reminded recently and have reminders left
+        return assignment.num_reminders > 0;
+      });
+      console.log(
+        `🔍 [DEBUG] Filtered to ${todayReminders.length} jobs that need reminders`
+      );
+      allAssignments.push(...todayReminders);
+
+      console.log(
+        `🔍 [DEBUG] Total assignments before filtering: ${allAssignments.length}`
+      );
+      console.log(
+        "🔍 [DEBUG] All assignments before filtering:",
+        allAssignments.map((a) => ({
+          job_id: a.job_id,
+          associate_id: a.associate_id,
+          work_date: a.work_date,
+          start_time: a.start_time,
+          num_reminders: a.num_reminders,
+          last_reminder_time: a.last_reminder_time,
+          confirmation_status: a.confirmation_status,
+        }))
+      );
+
+      // Filter out assignments that have been recently reminded
+      console.log("🔍 [DEBUG] Filtering out recently reminded assignments...");
+      const filteredAssignments = await this.getAssignmentsNotRecentlyReminded(
+        allAssignments
+      );
+
+      console.log(
+        `🔍 [DEBUG] Final result: ${allAssignments.length} total assignments, ${filteredAssignments.length} after filtering`
+      );
+      console.log(
+        "🔍 [DEBUG] Final filtered assignments:",
+        filteredAssignments.map((a) => ({
+          job_id: a.job_id,
+          associate_id: a.associate_id,
+          work_date: a.work_date,
+          start_time: a.start_time,
+          num_reminders: a.num_reminders,
+          last_reminder_time: a.last_reminder_time,
+          confirmation_status: a.confirmation_status,
+        }))
+      );
+
+      return filteredAssignments;
+    } catch (error) {
+      console.error("🔍 [DEBUG] Error getting due reminders:", error);
+      throw error;
+    }
+  }
+
   // Get reminder assignment with all related data
   async getReminderAssignment(
     jobId: string,
@@ -239,6 +355,12 @@ export class ReminderDaoSupabase implements IReminder {
     const supabase = await createClient();
     const dateString = date.toISOString().split("T")[0]; // Convert to YYYY-MM-DD
 
+    // Create start and end of day for range query
+    const startOfDay = `${dateString}T00:00:00.000Z`;
+    const endOfDay = `${dateString}T23:59:59.999Z`;
+
+    console.log(`Searching for jobs between ${startOfDay} and ${endOfDay}`);
+
     const { data, error } = await supabase
       .from("job_assignments")
       .select(
@@ -262,12 +384,20 @@ export class ReminderDaoSupabase implements IReminder {
             )
         `
       )
-      .eq("work_date", dateString)
+      .gte("work_date", startOfDay)
+      .lte("work_date", endOfDay)
       .order("start_time", { ascending: true });
 
     if (error) {
       console.error("Error grabbing assignments by date:", error);
       throw new Error(JSON.stringify(error));
+    }
+
+    console.log(
+      `Database returned ${data?.length || 0} jobs for date ${dateString}`
+    );
+    if (data && data.length > 0) {
+      console.log("Sample job data:", data[0]);
     }
 
     if (!data || data.length === 0) {
@@ -398,24 +528,48 @@ export class ReminderDaoSupabase implements IReminder {
     assignments: ReminderAssignment[],
     minHoursSinceLastReminder: number = 4
   ): Promise<ReminderAssignment[]> {
-    // const now = new Date();
+    console.log(
+      `🔍 [DEBUG] Filtering ${assignments.length} assignments with minHoursSinceLastReminder=${minHoursSinceLastReminder}`
+    );
+
+    const now = new Date();
     const cutoffTime = new Date();
     cutoffTime.setHours(cutoffTime.getHours() - minHoursSinceLastReminder);
 
     const twentyFourHoursAgo = new Date();
     twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
 
-    return assignments.filter((assignment) => {
+    console.log(`🔍 [DEBUG] Time calculations:`);
+    console.log(`  - Now: ${now.toISOString()}`);
+    console.log(
+      `  - Cutoff time (${minHoursSinceLastReminder}h ago): ${cutoffTime.toISOString()}`
+    );
+    console.log(`  - 24 hours ago: ${twentyFourHoursAgo.toISOString()}`);
+
+    const filtered = assignments.filter((assignment, index) => {
+      console.log(
+        `🔍 [DEBUG] Checking assignment ${index + 1}/${assignments.length}:`,
+        {
+          job_id: assignment.job_id,
+          associate_id: assignment.associate_id,
+          confirmation_status: assignment.confirmation_status,
+          last_reminder_time: assignment.last_reminder_time,
+          num_reminders: assignment.num_reminders,
+        }
+      );
+
       // Skip if confirmation status is Confirmed or Declined
       if (
         assignment.confirmation_status === "CONFIRMED" ||
         assignment.confirmation_status === "DECLINED"
       ) {
+        console.log(`🔍 [DEBUG]   ❌ Filtered out: Confirmed/Declined status`);
         return false;
       }
 
       // If no last reminder time, they haven't been reminded recently
       if (!assignment.last_reminder_time) {
+        console.log(`🔍 [DEBUG]   ✅ Included: No last reminder time`);
         return true;
       }
 
@@ -424,14 +578,31 @@ export class ReminderDaoSupabase implements IReminder {
       const today = new Date();
       const isJobToday = workDate.toDateString() === today.toDateString();
 
+      console.log(
+        `🔍 [DEBUG]   Work date: ${workDate.toDateString()}, Today: ${today.toDateString()}, Is job today: ${isJobToday}`
+      );
+
       // If it's the day of the job, only use the minHoursSinceLastReminder filter
       if (isJobToday) {
-        return assignment.last_reminder_time < cutoffTime;
+        const shouldInclude = assignment.last_reminder_time < cutoffTime;
+        console.log(
+          `🔍 [DEBUG]   Last reminder: ${assignment.last_reminder_time.toISOString()}, Cutoff: ${cutoffTime.toISOString()}, Should include: ${shouldInclude}`
+        );
+        return shouldInclude;
       }
 
       // For other days, use the 24-hour filter unless it's the day of
-      return assignment.last_reminder_time < twentyFourHoursAgo;
+      const shouldInclude = assignment.last_reminder_time < twentyFourHoursAgo;
+      console.log(
+        `🔍 [DEBUG]   Last reminder: ${assignment.last_reminder_time.toISOString()}, 24h ago: ${twentyFourHoursAgo.toISOString()}, Should include: ${shouldInclude}`
+      );
+      return shouldInclude;
     });
+
+    console.log(
+      `🔍 [DEBUG] Filtering result: ${assignments.length} -> ${filtered.length} assignments`
+    );
+    return filtered;
   }
 
   // Get assignments that need morning-of reminders (work date is today, start time is within next 1-2 hours)
@@ -448,7 +619,11 @@ export class ReminderDaoSupabase implements IReminder {
       .toTimeString()
       .split(" ")[0];
 
-    // Use PostgreSQL's time functions to properly compare time strings
+    // Create full datetime strings for proper timestamp comparison
+    const currentDateTime = `${todayString}T${currentTime}`;
+    const futureDateTime = `${todayString}T${futureTime}`;
+
+    // Use proper timestamp comparison instead of casting to time
     const { data, error } = await supabase
       .from("job_assignments")
       .select(
@@ -473,8 +648,8 @@ export class ReminderDaoSupabase implements IReminder {
         `
       )
       .eq("work_date", todayString)
-      .gte("start_time::time", currentTime) // Cast to time type for proper comparison
-      .lte("start_time::time", futureTime) // Cast to time type for proper comparison
+      .gte("start_time", currentDateTime) // Compare full timestamps
+      .lte("start_time", futureDateTime) // Compare full timestamps
       .gt("num_reminders", 0)
       .order("start_time", { ascending: true });
 

@@ -6,6 +6,8 @@ export interface IReminder {
     associateId: string
   ): Promise<ReminderAssignment | null>;
 
+  getDueReminders(): Promise<ReminderAssignment[]>;
+
   getAllUpcomingReminders(): Promise<ReminderAssignment[]>;
 
   getAssignmentsByDate(date: Date): Promise<ReminderAssignment[]>;
