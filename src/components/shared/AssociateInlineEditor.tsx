@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { AssociateFormData } from "./AssociateForm";
 
 interface AssociateInlineEditorProps {
@@ -23,10 +23,6 @@ export default function AssociateInlineEditor({
   const [editData, setEditData] = useState<AssociateFormData>(initialData);
   const [phoneError, setPhoneError] = useState("");
 
-  useEffect(() => {
-    setEditData(initialData);
-  }, [initialData]);
-
   const handleInputChange = (field: keyof AssociateFormData, value: string) => {
     setEditData((prev) => ({ ...prev, [field]: value }));
 
@@ -36,10 +32,13 @@ export default function AssociateInlineEditor({
         setPhoneError("");
       } else {
         try {
-          // Import formatPhoneToE164 dynamically to avoid circular imports
-          import("@/utils/phoneUtils").then(({ formatPhoneToE164 }) => {
-            formatPhoneToE164(value);
-            setPhoneError("");
+          // Import isValidPhoneNumber dynamically to avoid circular imports
+          import("@/utils/phoneUtils").then(({ isValidPhoneNumber }) => {
+            if (isValidPhoneNumber(value)) {
+              setPhoneError("");
+            } else {
+              setPhoneError("Invalid phone format");
+            }
           });
         } catch {
           setPhoneError("Invalid phone format");
@@ -55,9 +54,12 @@ export default function AssociateInlineEditor({
 
     if (editData.phoneNumber.trim()) {
       try {
-        import("@/utils/phoneUtils").then(({ formatPhoneToE164 }) => {
-          formatPhoneToE164(editData.phoneNumber);
-          onSave(editData);
+        import("@/utils/phoneUtils").then(({ isValidPhoneNumber }) => {
+          if (isValidPhoneNumber(editData.phoneNumber)) {
+            onSave(editData);
+          } else {
+            setPhoneError("Please enter a valid phone number");
+          }
         });
       } catch {
         setPhoneError("Please enter a valid phone number");

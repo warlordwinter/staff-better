@@ -148,7 +148,9 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
 
       // Convert local times to UTC before sending to API
       const utcAssociateTime = convertLocalTimeToUTC(
-        updatedData.start_date ?? undefined,
+        updatedData.start_date && updatedData.start_date.trim()
+          ? updatedData.start_date
+          : undefined,
         updatedData.work_date ?? new Date().toISOString().split("T")[0]
       );
 
@@ -174,8 +176,10 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
 
         // Create job assignment if in job context
         if (jobId) {
+          const jobTimeValue =
+            updatedData.job_start_time || updatedData.start_date;
           const utcJobTime = convertLocalTimeToUTC(
-            updatedData.job_start_time || (updatedData.start_date ?? undefined),
+            jobTimeValue && jobTimeValue.trim() ? jobTimeValue : undefined,
             updatedData.job_work_date ||
               (updatedData.work_date ?? new Date().toISOString().split("T")[0])
           );
@@ -222,8 +226,10 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
             updatedData.job_work_date ||
             updatedData.job_start_time)
         ) {
+          const jobTimeValue =
+            updatedData.job_start_time || updatedData.start_date;
           const utcJobTime = convertLocalTimeToUTC(
-            updatedData.job_start_time || (updatedData.start_date ?? undefined),
+            jobTimeValue && jobTimeValue.trim() ? jobTimeValue : undefined,
             updatedData.job_work_date ||
               (updatedData.work_date ?? new Date().toISOString().split("T")[0])
           );
@@ -250,17 +256,24 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
 
       // Update local state with saved data (keep local times for display)
       const finalData = isNewAssociate
-        ? { ...savedAssociate, ...updatedData, isNew: false }
+        ? {
+            ...updatedData,
+            id: savedAssociate.id, // Use the real database ID
+            isNew: false,
+            // Preserve the local time values for display
+            start_date: updatedData.start_date,
+            job_start_time: updatedData.job_start_time,
+          }
         : { ...associate, ...updatedData };
 
       setAssociatesData((prev) =>
         prev.map((a, i) => (i === index ? finalData : a))
       );
 
-      // Remove from newly added list since it's been saved
+      // Remove from newly added list and add the real ID
       setNewlyAddedIds((prev) => {
         const newSet = new Set(prev);
-        newSet.delete(associate.id);
+        newSet.delete(associate.id); // Remove temp ID
         return newSet;
       });
 
@@ -316,7 +329,7 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
   };
 
   const handleAdd = () => {
-    const localTime = "08:00"; // default local
+    const localTime = "10:00"; // default local
     const workDate = new Date();
     const yyyy = workDate.getFullYear();
     const mm = String(workDate.getMonth() + 1).padStart(2, "0");

@@ -2,12 +2,7 @@
 
 import React, { useState } from "react";
 import { Associate } from "@/model/interfaces/Associate";
-import { AssociateFormData } from "./AssociateForm";
 import AssociateActions from "./AssociateActions";
-import {
-  associateToFormData,
-  formDataToAssociate,
-} from "@/utils/associateUtils";
 import { formatPhoneForDisplay } from "@/utils/phoneUtils";
 import { to12HourDisplay } from "@/utils/timezoneUtils";
 import { AssociateDateDisplay } from "../associates/associateTableCell";
@@ -22,7 +17,7 @@ interface AssociateDisplay extends Associate {
 
 interface JobAssociateTableRowProps {
   data: AssociateDisplay;
-  index: number;
+  index?: number;
   onSave?: (updatedData: AssociateDisplay) => void;
   onDelete?: () => void;
   showJobAssignmentColumns?: boolean;
@@ -31,7 +26,6 @@ interface JobAssociateTableRowProps {
 
 export default function JobAssociateTableRow({
   data,
-  index,
   onSave,
   onDelete,
   showJobAssignmentColumns = false,
@@ -62,9 +56,13 @@ export default function JobAssociateTableRow({
   const handleSave = () => {
     if (editData.phone_number.trim()) {
       try {
-        import("@/utils/phoneUtils").then(({ formatPhoneToE164 }) => {
-          formatPhoneToE164(editData.phone_number);
-          setPhoneError("");
+        import("@/utils/phoneUtils").then(({ isValidPhoneNumber }) => {
+          if (isValidPhoneNumber(editData.phone_number)) {
+            setPhoneError("");
+          } else {
+            setPhoneError("Please enter a valid phone number");
+            return;
+          }
         });
       } catch {
         setPhoneError("Please enter a valid phone number");
@@ -125,9 +123,12 @@ export default function JobAssociateTableRow({
         setPhoneError("");
       } else {
         try {
-          import("@/utils/phoneUtils").then(({ formatPhoneToE164 }) => {
-            formatPhoneToE164(value);
-            setPhoneError("");
+          import("@/utils/phoneUtils").then(({ isValidPhoneNumber }) => {
+            if (isValidPhoneNumber(value)) {
+              setPhoneError("");
+            } else {
+              setPhoneError("Invalid phone format");
+            }
           });
         } catch {
           setPhoneError("Invalid phone format");

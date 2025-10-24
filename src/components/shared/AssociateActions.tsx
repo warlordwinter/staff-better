@@ -17,15 +17,15 @@ export default function AssociateActions({
   showMessageButton = false,
   size = "md",
 }: AssociateActionsProps) {
-  const iconSize = size === "sm" ? "w-3 h-3" : "w-4 h-4";
-  const buttonSize = size === "sm" ? "p-1" : "p-2";
+  const iconSize = size === "sm" ? "w-4 h-4" : "w-5 h-5";
+  const buttonSize = size === "sm" ? "p-2" : "p-3";
 
   return (
     <div className="flex items-center gap-1">
       {/* Edit Button */}
       <button
         onClick={onEdit}
-        className={`${buttonSize} text-gray-400 hover:text-blue-500 transition-colors`}
+        className={`${buttonSize} text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-all duration-200`}
         title="Edit associate"
       >
         <svg
@@ -47,7 +47,7 @@ export default function AssociateActions({
       {showMessageButton && onMessage && (
         <button
           onClick={onMessage}
-          className={`${buttonSize} text-gray-400 hover:text-green-500 transition-colors`}
+          className={`${buttonSize} text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-md transition-all duration-200`}
           title="Message associate"
         >
           <svg
@@ -69,7 +69,7 @@ export default function AssociateActions({
       {/* Delete Button */}
       <button
         onClick={onDelete}
-        className={`${buttonSize} text-gray-400 hover:text-red-500 transition-colors`}
+        className={`${buttonSize} text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-all duration-200`}
         title="Delete associate"
       >
         <svg

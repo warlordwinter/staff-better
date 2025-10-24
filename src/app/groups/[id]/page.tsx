@@ -12,7 +12,6 @@ import { GroupsDataService } from "@/lib/services/groupsDataService";
 
 // Import new components
 import GroupHeader from "@/components/groups/GroupHeader";
-import QuickAddForm from "@/components/groups/QuickAddForm";
 import GroupAssociateTable from "@/components/groups/GroupAssociateTable";
 import MassMessageModal from "@/components/groups/MassMessageModal";
 import IndividualMessageModal from "@/components/groups/IndividualMessageModal";
@@ -310,9 +309,6 @@ export default function GroupPage({ params }: GroupPageProps) {
           onMassMessage={handleMassMessage}
           loadingAssociates={loadingAssociates}
         />
-
-        {/* Quick Add Form */}
-        <QuickAddForm groupId={groupId} onAddAssociate={handleSaveAssociate} />
 
         {/* Associates Table */}
         <GroupAssociateTable
