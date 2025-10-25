@@ -4,7 +4,8 @@
 # This script mimics the GitHub workflow but targets localhost
 
 # Configuration
-LOCAL_URL="http://localhost:3000"
+# LOCAL_URL="http://localhost:3000"
+LOCAL_URL="https://staff-better.vercel.app"
 
 # Load environment variables from .env file if it exists
 if [ -f .env ]; then
