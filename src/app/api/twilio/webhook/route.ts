@@ -4,40 +4,71 @@ import { NextRequest, NextResponse } from "next/server";
 const messageService = serviceContainer.getIncomingMessageService();
 
 export async function POST(request: NextRequest) {
+  console.log("=== WEBHOOK HIT ===");
+  console.log("Timestamp:", new Date().toISOString());
+  console.log("Request URL:", request.url);
+  console.log("Request method:", request.method);
+
+  // Simple test - if no data, return success to avoid 400 errors
+  const url = new URL(request.url);
+  if (url.searchParams.get("test") === "true") {
+    console.log("Test webhook hit - returning success");
+    return new NextResponse(
+      '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
+      {
+        status: 200,
+        headers: { "Content-Type": "text/xml" },
+      }
+    );
+  }
+
   try {
-    const body = await request.formData();
-    const fromNumber = body.get("From") as string;
-    const messageBody = body.get("Body") as string;
+    // Debug: Log request headers and content type
+    console.log(
+      "Request headers:",
+      Object.fromEntries(request.headers.entries())
+    );
+    console.log("Content-Type:", request.headers.get("content-type"));
 
-    // Try alternative field names if the standard ones are missing
-    const altFromNumber =
-      fromNumber ||
-      (body.get("from") as string) ||
-      (body.get("FROM") as string);
-    const altMessageBody =
-      messageBody ||
-      (body.get("body") as string) ||
-      (body.get("BODY") as string);
+    let fromNumber: string | null = null;
+    let messageBody: string | null = null;
 
-    // Debug: Log all form data keys and values
-    console.log("All form data keys:", Array.from(body.keys()));
-    console.log("All form data entries:", Array.from(body.entries()));
-    console.log("Received Twilio webhook:", {
-      from: fromNumber,
-      body: messageBody,
-      timestamp: new Date().toISOString(),
-    });
+    const contentType = request.headers.get("content-type");
 
-    // Use alternative field names if standard ones are missing
-    const finalFromNumber = fromNumber || altFromNumber;
-    const finalMessageBody = messageBody || altMessageBody;
+    if (contentType?.includes("application/x-www-form-urlencoded")) {
+      // Handle form data
+      const body = await request.formData();
+      fromNumber = body.get("From") as string;
+      messageBody = body.get("Body") as string;
 
-    if (!finalFromNumber || !finalMessageBody) {
+      console.log("Form data keys:", Array.from(body.keys()));
+      console.log("Form data entries:", Array.from(body.entries()));
+    } else if (contentType?.includes("application/json")) {
+      // Handle JSON data
+      const body = await request.json();
+      fromNumber = body.From || body.from;
+      messageBody = body.Body || body.body;
+
+      console.log("JSON data:", body);
+    } else {
+      // Try to parse as form data anyway
+      try {
+        const body = await request.formData();
+        fromNumber = body.get("From") as string;
+        messageBody = body.get("Body") as string;
+        console.log("Fallback form data keys:", Array.from(body.keys()));
+      } catch (error) {
+        console.error("Failed to parse form data:", error);
+      }
+    }
+
+    console.log("Parsed values:", { fromNumber, messageBody });
+
+    if (!fromNumber || !messageBody) {
       console.error("Missing required fields:", {
-        fromNumber: finalFromNumber,
-        messageBody: finalMessageBody,
-        allKeys: Array.from(body.keys()),
-        allEntries: Array.from(body.entries()),
+        fromNumber: fromNumber,
+        messageBody: messageBody,
+        contentType: contentType,
       });
       return new NextResponse(
         '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
@@ -49,8 +80,8 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await messageService.processIncomingMessage(
-      finalFromNumber,
-      finalMessageBody
+      fromNumber,
+      messageBody
     );
 
     console.log("Message processing result:", result);
