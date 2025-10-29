@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Associate } from "@/model/interfaces/Associate";
 import AssociateActions from "./AssociateActions";
 import { formatPhoneForDisplay } from "@/utils/phoneUtils";
@@ -45,6 +45,20 @@ export default function JobAssociateTableRow({
     job_work_date: data.job_work_date || "",
     job_start_time: data.job_start_time || "", // local time for display
   });
+
+  // Update editData when data prop changes
+  useEffect(() => {
+    setEditData({
+      first_name: data.first_name || "",
+      last_name: data.last_name || "",
+      num_reminders: (data.num_reminders || 0).toString(),
+      phone_number: data.phone_number || "",
+      email_address: data.email_address || "",
+      confirmation_status: data.confirmation_status || "UNCONFIRMED",
+      job_work_date: data.job_work_date || "",
+      job_start_time: data.job_start_time || "",
+    });
+  }, [data]);
 
   const handleEdit = () => {
     setInternalIsEditing(true);

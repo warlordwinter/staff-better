@@ -271,7 +271,16 @@ export class GroupsDataService {
     }
 
     if (!response.ok) {
-      throw new Error("Failed to update associate");
+      const errorText = await response.text();
+      console.error(
+        "Failed to update associate. Status:",
+        response.status,
+        "Error:",
+        errorText
+      );
+      throw new Error(
+        `Failed to update associate: ${response.status} - ${errorText}`
+      );
     }
 
     const associate = await response.json();

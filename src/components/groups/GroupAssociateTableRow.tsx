@@ -41,6 +41,8 @@ export default function GroupAssociateTableRow({
       associate.groupId,
       associate.id
     );
+    // Preserve the isNew flag from the original associate
+    updatedAssociate.isNew = associate.isNew;
     onSave(updatedAssociate);
     setIsEditing(false);
   };
