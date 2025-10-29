@@ -15,7 +15,33 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const updates = await request.json();
 
     const updatedAssociate = await associatesDao.updateAssociate(id, updates);
-    return NextResponse.json(updatedAssociate[0]);
+
+    // Check if we got valid data back
+    if (
+      !updatedAssociate ||
+      !Array.isArray(updatedAssociate) ||
+      updatedAssociate.length === 0
+    ) {
+      console.error(
+        "No associate data returned from updateAssociate:",
+        updatedAssociate
+      );
+      return NextResponse.json(
+        { error: "No associate data returned after update" },
+        { status: 500 }
+      );
+    }
+
+    // Ensure we only return the fields that are JSON serializable
+    const safeAssociate = {
+      id: updatedAssociate[0].id,
+      first_name: updatedAssociate[0].first_name,
+      last_name: updatedAssociate[0].last_name,
+      phone_number: updatedAssociate[0].phone_number,
+      email_address: updatedAssociate[0].email_address,
+    };
+
+    return NextResponse.json(safeAssociate);
   } catch (error) {
     console.error("Failed to update associate:", error);
     return NextResponse.json(
