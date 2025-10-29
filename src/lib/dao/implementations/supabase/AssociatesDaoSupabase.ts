@@ -115,7 +115,7 @@ export class AssociatesDaoSupabase implements IAssociates {
     console.log("🔍 [DEBUG] updateAssociate - Updating associate with ID:", id);
 
     // First check if the associate exists
-    const { data: existingAssociate, error: checkError } = await supabase
+    const { error: checkError } = await supabase
       .from("associates")
       .select("id")
       .eq("id", id)
