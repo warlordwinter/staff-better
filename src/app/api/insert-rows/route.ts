@@ -3,6 +3,7 @@ import { AssociatesDaoSupabase } from "@/lib/dao/implementations/supabase/Associ
 import { JobsDaoSupabase } from "@/lib/dao/implementations/supabase/JobsDaoSupabase";
 import { JobsAssignmentsDaoSupabase } from "@/lib/dao/implementations/supabase/JobsAssignmentsDaoSupabase";
 import { formatPhoneToE164 } from "@/utils/phoneUtils";
+import { getCompanyId } from "@/lib/auth/getCompanyId";
 import { Associate } from "@/model/interfaces/Associate";
 import { Job } from "@/model/interfaces/Job";
 import { JobAssignment } from "@/model/interfaces/JobAssignment";
@@ -16,6 +17,15 @@ export async function POST(req: NextRequest) {
   const rows = body.rows;
 
   try {
+    // Get the company ID for the authenticated user
+    const companyId = await getCompanyId();
+    if (!companyId) {
+      return NextResponse.json(
+        { error: "Company not found for authenticated user" },
+        { status: 401 }
+      );
+    }
+
     // Prepare associate data for insertion with phone formatting
     const associateData = rows.map((r: Associate) => {
       let formattedPhone = r.phone_number;
@@ -44,6 +54,7 @@ export async function POST(req: NextRequest) {
 
     // Prepare job data for insertion
     const jobData = rows.map((r: Job) => ({
+      company_id: companyId,
       job_title: r.job_title,
       customer_name: r.customer_name,
       job_status: "UPCOMING", // or map accordingly if the status needs transformation
