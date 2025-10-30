@@ -34,6 +34,7 @@ export default function JobAssociateTableRow({
   const [internalIsEditing, setInternalIsEditing] = useState(false);
   const isEditing = externalIsEditing || internalIsEditing;
   const [phoneError, setPhoneError] = useState("");
+  const [timeError, setTimeError] = useState("");
 
   const [editData, setEditData] = useState({
     first_name: data.first_name || "",
@@ -123,8 +124,27 @@ export default function JobAssociateTableRow({
     setPhoneError("");
   };
 
+  const isWithinAllowedHours = (hhmm: string): boolean => {
+    const m = hhmm.match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return false;
+    const h = parseInt(m[1], 10);
+    const min = 8;
+    const max = 23;
+    return h >= min && h <= max;
+  };
+
   const handleInputChange = (field: string, value: string) => {
     setEditData((prev) => ({ ...prev, [field]: value }));
+
+    if (field === "job_start_time" || field === "start_time") {
+      if (!value) {
+        setTimeError("");
+      } else if (!isWithinAllowedHours(value)) {
+        setTimeError("Start time must be between 08:00 and 23:00");
+      } else {
+        setTimeError("");
+      }
+    }
 
     if (field === "phone_number") {
       if (value.trim() === "") {
@@ -257,6 +277,8 @@ export default function JobAssociateTableRow({
                   ? editData.job_start_time
                   : new Date().toISOString().split("T")[0]
               }
+              min="08:00"
+              max="23:00"
               onChange={(e) =>
                 handleInputChange(
                   showJobAssignmentColumns ? "job_start_time" : "start_time",
@@ -265,6 +287,9 @@ export default function JobAssociateTableRow({
               }
               className="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-blue-500"
             />
+            {timeError && (
+              <div className="text-[10px] text-red-500 mt-1">{timeError}</div>
+            )}
           </div>
         ) : (
           displayTime(
@@ -349,9 +374,9 @@ export default function JobAssociateTableRow({
           <div className="flex gap-1">
             <button
               onClick={handleSave}
-              disabled={!!phoneError}
+              disabled={!!phoneError || !!timeError}
               className={`px-2 py-1 text-xs text-white rounded focus:outline-none ${
-                phoneError
+                phoneError || timeError
                   ? "bg-gray-400 cursor-not-allowed"
                   : "bg-green-500 hover:bg-green-600"
               }`}

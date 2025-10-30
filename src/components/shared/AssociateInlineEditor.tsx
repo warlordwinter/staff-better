@@ -123,6 +123,8 @@ export default function AssociateInlineEditor({
           <input
             type="time"
             value={new Date().toISOString().split("T")[1].substring(0, 5)}
+            min="08:00"
+            max="23:00"
             className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
           />
         </>

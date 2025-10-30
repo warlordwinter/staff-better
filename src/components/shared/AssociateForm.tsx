@@ -234,6 +234,8 @@ export default function AssociateForm({
                 type="time"
                 placeholder="Start Time *"
                 value={new Date().toISOString().split("T")[1].substring(0, 5)}
+                min="08:00"
+                max="23:00"
                 className={`px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300`}
               />
             </div>
