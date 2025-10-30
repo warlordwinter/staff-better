@@ -91,7 +91,12 @@ export default function GroupPage({ params }: GroupPageProps) {
           groupId: updatedAssociate.groupId,
         });
 
-        setAssociates((prevAssociates) => [newAssociate, ...prevAssociates]);
+        // Replace the temporary draft row with the saved associate
+        setAssociates((prevAssociates) =>
+          prevAssociates.map((a) =>
+            a.id === updatedAssociate.id ? newAssociate : a
+          )
+        );
       } else {
         // Update existing associate
         const savedAssociate = await GroupsDataService.updateAssociate(

@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       associates: {
         Row: {
+          company_id: string | null
           email_address: string | null
           first_name: string | null
           id: string
@@ -24,6 +25,7 @@ export type Database = {
           sms_opt_out: boolean | null
         }
         Insert: {
+          company_id?: string | null
           email_address?: string | null
           first_name?: string | null
           id?: string
@@ -32,6 +34,7 @@ export type Database = {
           sms_opt_out?: boolean | null
         }
         Update: {
+          company_id?: string | null
           email_address?: string | null
           first_name?: string | null
           id?: string
@@ -39,7 +42,15 @@ export type Database = {
           phone_number?: string
           sms_opt_out?: boolean | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "associates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       companies: {
         Row: {
@@ -237,12 +248,44 @@ export type Database = {
           },
         ]
       }
+      user_profiles: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_user_profiles_company_id"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_company_id: { Args: never; Returns: string }
     }
     Enums: {
       confirmation_status_enum:
