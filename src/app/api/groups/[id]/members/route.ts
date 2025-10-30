@@ -126,9 +126,13 @@ export async function DELETE(
       );
     }
 
-    // Verify the group belongs to the company
-    const group = await groupsDao.getGroupById(groupId, companyId);
-    if (!group) {
+    // Verify the group belongs to the company; treat lookup errors as not found
+    try {
+      const group = await groupsDao.getGroupById(groupId, companyId);
+      if (!group) {
+        return NextResponse.json({ error: "Group not found" }, { status: 404 });
+      }
+    } catch {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
 

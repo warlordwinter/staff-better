@@ -43,6 +43,8 @@ export default function GroupPage({ params }: GroupPageProps) {
     []
   );
   const [loadingAssociates, setLoadingAssociates] = useState(false);
+  const [sendSuccess, setSendSuccess] = useState(false);
+  const [sendLoading, setSendLoading] = useState(false);
 
   // Load group and associates data using the data service
   useEffect(() => {
@@ -120,14 +122,17 @@ export default function GroupPage({ params }: GroupPageProps) {
   const handleDeleteAssociate = async (associateId: string) => {
     if (window.confirm("Are you sure you want to delete this associate?")) {
       try {
-        const success = await GroupsDataService.deleteAssociate(associateId);
+        const success = await GroupsDataService.removeAssociateFromGroup(
+          groupId,
+          associateId
+        );
         if (success) {
           setAssociates((prevAssociates) =>
             prevAssociates.filter((associate) => associate.id !== associateId)
           );
         }
       } catch (error) {
-        console.error("Error deleting associate:", error);
+        console.error("Error removing associate from group:", error);
         // Handle error appropriately in your app
       }
     }
@@ -226,6 +231,7 @@ export default function GroupPage({ params }: GroupPageProps) {
     if (!messageText.trim()) return;
 
     try {
+      setSendLoading(true);
       if (selectedAssociate) {
         // Send individual message
         await GroupsDataService.sendMessageToAssociate(
@@ -237,13 +243,19 @@ export default function GroupPage({ params }: GroupPageProps) {
         await GroupsDataService.sendMassMessageToGroup(groupId, messageText);
       }
 
-      // Reset state
-      setMessageText("");
-      setShowMassMessageModal(false);
-      setShowIndividualMessageModal(false);
-      setSelectedAssociate(null);
+      // Show success check briefly, then close/reset
+      setSendSuccess(true);
+      setSendLoading(false);
+      setTimeout(() => {
+        setSendSuccess(false);
+        setMessageText("");
+        setShowMassMessageModal(false);
+        setShowIndividualMessageModal(false);
+        setSelectedAssociate(null);
+      }, 1000);
     } catch (error) {
       console.error("Error sending message:", error);
+      setSendLoading(false);
       // Handle error appropriately in your app
     }
   };
@@ -330,6 +342,8 @@ export default function GroupPage({ params }: GroupPageProps) {
         messageText={messageText}
         onMessageTextChange={setMessageText}
         onSend={handleSendMessage}
+        sendLoading={sendLoading}
+        sendSuccess={sendSuccess}
         onCancel={handleCancelMessage}
       />
 
@@ -339,6 +353,8 @@ export default function GroupPage({ params }: GroupPageProps) {
         messageText={messageText}
         onMessageTextChange={setMessageText}
         onSend={handleSendMessage}
+        sendLoading={sendLoading}
+        sendSuccess={sendSuccess}
         onCancel={handleCancelMessage}
       />
 
