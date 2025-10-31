@@ -260,7 +260,7 @@ export default function MessagesPage() {
                   </div>
 
                   {/* Content */}
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 text-left">
                     <div className="flex items-center justify-between mb-1">
                       <h3 className="text-sm font-semibold text-black truncate">
                         {conversation.name}
@@ -274,7 +274,7 @@ export default function MessagesPage() {
                         </span>
                       </div>
                     </div>
-                    <p className="text-sm text-gray-600 truncate">
+                    <p className="text-sm text-gray-600 truncate text-left">
                       {conversation.lastMessage}
                     </p>
                   </div>

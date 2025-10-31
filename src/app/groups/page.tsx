@@ -272,13 +272,18 @@ export default function GroupsPage() {
             const iconColor = getGroupIconColor(index);
 
             return (
-              <div
+              <Link
                 key={group.id}
-                className="relative bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow h-full flex flex-col"
+                href={`/groups/${group.id}`}
+                className="relative bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow h-full flex flex-col cursor-pointer"
               >
                 {/* Delete Button */}
                 <button
-                  onClick={(e) => handleDeleteGroup(group.id, e)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleDeleteGroup(group.id, e);
+                  }}
                   className="absolute top-4 right-4 p-1.5 text-gray-400 hover:text-red-500 transition-colors z-10"
                   title="Delete group"
                 >
@@ -303,11 +308,9 @@ export default function GroupsPage() {
                     <GroupIcon color={iconColor} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <Link href={`/groups/${group.id}`}>
-                      <h3 className="text-xl font-bold text-black mb-1 hover:text-[#FE6F00] transition-colors cursor-pointer">
-                        {group.group_name}
-                      </h3>
-                    </Link>
+                    <h3 className="text-xl font-bold text-black mb-1 hover:text-[#FE6F00] transition-colors">
+                      {group.group_name}
+                    </h3>
                     {group.description && (
                       <p className="text-sm text-gray-600 mb-2">
                         {group.description}
@@ -344,13 +347,10 @@ export default function GroupsPage() {
                         ))}
                       </div>
                       {remainingMembers > 0 && (
-                      <Link
-                        href={`/groups/${group.id}`}
-                        className="text-sm text-[#FE6F00] hover:underline"
-                      >
+                      <span className="text-sm text-[#FE6F00] hover:underline">
                           +{remainingMembers} more{" "}
                           {remainingMembers === 1 ? "member" : "members"}
-                        </Link>
+                        </span>
                       )}
                     </>
                   ) : (
@@ -362,9 +362,13 @@ export default function GroupsPage() {
                 <div className="border-t border-gray-200 my-4"></div>
 
                 {/* Action Buttons */}
-                <div className="flex gap-3 mt-auto">
-                  <Link
-                    href={`/groups/${group.id}`}
+                <div className="flex gap-3 mt-auto" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      window.location.href = `/groups/${group.id}`;
+                    }}
                     className="flex-1 px-4 py-2 border border-[#FE6F00] rounded-lg text-[#FE6F00] font-medium text-center hover:bg-orange-50 transition-colors inline-flex items-center justify-center gap-2"
                   >
                     <svg
@@ -381,9 +385,13 @@ export default function GroupsPage() {
                       />
                     </svg>
                     Add Member
-                  </Link>
-                  <Link
-                    href={`/groups/${group.id}`}
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      window.location.href = `/groups/${group.id}`;
+                    }}
                     className="flex-1 px-4 py-2 bg-gradient-to-r from-[#FFBB87] to-[#FE6F00] text-white rounded-lg font-medium text-center hover:opacity-90 transition-opacity inline-flex items-center justify-center gap-2 shadow-sm"
                   >
                     <svg
@@ -400,9 +408,9 @@ export default function GroupsPage() {
                       />
                     </svg>
                     Message Group
-                  </Link>
+                  </button>
                 </div>
-              </div>
+              </Link>
             );
           })}
         </div>

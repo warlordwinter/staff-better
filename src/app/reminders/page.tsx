@@ -473,9 +473,10 @@ export default function RemindersPage() {
               : "Date TBD";
 
             return (
-              <div
+              <Link
                 key={job.id}
-                className="relative bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col"
+                href={`/reminders/${job.id}/associates`}
+                className="relative bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col cursor-pointer"
               >
                 {/* Status Badge */}
                 <div className="absolute top-4 right-4">
@@ -538,9 +539,12 @@ export default function RemindersPage() {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex items-center gap-3 mt-auto">
-                  <Link
-                    href={`/jobs/${job.id}/associates`}
+                <div className="flex items-center gap-3 mt-auto" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      window.location.href = `/reminders/${job.id}/associates`;
+                    }}
                     className="flex-1 px-4 py-2 bg-gradient-to-r from-[#FFBB87] to-[#FE6F00] text-white rounded-lg font-medium text-center hover:opacity-90 transition-opacity inline-flex items-center justify-center gap-2 shadow-sm"
                   >
                     <svg
@@ -557,28 +561,11 @@ export default function RemindersPage() {
                       />
                     </svg>
                     Add Associates
-                  </Link>
-                  <Link
-                    href={`/jobs/${job.id}`}
-                    className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                    title="Edit reminder"
-                  >
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                      />
-                    </svg>
-                  </Link>
+                  </button>
                   <button
-                    onClick={async () => {
+                    onClick={async (e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
                       if (
                         window.confirm(
                           "Are you sure you want to delete this reminder?"
@@ -616,7 +603,7 @@ export default function RemindersPage() {
                     </svg>
                   </button>
                 </div>
-              </div>
+              </Link>
             );
           })}
         </div>
