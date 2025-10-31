@@ -111,7 +111,13 @@ export class AssociatesDaoSupabase implements IAssociates {
       }
     }
 
+    // Check if we have any updates after cleaning
+    if (Object.keys(cleanedUpdates).length === 0) {
+      throw new Error("No valid fields to update (all values were empty)");
+    }
+
     console.log("Cleaned Updates:", cleanedUpdates);
+    console.log("Updating associate ID:", id);
 
     const { data, error } = await supabase
       .from("associates")
@@ -121,7 +127,14 @@ export class AssociatesDaoSupabase implements IAssociates {
 
     if (error) {
       console.error("Supabase update error:", error);
-      throw new Error("Failed to update associate");
+      const errorMessage =
+        error.message || "Failed to update associate in database";
+      throw new Error(errorMessage);
+    }
+
+    // Check if any rows were actually updated
+    if (!data || data.length === 0) {
+      throw new Error(`Associate with ID ${id} not found`);
     }
 
     return data;

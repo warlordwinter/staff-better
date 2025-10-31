@@ -271,7 +271,54 @@ export class GroupsDataService {
     }
 
     if (!response.ok) {
-      throw new Error("Failed to update associate");
+      let errorMessage = `Failed to update associate (Status: ${response.status})`;
+      try {
+        const errorText = await response.text();
+        console.error("Failed to update associate - Status:", response.status);
+        console.error("Failed to update associate - Response text:", errorText);
+
+        if (errorText && errorText.trim()) {
+          try {
+            const errorData = JSON.parse(errorText);
+            if (errorData.error && typeof errorData.error === "string") {
+              errorMessage = errorData.error;
+            } else if (typeof errorData === "string") {
+              errorMessage = errorData;
+            } else if (
+              errorData &&
+              typeof errorData === "object" &&
+              Object.keys(errorData).length > 0
+            ) {
+              // Safely stringify the error object
+              try {
+                errorMessage = `${errorMessage} - ${JSON.stringify(errorData)}`;
+              } catch {
+                errorMessage = `${errorMessage} - ${String(errorData)}`;
+              }
+            }
+          } catch {
+            // If not JSON, use the text directly (but ensure it's a valid string)
+            if (typeof errorText === "string") {
+              errorMessage = errorText.trim() || errorMessage;
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Failed to read error response:", e);
+        // Ensure errorMessage is still a valid string
+        if (typeof e === "string") {
+          errorMessage = e;
+        } else if (e instanceof Error) {
+          errorMessage = e.message;
+        }
+      }
+
+      // Ensure we're throwing a clean Error with a string message
+      const finalErrorMessage =
+        typeof errorMessage === "string"
+          ? errorMessage
+          : "Failed to update associate";
+      throw new Error(finalErrorMessage);
     }
 
     const associate = await response.json();
