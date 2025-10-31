@@ -63,6 +63,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Attempt to create a user profile linked to this company.
+    // If one already exists (unique constraint), just log and continue.
+    const { error: profileError } = await supabase
+      .from("user_profiles")
+      .insert({
+        user_id: user.id,
+        company_id: company.id,
+      });
+
+    if (profileError) {
+      console.log("user_profiles insert skipped:", profileError);
+    }
+
     return NextResponse.json(
       { success: true, companyId: company.id },
       { status: 201 }

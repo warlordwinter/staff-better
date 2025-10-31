@@ -3,6 +3,27 @@ import { ConfirmationStatus } from "@/model/enums/ConfirmationStatus";
 import { IJobAssignments } from "../../interfaces/IJobAssignments";
 
 export class JobsAssignmentsDaoSupabase implements IJobAssignments {
+  private extractHour(value: string | null): number | null {
+    if (!value) return null;
+    // Case 1: HH:mm
+    const hhmm = value.match(/^(\d{1,2}):(\d{2})/);
+    if (hhmm) {
+      const h = parseInt(hhmm[1], 10);
+      return isNaN(h) ? null : h;
+    }
+    // Case 2: ISO or date-like
+    const d = new Date(value);
+    if (!isNaN(d.getTime())) {
+      return d.getHours();
+    }
+    return null;
+  }
+
+  private isWithinAllowedHours(value: string | null): boolean {
+    const hour = this.extractHour(value);
+    if (hour === null) return false;
+    return hour >= 8 && hour <= 23;
+  }
   async insertJobsAssignments(
     jobsAssignments: {
       job_id: string;
@@ -35,6 +56,13 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
           );
           return false; // Skip this assignment
         }
+        // Validate allowed time window 08:00-23:00 if present
+        if (!this.isWithinAllowedHours(assignment.start_time)) {
+          console.warn(
+            `start_time must be between 08:00 and 23:00 - skipping assignment (start_time=${assignment.start_time})`
+          );
+          return false;
+        }
         return true;
       })
       .map((assignment) => {
@@ -63,6 +91,13 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
             } else {
               formattedStartTime = date.toISOString();
             }
+          }
+          // Final allowed-hours check after formatting
+          if (!this.isWithinAllowedHours(formattedStartTime)) {
+            console.warn(
+              `start_time must be between 08:00 and 23:00 - setting to null (start_time=${formattedStartTime})`
+            );
+            formattedStartTime = null;
           }
         }
 
@@ -219,6 +254,13 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
       }
     }
 
+    // Enforce allowed hours
+    if (!this.isWithinAllowedHours(formattedStartTime)) {
+      throw new Error(
+        `start_time must be between 08:00 and 23:00 (got ${formattedStartTime})`
+      );
+    }
+
     // Validate and format the work_date field
     let formattedWorkDate = assignmentData.work_date;
     if (formattedWorkDate && formattedWorkDate.trim()) {
@@ -345,6 +387,12 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
             // Assign the formatted time back to cleanedUpdates
             cleanedUpdates.start_time = formattedStartTime;
           }
+        }
+        // Enforce allowed hours on update
+        if (!this.isWithinAllowedHours(cleanedUpdates.start_time as string)) {
+          throw new Error(
+            `start_time must be between 08:00 and 23:00 (got ${cleanedUpdates.start_time})`
+          );
         }
       }
     }

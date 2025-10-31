@@ -10,6 +10,8 @@ interface IndividualMessageModalProps {
   onMessageTextChange: (text: string) => void;
   onSend: () => void;
   onCancel: () => void;
+  sendLoading?: boolean;
+  sendSuccess?: boolean;
 }
 
 export default function IndividualMessageModal({
@@ -19,6 +21,8 @@ export default function IndividualMessageModal({
   onMessageTextChange,
   onSend,
   onCancel,
+  sendLoading = false,
+  sendSuccess = false,
 }: IndividualMessageModalProps) {
   if (!isOpen || !associate) return null;
 
@@ -30,13 +34,47 @@ export default function IndividualMessageModal({
         </h2>
         <p className="text-sm text-gray-600 mb-4">What do you want to say?</p>
 
-        <textarea
-          value={messageText}
-          onChange={(e) => onMessageTextChange(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 h-24 resize-none"
-          placeholder="Enter your message here..."
-          autoFocus
-        />
+        <div className="relative">
+          <textarea
+            value={messageText}
+            onChange={(e) => onMessageTextChange(e.target.value)}
+            disabled={sendSuccess || sendLoading}
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none h-24 resize-none ${
+              sendSuccess
+                ? "border-green-500 ring-2 ring-green-500"
+                : sendLoading
+                ? "border-blue-500 ring-2 ring-blue-500"
+                : "border-gray-300 focus:ring-2 focus:ring-blue-500"
+            }`}
+            placeholder="Enter your message here..."
+            autoFocus
+          />
+          {sendLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-white/60">
+              <div className="w-8 h-8 rounded-full border-2 border-blue-600 border-t-transparent animate-spin" />
+            </div>
+          )}
+          {sendSuccess && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="flex items-center gap-2 text-green-600 bg-green-50 px-3 py-2 rounded-md shadow-sm">
+                <svg
+                  className="w-5 h-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+                <span className="text-sm font-medium">Sent</span>
+              </div>
+            </div>
+          )}
+        </div>
 
         <div className="flex justify-end gap-3 mt-6">
           <button
@@ -47,10 +85,10 @@ export default function IndividualMessageModal({
           </button>
           <button
             onClick={onSend}
-            disabled={!messageText.trim()}
+            disabled={sendLoading || sendSuccess || !messageText.trim()}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            Send Message
+            {sendLoading ? "Sending..." : "Send Message"}
           </button>
         </div>
       </div>

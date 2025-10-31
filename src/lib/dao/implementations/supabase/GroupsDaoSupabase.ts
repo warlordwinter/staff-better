@@ -184,6 +184,9 @@ export class GroupsDaoSupabase implements IGroups {
    * Get all members of a group
    */
   async getGroupMembers(groupId: string, companyId: string) {
+    console.log(
+      `🔍 [DEBUG] getGroupMembers called for groupId: ${groupId}, companyId: ${companyId}`
+    );
     const supabase = await createClient();
 
     // First verify the group belongs to the company
@@ -195,8 +198,14 @@ export class GroupsDaoSupabase implements IGroups {
       .single();
 
     if (groupError || !group) {
+      console.log(
+        `🔍 [DEBUG] Group not found or access denied. Error:`,
+        groupError
+      );
       throw new Error("Group not found or access denied");
     }
+
+    console.log(`🔍 [DEBUG] Group found:`, group);
 
     // Get member IDs first from the correct table
     const { data: groupMembers, error: membersError } = await supabase
@@ -209,13 +218,23 @@ export class GroupsDaoSupabase implements IGroups {
       throw new Error("Failed to fetch group members");
     }
 
+    console.log(
+      `🔍 [DEBUG] Group members from group_associates table:`,
+      groupMembers
+    );
+
     // If no members, return empty array
     if (!groupMembers || groupMembers.length === 0) {
+      console.log(
+        `🔍 [DEBUG] No members found in group_associates table for group ${groupId}`
+      );
       return [];
     }
 
     // Get associate details for all members
     const associateIds = groupMembers.map((m) => m.associate_id);
+    console.log(`🔍 [DEBUG] Associate IDs to fetch:`, associateIds);
+
     const { data: associates, error: associatesError } = await supabase
       .from("associates")
       .select(
@@ -228,8 +247,10 @@ export class GroupsDaoSupabase implements IGroups {
       throw new Error("Failed to fetch associate details");
     }
 
+    console.log(`🔍 [DEBUG] Associates fetched from database:`, associates);
+
     // Map to the expected format
-    return (associates || []).map((associate) => ({
+    const result = (associates || []).map((associate) => ({
       id: associate.id,
       first_name: associate.first_name,
       last_name: associate.last_name,
@@ -237,6 +258,9 @@ export class GroupsDaoSupabase implements IGroups {
       email_address: associate.email_address,
       sms_opt_out: associate.sms_opt_out,
     }));
+
+    console.log(`🔍 [DEBUG] Final result mapped:`, result);
+    return result;
   }
 
   /**

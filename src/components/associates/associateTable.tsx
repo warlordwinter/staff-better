@@ -240,16 +240,17 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
           }
         : { ...associate, ...updatedData };
 
-      setAssociatesData((prev) =>
-        prev.map((a, i) => (i === index ? finalData : a))
-      );
-
-      // Remove from newly added list and add the real ID
+      // Remove from newly added list first (associate is no longer being edited)
       setNewlyAddedIds((prev) => {
         const newSet = new Set(prev);
         newSet.delete(associate.id); // Remove temp ID
         return newSet;
       });
+
+      // Then update the associates data
+      setAssociatesData((prev) =>
+        prev.map((a, i) => (i === index ? finalData : a))
+      );
 
       console.log("Saved data at index", index, ":", updatedData);
     } catch (error) {

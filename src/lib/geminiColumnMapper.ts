@@ -1,7 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 
 export async function mapColumnsWithGemini(headers: string[]) {
-
   const prompt = `
         
 You are an assistant that helps match spreadsheet columns to a staffing agency database.

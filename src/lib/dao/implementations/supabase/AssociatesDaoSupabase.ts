@@ -117,7 +117,26 @@ export class AssociatesDaoSupabase implements IAssociates {
     }
 
     console.log("Cleaned Updates:", cleanedUpdates);
-    console.log("Updating associate ID:", id);
+    console.log("🔍 [DEBUG] updateAssociate - Updating associate with ID:", id);
+
+    // First check if the associate exists
+    const { error: checkError } = await supabase
+      .from("associates")
+      .select("id")
+      .eq("id", id)
+      .single();
+
+    if (checkError) {
+      console.error(
+        "🔍 [DEBUG] Associate not found with ID:",
+        id,
+        "Error:",
+        checkError
+      );
+      throw new Error("Associate not found");
+    }
+
+    console.log("🔍 [DEBUG] Associate found, proceeding with update");
 
     const { data, error } = await supabase
       .from("associates")
@@ -127,15 +146,16 @@ export class AssociatesDaoSupabase implements IAssociates {
 
     if (error) {
       console.error("Supabase update error:", error);
-      const errorMessage =
-        error.message || "Failed to update associate in database";
-      throw new Error(errorMessage);
+      throw new Error("Failed to update associate");
     }
 
-    // Check if any rows were actually updated
-    if (!data || data.length === 0) {
-      throw new Error(`Associate with ID ${id} not found`);
-    }
+    console.log("🔍 [DEBUG] updateAssociate - Supabase returned data:", data);
+    console.log(
+      "🔍 [DEBUG] updateAssociate - Data type:",
+      typeof data,
+      "Is array:",
+      Array.isArray(data)
+    );
 
     return data;
   }
