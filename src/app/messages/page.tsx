@@ -233,16 +233,16 @@ export default function MessagesPage() {
   return (
     <div className="min-h-screen flex flex-col bg-white">
       <Navbar />
-      <main className="flex-1 flex h-[calc(100vh-64px)] mt-16">
+      <main className="flex-1 flex h-[calc(100vh-64px)]">
         {/* Left Pane - Conversation List */}
-        <div className="w-80 border-r border-gray-200 flex flex-col bg-white">
+        <div className="w-80 border-r border-gray-200 flex flex-col bg-white h-full">
           {/* Messages Header */}
-          <div className="p-6 border-b border-gray-200">
+          <div className="p-6 border-b border-gray-200 flex-shrink-0">
             <h1 className="text-3xl font-bold text-black">Messages</h1>
           </div>
 
           {/* Conversation List */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto min-h-0">
             {conversations.map((conversation) => (
               <button
                 key={conversation.id}
@@ -350,24 +350,6 @@ export default function MessagesPage() {
                         strokeLinejoin="round"
                         strokeWidth={2}
                         d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                      />
-                    </svg>
-                  </button>
-                  <button
-                    className="w-12 h-12 rounded-full bg-gray-300 text-white flex items-center justify-center hover:bg-gray-400 transition-colors"
-                    title="Help"
-                  >
-                    <svg
-                      className="w-6 h-6"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                       />
                     </svg>
                   </button>
