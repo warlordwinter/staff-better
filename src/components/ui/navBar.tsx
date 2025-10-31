@@ -72,14 +72,24 @@ const Navbar = () => {
           {isLoggedIn ? (
             <>
               <Link 
-                href="/jobs" 
+                href="/reminders" 
                 className={`text-white text-lg font-medium transition-colors ${
-                  isActiveLink('/jobs') 
+                  isActiveLink('/reminders') || isActiveLink('/jobs')
                     ? 'text-white font-semibold' 
                     : 'hover:underline hover:text-gray-200'
                 }`}
               >
-                Jobs
+                Reminders
+              </Link>
+              <Link 
+                href="/messages" 
+                className={`text-white text-lg font-medium transition-colors px-3 py-1 rounded ${
+                  isActiveLink('/messages')
+                    ? 'bg-gradient-to-r from-[#FFBB87] to-[#FE6F00] text-white font-semibold' 
+                    : 'hover:underline hover:text-gray-200'
+                }`}
+              >
+                Messages
               </Link>
               <Link 
                 href="/groups" 
@@ -156,14 +166,24 @@ const Navbar = () => {
           {isLoggedIn ? (
             <>
               <Link 
-                href="/jobs" 
+                href="/reminders" 
                 className={`text-white text-lg font-medium transition-colors ${
-                  isActiveLink('/jobs') 
+                  isActiveLink('/reminders') || isActiveLink('/jobs')
                     ? 'text-white font-semibold' 
                     : 'hover:underline hover:text-gray-200'
                 }`}
               >
-                Jobs
+                Reminders
+              </Link>
+              <Link 
+                href="/messages" 
+                className={`text-white text-lg font-medium transition-colors px-3 py-1 rounded ${
+                  isActiveLink('/messages')
+                    ? 'bg-gradient-to-r from-[#FFBB87] to-[#FE6F00] text-white font-semibold' 
+                    : 'hover:underline hover:text-gray-200'
+                }`}
+              >
+                Messages
               </Link>
               <Link 
                 href="/groups" 
