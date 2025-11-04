@@ -287,29 +287,28 @@ export default function MessagesPage() {
                       {conversation.initials}
                     </div>
 
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className="text-sm font-semibold text-black truncate">
-                          {conversation.name}
-                        </h3>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          {conversation.unread && (
-                            <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                          )}
-                          <span className="text-xs text-gray-500">
-                            {conversation.timestamp}
-                          </span>
-                        </div>
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <h3 className="text-sm font-semibold text-black truncate">
+                        {conversation.name}
+                      </h3>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {conversation.unread && (
+                          <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                        )}
+                        <span className="text-xs text-gray-500">
+                          {conversation.timestamp}
+                        </span>
                       </div>
-                      <p className="text-sm text-gray-600 truncate">
-                        {conversation.lastMessage}
-                      </p>
                     </div>
+                    <p className="text-sm text-gray-600 truncate">
+                      {conversation.lastMessage}
+                    </p>
                   </div>
-                </button>
-              ))
-            )}
+                </div>
+              </button>
+            ))}
           </div>
         </div>
 
