@@ -287,28 +287,29 @@ export default function MessagesPage() {
                       {conversation.initials}
                     </div>
 
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <h3 className="text-sm font-semibold text-black truncate">
-                        {conversation.name}
-                      </h3>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {conversation.unread && (
-                          <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                        )}
-                        <span className="text-xs text-gray-500">
-                          {conversation.timestamp}
-                        </span>
+                    {/* Content */}
+                    <div className="flex-1 min-w-0 text-left">
+                      <div className="flex items-center justify-between mb-1">
+                        <h3 className="text-sm font-semibold text-black truncate">
+                          {conversation.name}
+                        </h3>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {conversation.unread && (
+                            <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                          )}
+                          <span className="text-xs text-gray-500">
+                            {conversation.timestamp}
+                          </span>
+                        </div>
                       </div>
+                      <p className="text-sm text-gray-600 truncate text-left">
+                        {conversation.lastMessage}
+                      </p>
                     </div>
-                    <p className="text-sm text-gray-600 truncate">
-                      {conversation.lastMessage}
-                    </p>
                   </div>
-                </div>
-              </button>
-            ))}
+                </button>
+              ))
+            )}
           </div>
         </div>
 
@@ -319,13 +320,13 @@ export default function MessagesPage() {
               {/* Conversation Header */}
               <div className="p-6 border-b border-gray-200">
                 <h2 className="text-2xl font-bold text-black">
-                  {selectedConversation.name}
+                  {selectedConversation?.name}
                 </h2>
               </div>
 
               {/* Messages */}
               <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                {selectedConversation.messages.map((message) => (
+                {selectedConversation?.messages?.map((message) => (
                   <div
                     key={message.id}
                     className={`flex ${
