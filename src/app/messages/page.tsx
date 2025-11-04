@@ -1,172 +1,179 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import Image from "next/image";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import Navbar from "@/components/ui/navBar";
 import Footer from "@/components/ui/footer";
 import LoadingSpinner from "@/components/ui/loadingSpinner";
 import { useAuthCheck } from "@/hooks/useAuthCheck";
-
-// Dummy data for conversations
-interface Conversation {
-  id: string;
-  name: string;
-  initials: string;
-  lastMessage: string;
-  timestamp: string;
-  unread: boolean;
-  messages: Message[];
-}
-
-interface Message {
-  id: string;
-  text: string;
-  sender: "incoming" | "outgoing";
-  timestamp: string;
-}
-
-const dummyConversations: Conversation[] = [
-  {
-    id: "1",
-    name: "John Gilbert",
-    initials: "JO",
-    lastMessage: "Some Random Reply this is what is doing the words that are going on this.",
-    timestamp: "2:30 PM",
-    unread: false,
-    messages: [
-      {
-        id: "1",
-        text: "Some Random Reply this is what is doing the words that are going on this.",
-        sender: "incoming",
-        timestamp: "2:30 PM",
-      },
-      {
-        id: "2",
-        text: "This is another reply that doesn't mean anything I am trying to multitask right now. Don't worry though I am listening to what tyler is saying.",
-        sender: "outgoing",
-        timestamp: "2:32 PM",
-      },
-      {
-        id: "3",
-        text: "This is another reply that doesn't mean anything I am trying to multitask right now. Don't worry though I am listening to what tyler is saying.",
-        sender: "outgoing",
-        timestamp: "2:33 PM",
-      },
-    ],
-  },
-  {
-    id: "2",
-    name: "Sarah Mitchell",
-    initials: "SA",
-    lastMessage: "Thanks for the reminder!",
-    timestamp: "1:15 PM",
-    unread: true,
-    messages: [
-      {
-        id: "1",
-        text: "Thanks for the reminder!",
-        sender: "incoming",
-        timestamp: "1:15 PM",
-      },
-    ],
-  },
-  {
-    id: "3",
-    name: "Mike Johnson",
-    initials: "MI",
-    lastMessage: "See you tomorrow",
-    timestamp: "Yesterday",
-    unread: false,
-    messages: [
-      {
-        id: "1",
-        text: "See you tomorrow",
-        sender: "incoming",
-        timestamp: "Yesterday",
-      },
-    ],
-  },
-  {
-    id: "4",
-    name: "Emily Davis",
-    initials: "EM",
-    lastMessage: "Got it, thanks!",
-    timestamp: "Tuesday",
-    unread: true,
-    messages: [
-      {
-        id: "1",
-        text: "Got it, thanks!",
-        sender: "incoming",
-        timestamp: "Tuesday",
-      },
-    ],
-  },
-  {
-    id: "5",
-    name: "Tyler Anderson",
-    initials: "TY",
-    lastMessage: "Will do!",
-    timestamp: "Monday",
-    unread: false,
-    messages: [
-      {
-        id: "1",
-        text: "Will do!",
-        sender: "incoming",
-        timestamp: "Monday",
-      },
-    ],
-  },
-  {
-    id: "6",
-    name: "Rachel Thompson",
-    initials: "RA",
-    lastMessage: "Perfect timing",
-    timestamp: "Last week",
-    unread: false,
-    messages: [
-      {
-        id: "1",
-        text: "Perfect timing",
-        sender: "incoming",
-        timestamp: "Last week",
-      },
-    ],
-  },
-  {
-    id: "7",
-    name: "David Chen",
-    initials: "DA",
-    lastMessage: "Understood",
-    timestamp: "Last week",
-    unread: false,
-    messages: [
-      {
-        id: "1",
-        text: "Understood",
-        sender: "incoming",
-        timestamp: "Last week",
-      },
-    ],
-  },
-];
+import {
+  MessagesDataService,
+  Conversation,
+  Message,
+} from "@/lib/services/messagesDataService";
+import { createClient } from "@/lib/supabase/client";
 
 export default function MessagesPage() {
   const { loading: authLoading, isAuthenticated } = useAuthCheck();
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [selectedConversation, setSelectedConversation] = useState<
-    Conversation | null
-  >(null);
+  const [selectedConversation, setSelectedConversation] =
+    useState<Conversation | null>(null);
   const [messageText, setMessageText] = useState("");
   const [mounted, setMounted] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Initialize conversations on client side only
-  useEffect(() => {
-    setMounted(true);
-    setConversations(dummyConversations);
-    setSelectedConversation(dummyConversations[0]);
+  // Create Supabase client for real-time subscriptions
+  const supabase = useMemo(() => {
+    try {
+      return createClient();
+    } catch (error) {
+      console.warn("Failed to create Supabase client:", error);
+      return null;
+    }
   }, []);
+
+  // Use ref to track selected conversation ID without causing re-subscriptions
+  const selectedConversationIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    selectedConversationIdRef.current = selectedConversation?.id || null;
+  }, [selectedConversation]);
+
+  // Set up real-time subscription for new messages
+  useEffect(() => {
+    if (!supabase || !isAuthenticated || authLoading) return;
+
+    const channel = supabase
+      .channel("messages")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+        },
+        (payload) => {
+          const newMessage = payload.new as {
+            id: string;
+            conversation_id: string;
+            sender: string;
+            recipient: string;
+            body: string;
+            direction: "inbound" | "outbound";
+            sent_at?: string;
+            created_at?: string;
+          };
+
+          console.log("New message received:", newMessage);
+
+          // Map database message to UI message format
+          const timestamp =
+            newMessage.sent_at ||
+            newMessage.created_at ||
+            new Date().toISOString();
+          const formattedTimestamp = new Date(timestamp).toLocaleTimeString(
+            "en-US",
+            {
+              hour: "numeric",
+              minute: "2-digit",
+            }
+          );
+
+          const uiMessage: Message = {
+            id: newMessage.id,
+            text: newMessage.body,
+            sender:
+              newMessage.direction === "inbound" ? "incoming" : "outgoing",
+            timestamp: formattedTimestamp,
+          };
+
+          // Find the conversation by matching phone number
+          // For inbound messages: sender is the associate's phone
+          // For outbound messages: recipient is the associate's phone
+          const phoneToMatch =
+            newMessage.direction === "inbound"
+              ? newMessage.sender
+              : newMessage.recipient;
+
+          setConversations((prevConversations) => {
+            return prevConversations.map((conv) => {
+              // Check if this conversation matches the phone number
+              // Phone numbers might be in different formats, so we'll do a simple match
+              if (
+                conv.phoneNumber &&
+                (conv.phoneNumber.includes(phoneToMatch) ||
+                  phoneToMatch.includes(conv.phoneNumber))
+              ) {
+                // Check if message already exists (prevent duplicates)
+                const messageExists = conv.messages.some(
+                  (msg) => msg.id === uiMessage.id
+                );
+
+                if (messageExists) {
+                  return conv;
+                }
+
+                const isSelected =
+                  selectedConversationIdRef.current === conv.id;
+
+                const updatedConv = {
+                  ...conv,
+                  messages: [...conv.messages, uiMessage],
+                  lastMessage: uiMessage.text,
+                  timestamp: uiMessage.timestamp,
+                  unread:
+                    newMessage.direction === "inbound"
+                      ? !isSelected
+                      : conv.unread,
+                };
+
+                // Update selected conversation if it's the current one
+                if (isSelected) {
+                  setSelectedConversation(updatedConv);
+                }
+
+                return updatedConv;
+              }
+              return conv;
+            });
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [supabase, isAuthenticated, authLoading]);
+
+  // Fetch conversations on mount
+  useEffect(() => {
+    const fetchConversations = async () => {
+      if (!isAuthenticated || authLoading) return;
+
+      try {
+        setLoading(true);
+        const conversations = await MessagesDataService.fetchConversations();
+
+        setConversations(conversations);
+
+        // Select first conversation if available
+        if (conversations.length > 0) {
+          setSelectedConversation(conversations[0]);
+        }
+      } catch (err) {
+        console.error("Error fetching conversations:", err);
+        setError(
+          err instanceof Error ? err.message : "Failed to load conversations"
+        );
+      } finally {
+        setLoading(false);
+        setMounted(true);
+      }
+    };
+
+    fetchConversations();
+  }, [isAuthenticated, authLoading]);
 
   // Update selected conversation when conversations change
   useEffect(() => {
@@ -181,8 +188,8 @@ export default function MessagesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversations]);
 
-  // Show loading spinner while checking authentication
-  if (authLoading || !mounted) {
+  // Show loading spinner while checking authentication or loading data
+  if (authLoading || !mounted || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <LoadingSpinner />
@@ -195,39 +202,55 @@ export default function MessagesPage() {
     return null;
   }
 
-  const handleSendMessage = () => {
-    if (!messageText.trim() || !selectedConversation) return;
+  const handleSendMessage = async () => {
+    if (!messageText.trim() || !selectedConversation || sending) return;
 
-    // Add new message to conversation
-    const timestamp = new Date().toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-    });
-    
-    const newMessage: Message = {
-      id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      text: messageText,
-      sender: "outgoing",
-      timestamp,
-    };
+    // Check if conversation has a phone number
+    if (!selectedConversation.phoneNumber) {
+      setError("This associate does not have a phone number");
+      return;
+    }
 
-    // Update the conversations state
-    const updatedConversations = conversations.map((conv) => {
-      if (conv.id === selectedConversation.id) {
-        const updatedConv = {
-          ...conv,
-          messages: [...conv.messages, newMessage],
-          lastMessage: messageText,
-          timestamp: newMessage.timestamp,
-        };
-        setSelectedConversation(updatedConv);
-        return updatedConv;
-      }
-      return conv;
-    });
+    const messageToSend = messageText.trim();
+    setSending(true);
+    setError(null);
 
-    setConversations(updatedConversations);
-    setMessageText("");
+    try {
+      // Send message via API
+      await MessagesDataService.sendMessage(
+        selectedConversation.associateId,
+        messageToSend
+      );
+
+      // Create message object
+      const newMessage = MessagesDataService.createMessage(
+        messageToSend,
+        "outgoing"
+      );
+
+      // Update the conversations state
+      const updatedConversations = conversations.map((conv) => {
+        if (conv.id === selectedConversation.id) {
+          const updatedConv = {
+            ...conv,
+            messages: [...conv.messages, newMessage],
+            lastMessage: messageToSend,
+            timestamp: newMessage.timestamp,
+          };
+          setSelectedConversation(updatedConv);
+          return updatedConv;
+        }
+        return conv;
+      });
+
+      setConversations(updatedConversations);
+      setMessageText("");
+    } catch (err) {
+      console.error("Error sending message:", err);
+      setError(err instanceof Error ? err.message : "Failed to send message");
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -243,44 +266,50 @@ export default function MessagesPage() {
 
           {/* Conversation List */}
           <div className="flex-1 overflow-y-auto min-h-0">
-            {conversations.map((conversation) => (
-              <button
-                key={conversation.id}
-                onClick={() => setSelectedConversation(conversation)}
-                className={`w-full p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
-                  selectedConversation?.id === conversation.id
-                    ? "bg-gray-100"
-                    : ""
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  {/* Avatar */}
-                  <div className="w-12 h-12 rounded-full bg-gray-400 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
-                    {conversation.initials}
-                  </div>
-
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <h3 className="text-sm font-semibold text-black truncate">
-                        {conversation.name}
-                      </h3>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {conversation.unread && (
-                          <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                        )}
-                        <span className="text-xs text-gray-500">
-                          {conversation.timestamp}
-                        </span>
-                      </div>
+            {conversations.length === 0 ? (
+              <div className="p-6 text-center text-gray-500">
+                <p>No associates with phone numbers found.</p>
+              </div>
+            ) : (
+              conversations.map((conversation) => (
+                <button
+                  key={conversation.id}
+                  onClick={() => setSelectedConversation(conversation)}
+                  className={`w-full p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+                    selectedConversation?.id === conversation.id
+                      ? "bg-gray-100"
+                      : ""
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    {/* Avatar */}
+                    <div className="w-12 h-12 rounded-full bg-gray-400 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
+                      {conversation.initials}
                     </div>
-                    <p className="text-sm text-gray-600 truncate">
-                      {conversation.lastMessage}
-                    </p>
+
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <h3 className="text-sm font-semibold text-black truncate">
+                          {conversation.name}
+                        </h3>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {conversation.unread && (
+                            <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                          )}
+                          <span className="text-xs text-gray-500">
+                            {conversation.timestamp}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-sm text-gray-600 truncate">
+                        {conversation.lastMessage}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              </button>
-            ))}
+                </button>
+              ))
+            )}
           </div>
         </div>
 
@@ -321,22 +350,31 @@ export default function MessagesPage() {
 
               {/* Message Input */}
               <div className="p-4 border-t border-gray-200">
+                {error && (
+                  <div className="mb-2 p-2 bg-red-100 border border-red-400 text-red-700 rounded text-sm">
+                    {error}
+                  </div>
+                )}
                 <div className="flex items-center gap-3">
                   <input
                     type="text"
                     value={messageText}
-                    onChange={(e) => setMessageText(e.target.value)}
+                    onChange={(e) => {
+                      setMessageText(e.target.value);
+                      setError(null);
+                    }}
                     onKeyPress={(e) => {
-                      if (e.key === "Enter") {
+                      if (e.key === "Enter" && !sending) {
                         handleSendMessage();
                       }
                     }}
                     placeholder="Enter Message Here"
-                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-gray-50"
+                    disabled={sending}
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-gray-50 disabled:opacity-50"
                   />
                   <button
                     onClick={handleSendMessage}
-                    disabled={!messageText.trim()}
+                    disabled={!messageText.trim() || sending}
                     className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <svg
@@ -369,4 +407,3 @@ export default function MessagesPage() {
     </div>
   );
 }
-

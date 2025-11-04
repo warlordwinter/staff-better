@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireCompanyId } from "@/lib/auth/getCompanyId";
-import { sendSMS, formatPhoneNumber } from "@/lib/twilio/sms";
+import { requireCompanyId, requireCompanyPhoneNumber } from "@/lib/auth/getCompanyId";
+import { TwilioMessageService } from "@/lib/services/implementations/TwilioMessageService";
 
 /**
  * POST /api/associates/[id]/message
@@ -12,7 +12,18 @@ export async function POST(
 ) {
   try {
     // Verify user is authenticated and has a company
-    await requireCompanyId();
+    console.log("📞 [PHONE DEBUG] Starting message send process...");
+    const companyId = await requireCompanyId();
+    console.log("📞 [PHONE DEBUG] Company ID:", companyId);
+    
+    const twoWayPhoneNumber = await requireCompanyPhoneNumber(companyId);
+    console.log("📞 [PHONE DEBUG] Company two-way phone number from database:", twoWayPhoneNumber);
+    
+    // Import reminder number for comparison
+    const { TWILIO_PHONE_NUMBER_REMINDERS } = await import("@/lib/twilio/client");
+    console.log("📞 [PHONE DEBUG] Reminder phone number (for comparison):", TWILIO_PHONE_NUMBER_REMINDERS);
+    console.log("📞 [PHONE DEBUG] Using company two-way number? ", twoWayPhoneNumber !== TWILIO_PHONE_NUMBER_REMINDERS);
+    console.log("📞 [PHONE DEBUG] Numbers match? ", twoWayPhoneNumber === TWILIO_PHONE_NUMBER_REMINDERS ? "⚠️ WARNING: Using reminder number!" : "✓ Using two-way number");
 
     const { id: associateId } = await params;
     const body = await request.json();
@@ -65,12 +76,29 @@ export async function POST(
       );
     }
 
-    // Send the SMS
+    // Send the SMS using TwilioMessageService
     try {
-      const formattedPhone = formatPhoneNumber(associate.phone_number);
-      const result = await sendSMS({
+      const messageService = new TwilioMessageService();
+      const formattedPhone = messageService.formatPhoneNumber(
+        associate.phone_number
+      );
+      
+      console.log("📞 [PHONE DEBUG] About to send SMS with:");
+      console.log("📞 [PHONE DEBUG]   FROM:", twoWayPhoneNumber);
+      console.log("📞 [PHONE DEBUG]   TO:", formattedPhone);
+      console.log("📞 [PHONE DEBUG]   BODY:", body.message.trim().substring(0, 50) + "...");
+      
+      const result = await messageService.sendSMS({
         to: formattedPhone,
         body: body.message.trim(),
+        from: twoWayPhoneNumber,
+      });
+      
+      console.log("📞 [PHONE DEBUG] SMS sent result:", {
+        success: result.success,
+        messageId: result.messageId,
+        from: result.success ? result.from : "N/A",
+        to: result.to,
       });
 
       if (!result.success) {

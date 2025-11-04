@@ -1,23 +1,24 @@
 // Twilio message statuses (complete list from Twilio docs)
-export type TwilioMessageStatus = 
-  | 'accepted'
-  | 'scheduled'
-  | 'canceled'
-  | 'queued'
-  | 'sending'
-  | 'sent'
-  | 'failed'
-  | 'delivered'
-  | 'undelivered'
-  | 'receiving'
-  | 'received'  
-  | 'read'
-  | 'partially_delivered';
+export type TwilioMessageStatus =
+  | "accepted"
+  | "scheduled"
+  | "canceled"
+  | "queued"
+  | "sending"
+  | "sent"
+  | "failed"
+  | "delivered"
+  | "undelivered"
+  | "receiving"
+  | "received"
+  | "read"
+  | "partially_delivered";
 
 // Input message structure
 export interface SMSMessage {
   to: string;
   body: string;
+  from: string; // Required: specify which Twilio number to use (reminder number or company two-way number)
 }
 
 // Successful SMS result
@@ -57,13 +58,13 @@ export interface TwilioWebhookPayload {
 
 // Common Twilio error codes
 export enum TwilioErrorCode {
-  INVALID_PHONE_NUMBER = '21211',
-  UNSUBSCRIBED_PHONE_NUMBER = '21610',
-  QUEUE_OVERFLOW = '30001',
-  ACCOUNT_SUSPENDED = '20003',
-  INSUFFICIENT_FUNDS = '20005',
-  MESSAGE_TOO_LONG = '30007',
-  RATE_LIMIT_EXCEEDED = '20429',
+  INVALID_PHONE_NUMBER = "21211",
+  UNSUBSCRIBED_PHONE_NUMBER = "21610",
+  QUEUE_OVERFLOW = "30001",
+  ACCOUNT_SUSPENDED = "20003",
+  INSUFFICIENT_FUNDS = "20005",
+  MESSAGE_TOO_LONG = "30007",
+  RATE_LIMIT_EXCEEDED = "20429",
 }
 
 // Batch processing result

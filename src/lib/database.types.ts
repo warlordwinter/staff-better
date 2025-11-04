@@ -23,6 +23,7 @@ export type Database = {
           last_name: string | null
           phone_number: string
           sms_opt_out: boolean | null
+          updated_at: string | null
         }
         Insert: {
           company_id?: string | null
@@ -32,6 +33,7 @@ export type Database = {
           last_name?: string | null
           phone_number: string
           sms_opt_out?: boolean | null
+          updated_at?: string | null
         }
         Update: {
           company_id?: string | null
@@ -41,6 +43,7 @@ export type Database = {
           last_name?: string | null
           phone_number?: string
           sms_opt_out?: boolean | null
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -59,6 +62,7 @@ export type Database = {
           email: string
           id: string
           non_temp_employees: number | null
+          phone_number: string | null
           referral_source: string
           setup_completed: boolean | null
           system_readiness: string | null
@@ -72,6 +76,7 @@ export type Database = {
           email: string
           id?: string
           non_temp_employees?: number | null
+          phone_number?: string | null
           referral_source: string
           setup_completed?: boolean | null
           system_readiness?: string | null
@@ -85,6 +90,7 @@ export type Database = {
           email?: string
           id?: string
           non_temp_employees?: number | null
+          phone_number?: string | null
           referral_source?: string
           setup_completed?: boolean | null
           system_readiness?: string | null
@@ -93,6 +99,45 @@ export type Database = {
           zip_code?: string
         }
         Relationships: []
+      }
+      conversations: {
+        Row: {
+          associate_id: string
+          company_id: string
+          created_at: string | null
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          associate_id: string
+          company_id: string
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+        }
+        Update: {
+          associate_id?: string
+          company_id?: string
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_associate_id_fkey"
+            columns: ["associate_id"]
+            isOneToOne: false
+            referencedRelation: "associates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       group_associates: {
         Row: {
@@ -248,6 +293,47 @@ export type Database = {
           },
         ]
       }
+      messages: {
+        Row: {
+          body: string | null
+          conversation_id: string
+          delivered_at: string | null
+          direction: string | null
+          id: string
+          sender_type: string
+          sent_at: string | null
+          status: string | null
+        }
+        Insert: {
+          body?: string | null
+          conversation_id: string
+          delivered_at?: string | null
+          direction?: string | null
+          id?: string
+          sender_type: string
+          sent_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          body?: string | null
+          conversation_id?: string
+          delivered_at?: string | null
+          direction?: string | null
+          id?: string
+          sender_type?: string
+          sent_at?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_profiles: {
         Row: {
           company_id: string | null
@@ -285,7 +371,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      get_user_company_id: { Args: never; Returns: string }
+      [_ in never]: never
     }
     Enums: {
       confirmation_status_enum:
