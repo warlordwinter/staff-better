@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireCompanyId, requireCompanyPhoneNumber } from "@/lib/auth/getCompanyId";
+import {
+  requireCompanyId,
+  requireCompanyPhoneNumber,
+} from "@/lib/auth/getCompanyId";
 import { TwilioMessageService } from "@/lib/services/implementations/TwilioMessageService";
 
 /**
@@ -15,15 +18,31 @@ export async function POST(
     console.log("📞 [PHONE DEBUG] Starting message send process...");
     const companyId = await requireCompanyId();
     console.log("📞 [PHONE DEBUG] Company ID:", companyId);
-    
+
     const twoWayPhoneNumber = await requireCompanyPhoneNumber(companyId);
-    console.log("📞 [PHONE DEBUG] Company two-way phone number from database:", twoWayPhoneNumber);
-    
+    console.log(
+      "📞 [PHONE DEBUG] Company two-way phone number from database:",
+      twoWayPhoneNumber
+    );
+
     // Import reminder number for comparison
-    const { TWILIO_PHONE_NUMBER_REMINDERS } = await import("@/lib/twilio/client");
-    console.log("📞 [PHONE DEBUG] Reminder phone number (for comparison):", TWILIO_PHONE_NUMBER_REMINDERS);
-    console.log("📞 [PHONE DEBUG] Using company two-way number? ", twoWayPhoneNumber !== TWILIO_PHONE_NUMBER_REMINDERS);
-    console.log("📞 [PHONE DEBUG] Numbers match? ", twoWayPhoneNumber === TWILIO_PHONE_NUMBER_REMINDERS ? "⚠️ WARNING: Using reminder number!" : "✓ Using two-way number");
+    const { TWILIO_PHONE_NUMBER_REMINDERS } = await import(
+      "@/lib/twilio/client"
+    );
+    console.log(
+      "📞 [PHONE DEBUG] Reminder phone number (for comparison):",
+      TWILIO_PHONE_NUMBER_REMINDERS
+    );
+    console.log(
+      "📞 [PHONE DEBUG] Using company two-way number? ",
+      twoWayPhoneNumber !== TWILIO_PHONE_NUMBER_REMINDERS
+    );
+    console.log(
+      "📞 [PHONE DEBUG] Numbers match? ",
+      twoWayPhoneNumber === TWILIO_PHONE_NUMBER_REMINDERS
+        ? "⚠️ WARNING: Using reminder number!"
+        : "✓ Using two-way number"
+    );
 
     const { id: associateId } = await params;
     const body = await request.json();
@@ -82,18 +101,21 @@ export async function POST(
       const formattedPhone = messageService.formatPhoneNumber(
         associate.phone_number
       );
-      
+
       console.log("📞 [PHONE DEBUG] About to send SMS with:");
       console.log("📞 [PHONE DEBUG]   FROM:", twoWayPhoneNumber);
       console.log("📞 [PHONE DEBUG]   TO:", formattedPhone);
-      console.log("📞 [PHONE DEBUG]   BODY:", body.message.trim().substring(0, 50) + "...");
-      
+      console.log(
+        "📞 [PHONE DEBUG]   BODY:",
+        body.message.trim().substring(0, 50) + "..."
+      );
+
       const result = await messageService.sendSMS({
         to: formattedPhone,
         body: body.message.trim(),
         from: twoWayPhoneNumber,
       });
-      
+
       console.log("📞 [PHONE DEBUG] SMS sent result:", {
         success: result.success,
         messageId: result.messageId,
@@ -109,6 +131,70 @@ export async function POST(
           },
           { status: 500 }
         );
+      }
+
+      // Find or create conversation and save message to database
+      try {
+        const supabaseAdmin = await (
+          await import("@/lib/supabase/admin")
+        ).createAdminClient();
+
+        // Find or create conversation
+        const { data: existingConversations } = await supabaseAdmin
+          .from("conversations")
+          .select("id")
+          .eq("associate_id", associateId)
+          .eq("company_id", companyId)
+          .limit(1);
+
+        let conversationId: string;
+        if (existingConversations && existingConversations.length > 0) {
+          conversationId = existingConversations[0].id;
+        } else {
+          // Create new conversation
+          const { data: newConversation, error: createError } =
+            await supabaseAdmin
+              .from("conversations")
+              .insert([
+                {
+                  associate_id: associateId,
+                  company_id: companyId,
+                },
+              ])
+              .select()
+              .single();
+
+          if (createError || !newConversation) {
+            console.error("Error creating conversation:", createError);
+            // Continue without saving message - SMS was sent successfully
+          } else {
+            conversationId = newConversation.id;
+          }
+        }
+
+        // Save message to database if we have a conversation_id
+        if (conversationId) {
+          const { error: insertError } = await supabaseAdmin
+            .from("messages")
+            .insert([
+              {
+                conversation_id: conversationId,
+                sender_type: "company",
+                body: body.message.trim(),
+                direction: "outbound",
+                status: result.success && result.messageId ? "queued" : null,
+                sent_at: new Date().toISOString(),
+              },
+            ]);
+
+          if (insertError) {
+            console.error("Error saving message to database:", insertError);
+            // Continue - SMS was sent successfully
+          }
+        }
+      } catch (dbError) {
+        console.error("Error saving message to database:", dbError);
+        // Continue - SMS was sent successfully
       }
 
       return NextResponse.json({

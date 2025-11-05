@@ -46,50 +46,51 @@ export async function POST(request: NextRequest) {
 
     const supabaseAdmin = createAdminClient();
 
+    // Normalize phone number for lookup
+    const normalizedFrom = normalizePhoneForLookup(From);
+
+    // Find the associate by phone number (phone numbers are unique)
+    const { data: associate, error: associateError } = await supabaseAdmin
+      .from("associates")
+      .select("id, company_id")
+      .eq("phone_number", normalizedFrom)
+      .single();
+
+    if (associateError || !associate || !associate.company_id) {
+      console.error(
+        "Error finding associate for conversation:",
+        associateError
+      );
+      // Still return valid TwiML to avoid Twilio retries
+      const response = new twiml.MessagingResponse();
+      return new NextResponse(response.toString(), {
+        status: 200,
+        headers: { "Content-Type": "text/xml" },
+      });
+    }
+
     // Determine which phone number to use for the conversation
-    // If the message is to the reminder number, we need to find the associate's company
-    // and use that company's two-way phone number instead
+    // If the message is to the reminder number, use the company's two-way number
     let conversationPhoneNumber = To;
-
-    // Check if this is a reply to a reminder (To is the reminder number)
     if (To === TWILIO_PHONE_NUMBER_REMINDERS) {
-      // Find the associate by their phone number to get their company
-      const normalizedFrom = normalizePhoneForLookup(From);
-
-      const { data: associate, error: associateError } = await supabaseAdmin
-        .from("associates")
-        .select("company_id")
-        .eq("phone_number", normalizedFrom)
-        .single();
-
-      if (!associateError && associate?.company_id) {
-        // Get the company's two-way phone number
-        const twoWayNumber = await getCompanyPhoneNumberAdmin(
-          associate.company_id
-        );
-        if (twoWayNumber) {
-          conversationPhoneNumber = twoWayNumber;
-          console.log(
-            `Message from reminder number, using company two-way number: ${twoWayNumber}`
-          );
-        } else {
-          console.warn(
-            `Associate ${associate.company_id} has no two-way phone number configured`
-          );
-        }
-      } else {
-        console.warn(
-          `Could not find associate for phone ${normalizedFrom} to determine company`
+      const twoWayNumber = await getCompanyPhoneNumberAdmin(
+        associate.company_id
+      );
+      if (twoWayNumber) {
+        conversationPhoneNumber = twoWayNumber;
+        console.log(
+          `Message from reminder number, using company two-way number: ${twoWayNumber}`
         );
       }
     }
 
-    // Find or create conversation using the appropriate phone number
+    // Find or create conversation using associate_id and company_id
     const { data: conversations, error: conversationError } =
       await supabaseAdmin
         .from("conversations")
         .select("*")
-        .or(`participant_a.eq.${From},participant_b.eq.${From}`)
+        .eq("associate_id", associate.id)
+        .eq("company_id", associate.company_id)
         .limit(1);
 
     let conversation_id: string;
@@ -100,7 +101,7 @@ export async function POST(request: NextRequest) {
       const { data: newConversation, error: createError } = await supabaseAdmin
         .from("conversations")
         .insert([
-          { participant_a: From, participant_b: conversationPhoneNumber },
+          { associate_id: associate.id, company_id: associate.company_id },
         ])
         .select()
         .single();
@@ -117,38 +118,14 @@ export async function POST(request: NextRequest) {
 
       conversation_id = newConversation.id;
     } else if (conversations && conversations.length > 0) {
-      // Conversation exists - check if we need to update it
-      const existingConversation = conversations[0];
-      conversation_id = existingConversation.id;
-
-      // If the existing conversation uses the reminder number but we have a company two-way number,
-      // update it to use the company's two-way number
-      if (
-        existingConversation.participant_b === TWILIO_PHONE_NUMBER_REMINDERS &&
-        conversationPhoneNumber !== TWILIO_PHONE_NUMBER_REMINDERS
-      ) {
-        const { error: updateError } = await supabaseAdmin
-          .from("conversations")
-          .update({ participant_b: conversationPhoneNumber })
-          .eq("id", conversation_id);
-
-        if (updateError) {
-          console.error(
-            "Error updating conversation phone number:",
-            updateError
-          );
-        } else {
-          console.log(
-            `Updated conversation ${conversation_id} to use company two-way number: ${conversationPhoneNumber}`
-          );
-        }
-      }
+      // Conversation exists
+      conversation_id = conversations[0].id;
     } else {
       // No conversation found, create a new one
       const { data: newConversation, error: createError } = await supabaseAdmin
         .from("conversations")
         .insert([
-          { participant_a: From, participant_b: conversationPhoneNumber },
+          { associate_id: associate.id, company_id: associate.company_id },
         ])
         .select()
         .single();
@@ -167,14 +144,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Save inbound message
-    // Use conversationPhoneNumber as recipient (which may be the company's two-way number)
     const { error: insertError } = await supabaseAdmin.from("messages").insert([
       {
         conversation_id,
-        sender: From,
-        recipient: conversationPhoneNumber,
+        sender_type: "associate",
         body: Body.trim(),
         direction: "inbound",
+        sent_at: new Date().toISOString(),
       },
     ]);
 

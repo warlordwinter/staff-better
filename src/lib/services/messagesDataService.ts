@@ -6,7 +6,7 @@
  */
 
 export interface Conversation {
-  id: string;
+  id: string; // conversation_id from database
   associateId: string;
   name: string;
   initials: string;
@@ -83,21 +83,57 @@ function associateToConversation(associate: Associate): Conversation {
  */
 export class MessagesDataService {
   /**
-   * Fetch all conversations (associates with phone numbers)
+   * Fetch all conversations with their messages from the database
    */
   static async fetchConversations(): Promise<Conversation[]> {
-    const response = await fetch("/api/associates");
+    const response = await fetch("/api/conversations");
 
     if (!response.ok) {
-      throw new Error("Failed to fetch associates");
+      throw new Error("Failed to fetch conversations");
     }
 
-    const associates: Associate[] = await response.json();
+    const data = await response.json();
 
-    // Filter associates with phone numbers and convert to conversations
-    return associates
-      .filter((associate) => associate.phone_number)
-      .map(associateToConversation);
+    // Transform API response to Conversation format
+    return data.map((conv: any) => {
+      const name = conv.associate_name || "Unknown";
+      const nameParts = name.split(" ");
+      const firstName = nameParts[0] || null;
+      const lastName = nameParts.slice(1).join(" ") || null;
+
+      // Transform messages from database format to UI format
+      const messages: Message[] = (conv.messages || []).map((msg: any) => {
+        const timestamp = msg.sent_at
+          ? new Date(msg.sent_at).toLocaleTimeString("en-US", {
+              hour: "numeric",
+              minute: "2-digit",
+            })
+          : "";
+
+        return {
+          id: msg.id,
+          text: msg.body || "",
+          sender: msg.direction === "inbound" ? "incoming" : "outgoing",
+          timestamp,
+        };
+      });
+
+      // Get last message info
+      const lastMessage =
+        messages.length > 0 ? messages[messages.length - 1] : null;
+
+      return {
+        id: conv.conversation_id,
+        associateId: conv.associate_id,
+        name,
+        initials: getInitials(firstName, lastName),
+        phoneNumber: conv.phone_number,
+        lastMessage: lastMessage?.text || "",
+        timestamp: lastMessage?.timestamp || "",
+        unread: false, // TODO: implement unread tracking
+        messages,
+      };
+    });
   }
 
   /**

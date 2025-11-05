@@ -132,8 +132,7 @@ export async function POST(request: NextRequest) {
     const { error: insertError } = await supabaseAdmin.from("messages").insert([
       {
         conversation_id,
-        sender,
-        recipient: to,
+        sender_type: "company",
         body: messageBody.trim(),
         direction: "outbound",
         status: message.status,

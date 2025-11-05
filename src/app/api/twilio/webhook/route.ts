@@ -97,50 +97,76 @@ export async function POST(request: NextRequest) {
       if (toNumber && fromNumber && messageBody) {
         const supabaseAdmin = createAdminClient();
 
-        // Find or create conversation
-        const { data: conversations, error: conversationError } =
-          await supabaseAdmin
-            .from("conversations")
-            .select("*")
-            .or(`participant_a.eq.${fromNumber},participant_b.eq.${fromNumber}`)
-            .limit(1);
+        // Find the associate by phone number (phone numbers are unique)
+        const { normalizePhoneForLookup } = await import("@/utils/phoneUtils");
+        const normalizedFrom = normalizePhoneForLookup(fromNumber);
+        const { data: associate, error: associateError } = await supabaseAdmin
+          .from("associates")
+          .select("id, company_id")
+          .eq("phone_number", normalizedFrom)
+          .single();
 
-        let conversation_id: string | undefined;
-
-        if (conversationError || !conversations || conversations.length === 0) {
-          // Create new conversation
-          const { data: newConversation, error: createError } =
+        if (associateError || !associate || !associate.company_id) {
+          console.error(
+            "Error finding associate for conversation:",
+            associateError
+          );
+        } else {
+          // Find or create conversation using associate_id and company_id
+          const { data: conversations, error: conversationError } =
             await supabaseAdmin
               .from("conversations")
-              .insert([{ participant_a: fromNumber, participant_b: toNumber }])
-              .select()
-              .single();
+              .select("*")
+              .eq("associate_id", associate.id)
+              .eq("company_id", associate.company_id)
+              .limit(1);
 
-          if (createError || !newConversation) {
-            console.error("Error creating conversation:", createError);
+          let conversation_id: string | undefined;
+
+          if (
+            conversationError ||
+            !conversations ||
+            conversations.length === 0
+          ) {
+            // Create new conversation
+            const { data: newConversation, error: createError } =
+              await supabaseAdmin
+                .from("conversations")
+                .insert([
+                  {
+                    associate_id: associate.id,
+                    company_id: associate.company_id,
+                  },
+                ])
+                .select()
+                .single();
+
+            if (createError || !newConversation) {
+              console.error("Error creating conversation:", createError);
+            } else {
+              conversation_id = newConversation.id;
+            }
           } else {
-            conversation_id = newConversation.id;
+            conversation_id = conversations[0].id;
           }
-        } else {
-          conversation_id = conversations[0].id;
-        }
 
-        // Save inbound message if we have a conversation_id
-        if (conversation_id) {
-          const { error: insertError } = await supabaseAdmin
-            .from("messages")
-            .insert([
-              {
-                conversation_id,
-                sender: fromNumber,
-                recipient: toNumber,
-                body: messageBody.trim(),
-                direction: "inbound",
-              },
-            ]);
+          // Save inbound message if we have a conversation_id
+          if (conversation_id) {
+            const { error: insertError } = await supabaseAdmin
+              .from("messages")
+              .insert([
+                {
+                  conversation_id,
+                  sender_type: "associate",
+                  body: messageBody.trim(),
+                  direction: "inbound",
+                  sent_at: new Date().toISOString(),
+                },
+              ]);
 
-          if (insertError) {
-            console.error("Error saving message to Supabase:", insertError);
+            if (insertError) {
+              console.error("Error saving message to Supabase:", insertError);
+            }
           }
         }
       }
