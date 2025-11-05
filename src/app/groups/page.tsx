@@ -80,7 +80,7 @@ export default function GroupsPage() {
                 ...group,
                 members: members.slice(0, 4), // Only first 4 for display
               };
-            } catch (error) {
+            } catch {
               // If members can't be loaded, just return empty array
               return {
                 ...group,

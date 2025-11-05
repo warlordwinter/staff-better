@@ -45,7 +45,7 @@ const formatDate = (dateString: string): string => {
     const month = months[date.getMonth()];
     const day = date.getDate();
     return `${month} ${day}`;
-  } catch (error) {
+  } catch {
     return dateString;
   }
 };
@@ -59,7 +59,7 @@ const formatTime = (timeString: string, workDate: string): string => {
     const ampm = hour >= 12 ? "PM" : "AM";
     const displayHour = hour % 12 || 12;
     return `${displayHour}:${minutes} ${ampm}`;
-  } catch (error) {
+  } catch {
     return timeString;
   }
 };

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { requireCompanyId } from "@/lib/auth/getCompanyId";
 import { createClient } from "@/lib/supabase/server";
 
@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
  * GET /api/conversations
  * Fetch all conversations for the authenticated company with their messages
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const companyId = await requireCompanyId();
     const supabase = await createClient();

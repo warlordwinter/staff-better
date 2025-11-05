@@ -160,7 +160,7 @@ export class IncomingMessageService {
   ): Promise<IncomingMessageResult> {
     const unknownMessage = `Hi ${associate.first_name}!\n\nI didn't understand that message.\n\nReply "C" to confirm, "HELP" for help, or call us directly.`;
 
-    await this.messageService.sendSMS({
+    await this.messageService.sendReminderSMS({
       to: phoneNumber,
       body: unknownMessage,
     });

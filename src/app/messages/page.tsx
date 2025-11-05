@@ -18,16 +18,6 @@ import {
 } from "@/lib/services/messagesDataService";
 import { createClient } from "@/lib/supabase/client";
 
-// Helper function to generate initials
-function getInitials(
-  firstName: string | null,
-  lastName: string | null
-): string {
-  const first = firstName?.charAt(0).toUpperCase() || "";
-  const last = lastName?.charAt(0).toUpperCase() || "";
-  return `${first}${last}` || "??";
-}
-
 export default function MessagesPage() {
   const { loading: authLoading, isAuthenticated } = useAuthCheck();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -73,9 +63,6 @@ export default function MessagesPage() {
     conversationsRef.current = conversations;
   }, [conversations]);
 
-  // Polling fallback: Track last message timestamp to detect new messages
-  const lastMessageTimestampRef = useRef<string | null>(null);
-
   // Polling function to check for new messages (fallback if real-time fails)
   const pollForNewMessages = useCallback(async () => {
     if (!isAuthenticated || authLoading) return;
@@ -86,9 +73,6 @@ export default function MessagesPage() {
       // Check for new messages in all conversations
       conversations.forEach((conv) => {
         if (conv.messages.length > 0) {
-          const lastMessage = conv.messages[conv.messages.length - 1];
-          const lastTimestamp = lastMessage.timestamp;
-
           // Check if we have this conversation in state
           const existingConv = conversationsRef.current.find(
             (c) => c.id === conv.id
@@ -392,23 +376,53 @@ export default function MessagesPage() {
     };
   }, [supabase, isAuthenticated, authLoading]);
 
-  // Set up polling fallback (runs every 3 seconds to check for new messages)
+  // Set up polling fallback (runs every 10 seconds, only when page is visible)
   useEffect(() => {
     if (!isAuthenticated || authLoading) return;
+
+    let pollInterval: NodeJS.Timeout | null = null;
+
+    // Function to start/stop polling based on page visibility
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Page is hidden - stop polling
+        if (pollInterval) {
+          clearInterval(pollInterval);
+          pollInterval = null;
+          console.log("⏸️ Page hidden, stopped polling");
+        }
+      } else {
+        // Page is visible - start polling
+        if (!pollInterval) {
+          // Poll immediately when page becomes visible
+          pollForNewMessages();
+          // Then poll every 10 seconds (less frequent to reduce load)
+          pollInterval = setInterval(() => {
+            pollForNewMessages();
+          }, 10000); // 10 seconds instead of 3
+          console.log("▶️ Page visible, started polling every 10 seconds");
+        }
+      }
+    };
 
     // Initial poll after a short delay
     const initialTimeout = setTimeout(() => {
       pollForNewMessages();
+      // Start polling every 10 seconds
+      pollInterval = setInterval(() => {
+        pollForNewMessages();
+      }, 10000);
     }, 2000);
 
-    // Then poll every 3 seconds
-    const pollInterval = setInterval(() => {
-      pollForNewMessages();
-    }, 3000);
+    // Listen for page visibility changes
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       clearTimeout(initialTimeout);
-      clearInterval(pollInterval);
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [isAuthenticated, authLoading, pollForNewMessages]);
 

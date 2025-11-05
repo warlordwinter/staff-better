@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import {
   requireCompanyId,
   requireCompanyPhoneNumber,
@@ -14,7 +14,7 @@ import {
  * - 401: { error: string } (not authenticated or company not found)
  * - 404: { error: string } (phone number not configured)
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const companyId = await requireCompanyId();
     const phoneNumber = await requireCompanyPhoneNumber(companyId);

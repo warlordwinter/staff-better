@@ -29,7 +29,7 @@ export class OptOutHandler implements IMessageHandler {
         `${associate.first_name}, you have been unsubscribed from our text reminders. ` +
         `You can still receive calls about your assignments. To re-subscribe, please call us.`;
 
-      await this.messageService.sendSMS({
+      await this.messageService.sendReminderSMS({
         to: phoneNumber,
         body: optOutMessage,
       });

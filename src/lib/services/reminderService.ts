@@ -6,7 +6,7 @@ import {
   ILogger,
 } from "./interfaces/index";
 import { ReminderAssignment, ReminderResult, ReminderType } from "./types";
-import { SMSMessage, SMSResult } from "../twilio/types";
+import { SMSResult } from "../twilio/types";
 
 // Re-export types from the types file
 export type { ReminderAssignment, ReminderResult, ReminderType } from "./types";

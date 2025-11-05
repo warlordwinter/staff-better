@@ -2,7 +2,6 @@
 
 import React from "react";
 import Link from "next/link";
-import Image from "next/image";
 import Navbar from "@/components/ui/navBar";
 import Footer from "@/components/ui/footer";
 import LoadingSpinner from "@/components/ui/loadingSpinner";

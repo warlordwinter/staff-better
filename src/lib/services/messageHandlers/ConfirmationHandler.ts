@@ -29,7 +29,7 @@ export class ConfirmationHandler implements IMessageHandler {
       if (activeAssignments.length === 0) {
         const response = `Hi ${associate.first_name}!\n\nWe don't have any upcoming assignments for you to confirm right now.\n\nIf you think this is an error, please call us.`;
 
-        await this.messageService.sendSMS({
+        await this.messageService.sendReminderSMS({
           to: phoneNumber,
           body: response,
         });
@@ -62,7 +62,7 @@ export class ConfirmationHandler implements IMessageHandler {
           ? `Thanks ${associate.first_name}!\n\nYour assignment is confirmed.\n\nWe'll see you there!`
           : `Thanks ${associate.first_name}!\n\nYour ${updatedCount} assignments are confirmed.\n\nWe'll see you there!`;
 
-      await this.messageService.sendSMS({
+      await this.messageService.sendReminderSMS({
         to: phoneNumber,
         body: response,
       });

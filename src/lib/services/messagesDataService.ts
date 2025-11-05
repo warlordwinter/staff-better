@@ -24,14 +24,6 @@ export interface Message {
   timestamp: string;
 }
 
-interface Associate {
-  id: string;
-  first_name: string | null;
-  last_name: string | null;
-  phone_number: string;
-  email_address: string | null;
-}
-
 interface SendMessageResponse {
   success: boolean;
   message_id?: string;
@@ -50,32 +42,6 @@ function getInitials(
   const first = firstName?.charAt(0).toUpperCase() || "";
   const last = lastName?.charAt(0).toUpperCase() || "";
   return `${first}${last}` || "??";
-}
-
-/**
- * Helper function to get full name
- */
-function getName(firstName: string | null, lastName: string | null): string {
-  const parts = [firstName, lastName].filter(Boolean);
-  return parts.length > 0 ? parts.join(" ") : "Unknown";
-}
-
-/**
- * Transform associate to conversation
- */
-function associateToConversation(associate: Associate): Conversation {
-  const name = getName(associate.first_name, associate.last_name);
-  return {
-    id: associate.id,
-    associateId: associate.id,
-    name,
-    initials: getInitials(associate.first_name, associate.last_name),
-    phoneNumber: associate.phone_number,
-    lastMessage: "",
-    timestamp: "",
-    unread: false,
-    messages: [],
-  };
 }
 
 /**

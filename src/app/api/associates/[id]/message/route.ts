@@ -118,7 +118,7 @@ export async function POST(
 
       console.log("📞 [PHONE DEBUG] SMS sent result:", {
         success: result.success,
-        messageId: result.messageId,
+        messageId: result.success ? result.messageId : "N/A",
         from: result.success ? result.from : "N/A",
         to: result.to,
       });
@@ -147,7 +147,7 @@ export async function POST(
           .eq("company_id", companyId)
           .limit(1);
 
-        let conversationId: string;
+        let conversationId: string | undefined;
         if (existingConversations && existingConversations.length > 0) {
           conversationId = existingConversations[0].id;
         } else {

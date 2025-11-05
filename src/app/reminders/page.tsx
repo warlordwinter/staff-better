@@ -37,7 +37,7 @@ const formatDateTime = (dateString: string): string => {
     const displayHours = hours % 12 || 12;
     const displayMinutes = minutes.toString().padStart(2, "0");
     return `${month} ${day}, ${displayHours}:${displayMinutes} ${ampm}`;
-  } catch (error) {
+  } catch {
     return dateString;
   }
 };
@@ -145,7 +145,6 @@ export default function RemindersPage() {
     if (!authLoading && isAuthenticated) {
       loadJobs();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, isAuthenticated]);
 
   // Handle CSV/Excel upload

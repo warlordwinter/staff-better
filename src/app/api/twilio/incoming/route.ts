@@ -71,13 +71,11 @@ export async function POST(request: NextRequest) {
 
     // Determine which phone number to use for the conversation
     // If the message is to the reminder number, use the company's two-way number
-    let conversationPhoneNumber = To;
     if (To === TWILIO_PHONE_NUMBER_REMINDERS) {
       const twoWayNumber = await getCompanyPhoneNumberAdmin(
         associate.company_id
       );
       if (twoWayNumber) {
-        conversationPhoneNumber = twoWayNumber;
         console.log(
           `Message from reminder number, using company two-way number: ${twoWayNumber}`
         );
