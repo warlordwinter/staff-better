@@ -6,7 +6,7 @@ import {
   ILogger,
 } from "./interfaces/index";
 import { ReminderAssignment, ReminderResult, ReminderType } from "./types";
-import { SMSMessage, SMSResult } from "../twilio/types";
+import { SMSResult } from "../twilio/types";
 
 // Re-export types from the types file
 export type { ReminderAssignment, ReminderResult, ReminderType } from "./types";
@@ -78,7 +78,7 @@ export class ReminderService {
         reminderType
       );
 
-      const smsResult = await this.messageService.sendSMS({
+      const smsResult = await this.messageService.sendReminderSMS({
         to: formattedPhone,
         body: messageBody,
       });
@@ -380,20 +380,17 @@ export class ReminderService {
 
   /**
    * Send SMS notification (consolidated from NotificationService)
+   * Uses reminder phone number
    */
   async sendSMSNotification(
     phoneNumber: string,
     messageBody: string
   ): Promise<SMSResult> {
-    const smsMessage: SMSMessage = {
-      to: phoneNumber,
-      body: messageBody,
-    };
-
     try {
-      const smsResult: SMSResult = await this.messageService.sendSMS(
-        smsMessage
-      );
+      const smsResult: SMSResult = await this.messageService.sendReminderSMS({
+        to: phoneNumber,
+        body: messageBody,
+      });
       return smsResult;
     } catch (error) {
       this.logger.error("Error sending SMS:", error as Error);

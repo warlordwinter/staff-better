@@ -120,7 +120,11 @@ export default function GroupPage({ params }: GroupPageProps) {
   };
 
   const handleDeleteAssociate = async (associateId: string) => {
-    if (window.confirm("Are you sure you want to delete this associate?")) {
+    if (
+      window.confirm(
+        "Are you sure you want to remove this associate from the group?"
+      )
+    ) {
       try {
         const success = await GroupsDataService.removeAssociateFromGroup(
           groupId,

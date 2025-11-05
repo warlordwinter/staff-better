@@ -111,6 +111,11 @@ export class AssociatesDaoSupabase implements IAssociates {
       }
     }
 
+    // Check if we have any updates after cleaning
+    if (Object.keys(cleanedUpdates).length === 0) {
+      throw new Error("No valid fields to update (all values were empty)");
+    }
+
     console.log("Cleaned Updates:", cleanedUpdates);
     console.log("🔍 [DEBUG] updateAssociate - Updating associate with ID:", id);
 

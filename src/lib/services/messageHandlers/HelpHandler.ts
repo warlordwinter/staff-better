@@ -27,7 +27,7 @@ export class HelpHandler implements IMessageHandler {
       `• Reply "STOP" to stop receiving texts\n\n` +
       `Questions? Call us at [YOUR_PHONE_NUMBER]`;
 
-    await this.messageService.sendSMS({
+    await this.messageService.sendReminderSMS({
       to: phoneNumber,
       body: helpMessage,
     });

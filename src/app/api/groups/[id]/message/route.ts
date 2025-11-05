@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GroupsDaoSupabase } from "@/lib/dao/implementations/supabase/GroupsDaoSupabase";
-import { requireCompanyId } from "@/lib/auth/getCompanyId";
-import { sendSMS, formatPhoneNumber } from "@/lib/twilio/sms";
+import { requireCompanyId, requireCompanyPhoneNumber } from "@/lib/auth/getCompanyId";
+import { sendTwoWaySMS, formatPhoneNumber } from "@/lib/twilio/sms";
 
 const groupsDao = new GroupsDaoSupabase();
 
@@ -15,6 +15,7 @@ export async function POST(
 ) {
   try {
     const companyId = await requireCompanyId();
+    const twoWayPhoneNumber = await requireCompanyPhoneNumber(companyId);
     const { id: groupId } = await params;
     const body = await request.json();
 
@@ -70,10 +71,13 @@ export async function POST(
     for (const member of eligibleMembers) {
       try {
         const formattedPhone = formatPhoneNumber(member.phone_number);
-        const result = await sendSMS({
-          to: formattedPhone,
-          body: body.message.trim(),
-        });
+        const result = await sendTwoWaySMS(
+          {
+            to: formattedPhone,
+            body: body.message.trim(),
+          },
+          twoWayPhoneNumber
+        );
 
         results.push({
           member_id: member.id,

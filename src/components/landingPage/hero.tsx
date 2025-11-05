@@ -4,67 +4,82 @@ import Image from 'next/image';
 
 export default function Hero() {
   return (
-    <section className="bg-gradient-to-b from-[#F59144] via-[#F59144] via-30% to-white px-6 py-16 min-h-[60vh] text-[#2F2F2F] flex items-center">
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-12 w-full">
-        
-        {/* Left Text Section */}
-        <div className="flex flex-col items-center md:items-start gap-8 max-w-full md:max-w-[476px] text-center md:text-left">
-          <h1 className="text-4xl md:text-6xl font-black leading-tight md:leading-[72px] tracking-tight md:tracking-[5.76px]">
-            Cut Down on No Shows
-          </h1>
-          <p className="text-lg md:text-3xl font-semibold leading-snug md:leading-10 tracking-normal md:tracking-[2.88px] max-w-sm md:max-w-none">
-            An automated SMS and Call reminder system for the temporary staffing companies
-          </p>
-
-          {/* Button aligned left, Learn More centered under button */}
-          <div className="w-full md:w-80 flex flex-col items-start">
-            <a
-              href="https://calendly.com/john-henry-gilbert-1/30min"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="h-14 md:h-16 w-full px-6 py-3 bg-blue-600 rounded-full text-white text-lg md:text-2xl font-bold tracking-widest hover:bg-blue-700 transition flex items-center justify-center"
-            >
-              Book a Demo
-            </a>
-            <a
-              href="#learn-more"
-              className="text-blue-600 text-sm md:text-lg font-medium tracking-wide mt-1 text-center self-center"
-            >
-              Learn More
-            </a>
+    <section className="bg-gradient-to-r from-[#ffb877] to-[#ff8a42] text-white">
+      <div className="max-w-7xl mx-auto px-4 md:px-8 py-12 md:py-20">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          
+          {/* Left: Content */}
+          <div>
+            <h1 className="text-4xl md:text-5xl lg:text-6xl mb-6">
+              Cut Down on No Shows
+            </h1>
+            <p className="text-lg md:text-xl mb-8 text-white/90">
+              An automated SMS and Call reminder system for temporary staffing companies
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <a
+                href="https://calendly.com/john-henry-gilbert-1/30min"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-lg transition-colors text-lg text-center"
+              >
+                Book a Demo
+              </a>
+              <a
+                href="#quick-access"
+                className="text-white hover:text-white/80 flex items-center justify-center gap-2 transition-colors"
+              >
+                Learn More
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </a>
+            </div>
           </div>
-        </div>
 
-        {/* Right Image Section */}
-        <div className="flex flex-col md:grid md:grid-cols-2 gap-4 w-full md:w-[55%] items-center">
-          <Image
-            src="/images/text.jpg"
-            alt="Texting"
-            width={330}
-            height={174}
-            className="rounded-2xl object-cover w-[80%] md:w-full"
-          />
-          <Image
-            src="/images/call.jpg"
-            alt="Calling"
-            width={330}
-            height={174}
-            className="rounded-2xl object-cover w-[80%] md:w-full"
-          />
-          <Image
-            src="/images/email.jpg"
-            alt="Emailing"
-            width={330}
-            height={174}
-            className="rounded-2xl object-cover w-[80%] md:w-full"
-          />
-          <Image
-            src="/images/work.jpg"
-            alt="Work"
-            width={330}
-            height={174}
-            className="rounded-2xl object-cover w-[80%] md:w-full"
-          />
+          {/* Right: Image Grid */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4">
+              <div className="rounded-xl overflow-hidden shadow-lg">
+                <Image 
+                  src="/images/work.jpg"
+                  alt="Warehouse worker"
+                  width={400}
+                  height={300}
+                  className="w-full h-48 object-cover"
+                />
+              </div>
+              <div className="rounded-xl overflow-hidden shadow-lg">
+                <Image 
+                  src="/images/text.jpg"
+                  alt="Person texting on phone"
+                  width={400}
+                  height={300}
+                  className="w-full h-48 object-cover"
+                />
+              </div>
+            </div>
+            <div className="space-y-4 pt-8">
+              <div className="rounded-xl overflow-hidden shadow-lg">
+                <Image 
+                  src="/images/call.jpg"
+                  alt="Worker checking phone"
+                  width={400}
+                  height={300}
+                  className="w-full h-48 object-cover"
+                />
+              </div>
+              <div className="rounded-xl overflow-hidden shadow-lg">
+                <Image 
+                  src="/images/email.jpg"
+                  alt="Warehouse logistics"
+                  width={400}
+                  height={300}
+                  className="w-full h-48 object-cover"
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>

@@ -45,12 +45,12 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="w-full px-5 py-3 bg-[#F59144]">
+    <nav className="w-full px-5 py-3 bg-gradient-to-r from-[#ffb877] to-[#ff8a42]">
       <div className="flex justify-between items-center">
         {/* Logo + Brand */}
-        <Link href="/landingpage" className="flex items-center gap-5 cursor-pointer">
+        <Link href="/home" className="flex items-center gap-5 cursor-pointer">
           <Image height={50} width={50} alt="Logo" src="/icons/logo.svg" />
-          <span className="text-white text-2xl sm:text-3xl font-semibold font-inter">Staff Better</span>
+          <span className="text-white text-2xl sm:text-3xl font-bold font-inter">Staff Better</span>
         </Link>
 
         {/* Hamburger Icon */}
@@ -68,34 +68,67 @@ const Navbar = () => {
         </button>
 
         {/* Desktop Nav */}
-        <div className="hidden sm:flex items-center gap-8">
+        <div className="hidden sm:flex items-center gap-6">
           {isLoggedIn ? (
             <>
               <Link 
-                href="/jobs" 
-                className={`text-white text-lg font-medium transition-colors ${
-                  isActiveLink('/jobs') 
-                    ? 'text-white font-semibold' 
-                    : 'hover:underline hover:text-gray-200'
+                href="/home" 
+                className={`text-white text-lg font-bold transition-colors inline-flex items-center gap-2 px-3 py-1.5 rounded ${
+                  isActiveLink('/home')
+                    ? 'border-2 border-white border-opacity-100' 
+                    : 'hover:opacity-80'
                 }`}
               >
-                Jobs
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                  />
+                </svg>
+                Home
+              </Link>
+              <Link 
+                href="/messages" 
+                className={`text-white text-lg font-bold transition-colors ${
+                  isActiveLink('/messages')
+                    ? '' 
+                    : 'hover:opacity-80'
+                }`}
+              >
+                Messages
+              </Link>
+              <Link 
+                href="/reminders" 
+                className={`text-white text-lg font-bold transition-colors ${
+                  isActiveLink('/reminders') || isActiveLink('/jobs')
+                    ? '' 
+                    : 'hover:opacity-80'
+                }`}
+              >
+                Reminders
               </Link>
               <Link 
                 href="/groups" 
-                className={`text-white text-lg font-medium transition-colors ${
+                className={`text-white text-lg font-bold transition-colors ${
                   isActiveLink('/groups') 
-                    ? 'text-white font-semibold' 
-                    : 'hover:underline hover:text-gray-200'
+                    ? '' 
+                    : 'hover:opacity-80'
                 }`}
               >
-                Groups
+                Associates
               </Link>
               <div className="relative" ref={dropdownRef}>
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                    className="flex items-center gap-2 text-white hover:text-gray-200 transition-colors"
+                    className="flex items-center gap-2 text-white hover:opacity-80 transition-opacity"
                   >
                     <Image
                       src="/images/profile.svg"
@@ -156,24 +189,57 @@ const Navbar = () => {
           {isLoggedIn ? (
             <>
               <Link 
-                href="/jobs" 
-                className={`text-white text-lg font-medium transition-colors ${
-                  isActiveLink('/jobs') 
-                    ? 'text-white font-semibold' 
-                    : 'hover:underline hover:text-gray-200'
+                href="/home" 
+                className={`text-white text-lg font-bold transition-colors inline-flex items-center gap-2 px-3 py-1.5 rounded ${
+                  isActiveLink('/home')
+                    ? 'border-2 border-white' 
+                    : 'hover:opacity-80'
                 }`}
               >
-                Jobs
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                  />
+                </svg>
+                Home
+              </Link>
+              <Link 
+                href="/messages" 
+                className={`text-white text-lg font-bold transition-colors ${
+                  isActiveLink('/messages')
+                    ? '' 
+                    : 'hover:opacity-80'
+                }`}
+              >
+                Messages
+              </Link>
+              <Link 
+                href="/reminders" 
+                className={`text-white text-lg font-bold transition-colors ${
+                  isActiveLink('/reminders') || isActiveLink('/jobs')
+                    ? '' 
+                    : 'hover:opacity-80'
+                }`}
+              >
+                Reminders
               </Link>
               <Link 
                 href="/groups" 
-                className={`text-white text-lg font-medium transition-colors ${
+                className={`text-white text-lg font-bold transition-colors ${
                   isActiveLink('/groups') 
-                    ? 'text-white font-semibold' 
-                    : 'hover:underline hover:text-gray-200'
+                    ? '' 
+                    : 'hover:opacity-80'
                 }`}
               >
-                Groups
+                Associates
               </Link>
               <div className="flex items-center gap-3">
                 <button

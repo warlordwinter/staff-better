@@ -1,15 +1,17 @@
-import twilio from 'twilio';
+import twilio from "twilio";
 
 if (!process.env.TWILIO_ACCOUNT_SID) {
-  throw new Error('TWILIO_ACCOUNT_SID is required');
+  throw new Error("TWILIO_ACCOUNT_SID is required");
 }
 
 if (!process.env.TWILIO_AUTH_TOKEN) {
-  throw new Error('TWILIO_AUTH_TOKEN is required');
+  throw new Error("TWILIO_AUTH_TOKEN is required");
 }
 
-if (!process.env.TWILIO_PHONE_NUMBER) {
-  throw new Error('TWILIO_PHONE_NUMBER is required');
+// Support for reminder phone number from environment variable
+// The two-way phone number is stored in company.phone_number in the database
+if (!process.env.TWILIO_PHONE_NUMBER_REMINDERS) {
+  throw new Error("TWILIO_PHONE_NUMBER_REMINDERS is required");
 }
 
 export const twilioClient = twilio(
@@ -17,4 +19,9 @@ export const twilioClient = twilio(
   process.env.TWILIO_AUTH_TOKEN
 );
 
-export const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER;
+// Phone number for sending reminder messages
+export const TWILIO_PHONE_NUMBER_REMINDERS =
+  process.env.TWILIO_PHONE_NUMBER_REMINDERS;
+
+// Note: Two-way phone number is stored in company.phone_number in the database
+// and should be retrieved per company when sending two-way messages
