@@ -40,11 +40,11 @@ export default function MessagesPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
+    <div className="h-screen flex flex-col bg-white overflow-hidden">
       <Navbar />
-      <main className="flex-1 flex h-[calc(100vh-64px)]">
+      <main className="flex-1 flex min-h-0 overflow-hidden">
         {/* Left Pane - Conversation List */}
-        <div className="w-80 border-r border-gray-200 flex flex-col bg-white h-full">
+        <div className="w-80 border-r border-gray-200 flex flex-col bg-white overflow-hidden">
           {/* Messages Header */}
           <div className="p-6 border-b border-gray-200 flex-shrink-0">
             <h1 className="text-3xl font-bold text-black">Messages</h1>
@@ -100,11 +100,11 @@ export default function MessagesPage() {
         </div>
 
         {/* Right Pane - Chat Window */}
-        <div className="flex-1 flex flex-col bg-white">
+        <div className="flex-1 flex flex-col bg-white overflow-hidden">
           {selectedConversation ? (
             <>
               {/* Conversation Header */}
-              <div className="p-6 border-b border-gray-200">
+              <div className="p-6 border-b border-gray-200 flex-shrink-0">
                 <h2 className="text-2xl font-bold text-black">
                   {selectedConversation?.name}
                 </h2>
@@ -113,7 +113,7 @@ export default function MessagesPage() {
               {/* Messages - Scrollable Container */}
               <div
                 ref={messagesContainerRef}
-                className="flex-1 overflow-y-auto p-6 min-h-0 max-h-full"
+                className="flex-1 overflow-y-auto p-6 min-h-0"
                 style={{
                   scrollBehavior: "smooth",
                   WebkitOverflowScrolling: "touch",
@@ -127,7 +127,7 @@ export default function MessagesPage() {
               </div>
 
               {/* Message Input */}
-              <div className="p-4 border-t border-gray-200">
+              <div className="p-4 border-t border-gray-200 flex-shrink-0">
                 {error && (
                   <div className="mb-2 p-2 bg-red-100 border border-red-400 text-red-700 rounded text-sm">
                     {error}
