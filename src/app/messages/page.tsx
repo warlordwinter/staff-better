@@ -1,4 +1,4 @@
-"use client";
+Ca"use client";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import Navbar from "@/components/ui/navBar";
