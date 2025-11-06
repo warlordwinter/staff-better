@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GroupsDaoSupabase } from "@/lib/dao/implementations/supabase/GroupsDaoSupabase";
-import { requireCompanyId, requireCompanyPhoneNumber } from "@/lib/auth/getCompanyId";
+import { requireCompanyId } from "@/lib/auth/getCompanyId";
 import { sendTwoWaySMS, formatPhoneNumber } from "@/lib/twilio/sms";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 const groupsDao = new GroupsDaoSupabase();
 
@@ -15,7 +16,30 @@ export async function POST(
 ) {
   try {
     const companyId = await requireCompanyId();
-    const twoWayPhoneNumber = await requireCompanyPhoneNumber(companyId);
+
+    // Get company phone number directly from database (no fallback)
+    const supabaseAdmin = createAdminClient();
+    const { data: company, error: companyError } = await supabaseAdmin
+      .from("companies")
+      .select("phone_number")
+      .eq("id", companyId)
+      .single();
+
+    if (companyError || !company) {
+      return NextResponse.json({ error: "Company not found" }, { status: 404 });
+    }
+
+    if (!company.phone_number) {
+      return NextResponse.json(
+        {
+          error:
+            "Company phone number is not configured. Please set a phone number in company settings.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const twoWayPhoneNumber = company.phone_number;
     const { id: groupId } = await params;
     const body = await request.json();
 
