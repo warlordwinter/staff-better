@@ -417,48 +417,28 @@ export function useMessages(
     setSending(true);
     setError(null);
 
+    // Clear input immediately for better UX
+    setMessageText("");
+
     try {
       // Send message via API
+      // The message will be added to the UI via real-time subscription
+      // when it's saved to the database, preventing duplicates
       await MessagesDataService.sendMessage(
         selectedConversation.associateId,
         messageToSend
       );
 
-      // Create message object
-      const newMessage = MessagesDataService.createMessage(
-        messageToSend,
-        "outgoing"
-      );
-
-      // Update conversations
-      setConversations((prev) => {
-        const conv = prev.find((c) => c.id === selectedConversation.id);
-        if (!conv) return prev;
-
-        const updated = {
-          ...conv,
-          messages: [...conv.messages, newMessage],
-          lastMessage: messageToSend,
-          timestamp: newMessage.timestamp,
-        };
-
-        // Update selected conversation immediately
-        setSelectedConversation(updated);
-
-        return prev.map((c) =>
-          c.id === selectedConversation.id ? updated : c
-        );
-      });
-
-      setMessageText("");
-
       // Scroll to bottom after sending message
+      // The real-time subscription will add the message shortly
       setTimeout(() => {
         scrollToBottom(true);
-      }, 50);
+      }, 100);
     } catch (err) {
       console.error("Error sending message:", err);
       setError(err instanceof Error ? err.message : "Failed to send message");
+      // Restore message text on error so user can retry
+      setMessageText(messageToSend);
     } finally {
       setSending(false);
     }

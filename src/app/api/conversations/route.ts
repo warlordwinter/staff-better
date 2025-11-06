@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireCompanyId } from "@/lib/auth/getCompanyId";
 import { createClient } from "@/lib/supabase/server";
+import { time } from "console";
 
 /**
  * GET /api/conversations
