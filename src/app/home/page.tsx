@@ -1,14 +1,151 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Navbar from "@/components/ui/navBar";
 import Footer from "@/components/ui/footer";
 import LoadingSpinner from "@/components/ui/loadingSpinner";
 import { useAuthCheck } from "@/hooks/useAuthCheck";
+import {
+  MessagesDataService,
+  Conversation,
+} from "@/lib/services/messagesDataService";
+import { GroupsDataService } from "@/lib/services/groupsDataService";
+import { Job } from "@/model/interfaces/Job";
+
+interface RecentActivity {
+  type: "message" | "reminder" | "member";
+  title: string;
+  description: string;
+  timestamp: string;
+}
 
 export default function HomePage() {
   const { loading: authLoading, isAuthenticated } = useAuthCheck();
+
+  // State for dashboard data
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const [activeConversations, setActiveConversations] = useState(0);
+  const [activeReminders, setActiveReminders] = useState(0);
+  const [totalReminders, setTotalReminders] = useState(0);
+  const [totalGroups, setTotalGroups] = useState(0);
+  const [totalTeamMembers, setTotalTeamMembers] = useState(0);
+  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
+
+  // Fetch dashboard data
+  useEffect(() => {
+    if (!isAuthenticated || authLoading) {
+      return;
+    }
+
+    const fetchDashboardData = async () => {
+      try {
+        setDataLoading(true);
+
+        // Fetch messages/conversations
+        const conversationsRes = await fetch("/api/conversations");
+        if (conversationsRes.ok) {
+          const conversationsData = await conversationsRes.json();
+
+          // Count active conversations
+          setActiveConversations(conversationsData.length);
+
+          // Count unread messages (for now, all are marked as unread: false in the service)
+          // When unread tracking is implemented, this will work automatically
+          const conversations = await MessagesDataService.fetchConversations();
+          const unreadCount = conversations.filter(
+            (conv) => conv.unread
+          ).length;
+          setUnreadMessages(unreadCount);
+
+          // Build recent activity from raw data for proper timestamps
+          const recentMessages = conversationsData
+            .filter((conv: any) => conv.messages && conv.messages.length > 0)
+            .map((conv: any) => {
+              const lastMessage = conv.messages[conv.messages.length - 1];
+              const sentAt =
+                lastMessage?.sent_at ||
+                conv.last_message_time ||
+                conv.updated_at;
+              const timestamp = sentAt
+                ? new Date(sentAt).toLocaleTimeString("en-US", {
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })
+                : "";
+
+              return {
+                type: "message" as const,
+                title: `New message from ${conv.associate_name || "Unknown"}`,
+                description: lastMessage?.body || conv.last_message || "",
+                timestamp,
+                sortTime: sentAt,
+              };
+            })
+            .sort((a: any, b: any) => {
+              // Sort by timestamp (most recent first)
+              if (!a.sortTime || !b.sortTime) return 0;
+              return (
+                new Date(b.sortTime).getTime() - new Date(a.sortTime).getTime()
+              );
+            })
+            .slice(0, 3)
+            .map(({ sortTime, ...rest }: any) => rest);
+
+          setRecentActivity(recentMessages);
+        } else {
+          // Fallback to using service data
+          const conversations = await MessagesDataService.fetchConversations();
+          const unreadCount = conversations.filter(
+            (conv) => conv.unread
+          ).length;
+          setUnreadMessages(unreadCount);
+          setActiveConversations(conversations.length);
+
+          const recentMessages = conversations
+            .filter((conv) => conv.messages.length > 0)
+            .slice(0, 3)
+            .map((conv) => {
+              const lastMessage = conv.messages[conv.messages.length - 1];
+              return {
+                type: "message" as const,
+                title: `New message from ${conv.name}`,
+                description: lastMessage.text || "",
+                timestamp: lastMessage.timestamp || "",
+              };
+            });
+          setRecentActivity(recentMessages);
+        }
+
+        // Fetch jobs/reminders
+        const jobsRes = await fetch("/api/jobs");
+        if (jobsRes.ok) {
+          const jobs: Job[] = await jobsRes.json();
+          setTotalReminders(jobs.length);
+
+          // Count active reminders (jobs that need reminders)
+          // For now, we'll count all jobs as active reminders
+          // In the future, this could be filtered by num_reminders > 0
+          setActiveReminders(jobs.length);
+        }
+
+        // Fetch groups
+        const groups = await GroupsDataService.fetchGroups();
+        setTotalGroups(groups.length);
+
+        // Fetch all associates to get total team members
+        const associates = await GroupsDataService.fetchAllAssociates();
+        setTotalTeamMembers(associates.length);
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+      } finally {
+        setDataLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, [isAuthenticated, authLoading]);
 
   // Show loading spinner while checking authentication
   if (authLoading) {
@@ -67,10 +204,16 @@ export default function HomePage() {
                   Messages
                 </h3>
                 <div className="mb-1">
-                  <span className="text-3xl font-bold text-black">12</span>
+                  <span className="text-3xl font-bold text-black">
+                    {dataLoading ? "..." : unreadMessages}
+                  </span>
                   <span className="text-sm text-gray-600 ml-2">Unread</span>
                 </div>
-                <p className="text-sm text-gray-500">7 active conversations</p>
+                <p className="text-sm text-gray-500">
+                  {dataLoading
+                    ? "Loading..."
+                    : `${activeConversations} active conversations`}
+                </p>
               </div>
             </div>
           </Link>
@@ -101,10 +244,16 @@ export default function HomePage() {
                   Reminders
                 </h3>
                 <div className="mb-1">
-                  <span className="text-3xl font-bold text-black">8</span>
+                  <span className="text-3xl font-bold text-black">
+                    {dataLoading ? "..." : activeReminders}
+                  </span>
                   <span className="text-sm text-gray-600 ml-2">Active</span>
                 </div>
-                <p className="text-sm text-gray-500">12 total shift reminders</p>
+                <p className="text-sm text-gray-500">
+                  {dataLoading
+                    ? "Loading..."
+                    : `${totalReminders} total shift reminders`}
+                </p>
               </div>
             </div>
           </Link>
@@ -135,10 +284,16 @@ export default function HomePage() {
                   Associates
                 </h3>
                 <div className="mb-1">
-                  <span className="text-3xl font-bold text-black">5</span>
+                  <span className="text-3xl font-bold text-black">
+                    {dataLoading ? "..." : totalGroups}
+                  </span>
                   <span className="text-sm text-gray-600 ml-2">Groups</span>
                 </div>
-                <p className="text-sm text-gray-500">42 team members</p>
+                <p className="text-sm text-gray-500">
+                  {dataLoading
+                    ? "Loading..."
+                    : `${totalTeamMembers} team members`}
+                </p>
               </div>
             </div>
           </Link>
@@ -168,38 +323,32 @@ export default function HomePage() {
             </div>
 
             <div className="space-y-4">
-              {/* Activity Item 1 */}
-              <div className="border-b border-gray-100 pb-4 last:border-0 last:pb-0">
-                <h3 className="text-sm font-semibold text-black mb-1">
-                  New message from Sarah Mitchell
-                </h3>
-                <p className="text-sm text-gray-600 mb-2">
-                  Thanks for the update! See you tomorrow.
-                </p>
-                <p className="text-xs text-gray-500">1:15 PM</p>
-              </div>
-
-              {/* Activity Item 2 */}
-              <div className="border-b border-gray-100 pb-4 last:border-0 last:pb-0">
-                <h3 className="text-sm font-semibold text-black mb-1">
-                  Reminder confirmed: Evening Dinner Service
-                </h3>
-                <p className="text-sm text-gray-600 mb-2">
-                  4 associates confirmed for Oct 30 shift
-                </p>
-                <p className="text-xs text-gray-500">10:30 AM</p>
-              </div>
-
-              {/* Activity Item 3 */}
-              <div className="border-b border-gray-100 pb-4 last:border-0 last:pb-0">
-                <h3 className="text-sm font-semibold text-black mb-1">
-                  New member added to Kitchen Staff
-                </h3>
-                <p className="text-sm text-gray-600 mb-2">
-                  David Chen joined the team
-                </p>
-                <p className="text-xs text-gray-500">Yesterday</p>
-              </div>
+              {dataLoading ? (
+                <div className="text-center py-8">
+                  <LoadingSpinner />
+                </div>
+              ) : recentActivity.length > 0 ? (
+                recentActivity.map((activity, index) => (
+                  <div
+                    key={index}
+                    className="border-b border-gray-100 pb-4 last:border-0 last:pb-0"
+                  >
+                    <h3 className="text-sm font-semibold text-black mb-1">
+                      {activity.title}
+                    </h3>
+                    <p className="text-sm text-gray-600 mb-2">
+                      {activity.description}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {activity.timestamp}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <p className="text-sm">No recent activity</p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -275,4 +424,3 @@ export default function HomePage() {
     </div>
   );
 }
-
