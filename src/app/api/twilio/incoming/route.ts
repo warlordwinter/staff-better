@@ -80,12 +80,14 @@ export async function POST(request: NextRequest) {
 
     // Try normalized phone number first
     // Use .limit(1) instead of .single() to handle duplicate phone numbers
-    let { data: associates, error: associateError } = await supabaseAdmin
-      .from("associates")
-      .select("id, company_id, phone_number")
-      .eq("phone_number", normalizedFrom)
-      .limit(2); // Get up to 2 to detect duplicates
+    const { data: associates, error: initialAssociateError } =
+      await supabaseAdmin
+        .from("associates")
+        .select("id, company_id, phone_number")
+        .eq("phone_number", normalizedFrom)
+        .limit(2); // Get up to 2 to detect duplicates
 
+    let associateError = initialAssociateError;
     let associate = null;
 
     // Handle the results
