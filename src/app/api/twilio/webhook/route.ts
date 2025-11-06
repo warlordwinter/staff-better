@@ -93,26 +93,66 @@ export async function POST(request: NextRequest) {
     console.log("Message processing result:", result);
 
     // Also save message to database for messages UI (new functionality)
+    // Note: toNumber is optional - we can find the conversation by associate_id alone
     try {
-      if (toNumber && fromNumber && messageBody) {
+      if (fromNumber && messageBody) {
         const supabaseAdmin = createAdminClient();
 
         // Find the associate by phone number (phone numbers are unique)
+        // Use the same normalization logic as AssociatesDaoSupabase
         const { normalizePhoneForLookup } = await import("@/utils/phoneUtils");
         const normalizedFrom = normalizePhoneForLookup(fromNumber);
-        const { data: associate, error: associateError } = await supabaseAdmin
+
+        console.log(
+          `🔍 Looking up associate: ${fromNumber} → normalized: ${normalizedFrom}`
+        );
+
+        // Try normalized phone number first
+        let { data: associate, error: associateError } = await supabaseAdmin
           .from("associates")
-          .select("id, company_id")
+          .select("id, company_id, phone_number")
           .eq("phone_number", normalizedFrom)
           .single();
 
+        // If no match and numbers are different, try original format
+        if (
+          associateError &&
+          associateError.code === "PGRST116" &&
+          normalizedFrom !== fromNumber
+        ) {
+          console.log(
+            `⚠️ No match for normalized phone, trying original: ${fromNumber}`
+          );
+          const result = await supabaseAdmin
+            .from("associates")
+            .select("id, company_id, phone_number")
+            .eq("phone_number", fromNumber)
+            .single();
+
+          associate = result.data;
+          associateError = result.error;
+        }
+
         if (associateError || !associate || !associate.company_id) {
           console.error(
-            "Error finding associate for conversation:",
+            "❌ Error finding associate for conversation:",
             associateError
           );
+          console.error(
+            "❌ Failed to save message - associate not found for phone:",
+            normalizedFrom,
+            "(also tried original:",
+            fromNumber,
+            ")"
+          );
         } else {
+          console.log(
+            `✅ Found associate: ${associate.id} (company: ${associate.company_id}, stored phone: ${associate.phone_number})`
+          );
           // Find or create conversation using associate_id and company_id
+          console.log(
+            `🔍 Looking for conversation: associate_id=${associate.id}, company_id=${associate.company_id}`
+          );
           const { data: conversations, error: conversationError } =
             await supabaseAdmin
               .from("conversations")
@@ -129,6 +169,7 @@ export async function POST(request: NextRequest) {
             conversations.length === 0
           ) {
             // Create new conversation
+            console.log("📝 Creating new conversation...");
             const { data: newConversation, error: createError } =
               await supabaseAdmin
                 .from("conversations")
@@ -142,37 +183,77 @@ export async function POST(request: NextRequest) {
                 .single();
 
             if (createError || !newConversation) {
-              console.error("Error creating conversation:", createError);
+              console.error("❌ Error creating conversation:", createError);
+              console.error(
+                "❌ Failed to save message - conversation creation failed"
+              );
             } else {
               conversation_id = newConversation.id;
+              console.log("✅ Created new conversation:", conversation_id);
             }
           } else {
             conversation_id = conversations[0].id;
+            console.log("✅ Found existing conversation:", conversation_id);
           }
 
           // Save inbound message if we have a conversation_id
           if (conversation_id) {
-            const { error: insertError } = await supabaseAdmin
-              .from("messages")
-              .insert([
-                {
-                  conversation_id,
-                  sender_type: "associate",
-                  body: messageBody.trim(),
-                  direction: "inbound",
-                  sent_at: new Date().toISOString(),
-                },
-              ]);
+            const messageData = {
+              conversation_id,
+              sender_type: "associate",
+              body: messageBody.trim(),
+              direction: "inbound",
+              sent_at: new Date().toISOString(),
+            };
+
+            console.log("💾 Attempting to save message:", {
+              conversation_id,
+              body_length: messageData.body.length,
+              direction: messageData.direction,
+            });
+
+            const { data: insertedMessage, error: insertError } =
+              await supabaseAdmin
+                .from("messages")
+                .insert([messageData])
+                .select()
+                .single();
 
             if (insertError) {
-              console.error("Error saving message to Supabase:", insertError);
+              console.error(
+                "❌ Error saving message to Supabase:",
+                insertError
+              );
+              console.error(
+                "❌ Failed to save message - insert error:",
+                JSON.stringify(insertError, null, 2)
+              );
+            } else {
+              console.log(
+                "✅ Successfully saved incoming message to Supabase:",
+                insertedMessage?.id
+              );
             }
+          } else {
+            console.error(
+              "❌ Failed to save message - no conversation_id available"
+            );
           }
         }
+      } else {
+        console.error("Missing required fields for saving message:", {
+          fromNumber: !!fromNumber,
+          messageBody: !!messageBody,
+          toNumber: !!toNumber,
+        });
       }
     } catch (dbError) {
       // Don't fail the webhook if DB save fails
       console.error("Error saving message to database:", dbError);
+      console.error(
+        "Database error details:",
+        dbError instanceof Error ? dbError.message : String(dbError)
+      );
     }
 
     return new NextResponse(

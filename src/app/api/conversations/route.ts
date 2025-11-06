@@ -7,8 +7,10 @@ import { createClient } from "@/lib/supabase/server";
  * Fetch all conversations for the authenticated company with their messages
  */
 export async function GET() {
+  console.log("📞 GET /api/conversations called");
   try {
     const companyId = await requireCompanyId();
+    console.log("✅ Company ID:", companyId);
     const supabase = await createClient();
 
     // Fetch conversations for this company

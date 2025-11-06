@@ -26,12 +26,38 @@ import { getCompanyPhoneNumberAdmin } from "@/lib/auth/getCompanyId";
  * - 500: Internal server error
  */
 export async function POST(request: NextRequest) {
+  console.log("=== INCOMING WEBHOOK HIT ===");
+  console.log("Timestamp:", new Date().toISOString());
+  console.log("Request URL:", request.url);
+  console.log("Request method:", request.method);
+
+  // Log request headers to see what Twilio is sending
+  console.log(
+    "Request headers:",
+    Object.fromEntries(request.headers.entries())
+  );
+  console.log("Content-Type:", request.headers.get("content-type"));
+  console.log("User-Agent:", request.headers.get("user-agent"));
+
   try {
     // Parse form data from Twilio
     const formData = await request.formData();
+
+    // Log all form data keys to see what Twilio sent
+    console.log("Form data keys:", Array.from(formData.keys()));
+
     const From = formData.get("From") as string;
     const To = formData.get("To") as string;
     const Body = formData.get("Body") as string;
+
+    // Log all form data entries for debugging
+    console.log("All form data entries:", Array.from(formData.entries()));
+
+    console.log("📨 Incoming message received:", {
+      From,
+      To,
+      Body: Body?.substring(0, 50) + (Body && Body.length > 50 ? "..." : ""),
+    });
 
     // Validate required fields
     if (!From || !To || !Body) {
@@ -48,18 +74,72 @@ export async function POST(request: NextRequest) {
 
     // Normalize phone number for lookup
     const normalizedFrom = normalizePhoneForLookup(From);
+    console.log(
+      `🔍 Looking up associate: ${From} → normalized: ${normalizedFrom}`
+    );
 
-    // Find the associate by phone number (phone numbers are unique)
-    const { data: associate, error: associateError } = await supabaseAdmin
-      .from("associates")
-      .select("id, company_id")
-      .eq("phone_number", normalizedFrom)
-      .single();
+    // Try normalized phone number first
+    // Use .limit(1) instead of .single() to handle duplicate phone numbers
+    const { data: associates, error: initialAssociateError } =
+      await supabaseAdmin
+        .from("associates")
+        .select("id, company_id, phone_number")
+        .eq("phone_number", normalizedFrom)
+        .limit(2); // Get up to 2 to detect duplicates
+
+    let associateError = initialAssociateError;
+    let associate = null;
+
+    // Handle the results
+    if (associateError) {
+      console.error("❌ Error querying associates:", associateError);
+    } else if (associates && associates.length > 0) {
+      if (associates.length > 1) {
+        console.warn(
+          `⚠️ WARNING: Found ${associates.length} associates with phone number ${normalizedFrom}. Using the first one.`
+        );
+        console.warn(
+          "⚠️ Duplicate associates:",
+          associates.map((a) => ({ id: a.id, company_id: a.company_id }))
+        );
+      }
+      // Take the first associate
+      associate = associates[0];
+    }
+
+    // If no match and numbers are different, try original format
+    if (!associate && normalizedFrom !== From) {
+      console.log(`⚠️ No match for normalized phone, trying original: ${From}`);
+      const result = await supabaseAdmin
+        .from("associates")
+        .select("id, company_id, phone_number")
+        .eq("phone_number", From)
+        .limit(2);
+
+      if (result.error) {
+        associateError = result.error;
+      } else if (result.data && result.data.length > 0) {
+        if (result.data.length > 1) {
+          console.warn(
+            `⚠️ WARNING: Found ${result.data.length} associates with phone number ${From}. Using the first one.`
+          );
+        }
+        associate = result.data[0];
+        associateError = null;
+      }
+    }
 
     if (associateError || !associate || !associate.company_id) {
       console.error(
-        "Error finding associate for conversation:",
+        "❌ Error finding associate for conversation:",
         associateError
+      );
+      console.error(
+        "❌ Failed to save message - associate not found for phone:",
+        normalizedFrom,
+        "(also tried original:",
+        From,
+        ")"
       );
       // Still return valid TwiML to avoid Twilio retries
       const response = new twiml.MessagingResponse();
@@ -68,6 +148,10 @@ export async function POST(request: NextRequest) {
         headers: { "Content-Type": "text/xml" },
       });
     }
+
+    console.log(
+      `✅ Found associate: ${associate.id} (company: ${associate.company_id}, stored phone: ${associate.phone_number})`
+    );
 
     // Determine which phone number to use for the conversation
     // If the message is to the reminder number, use the company's two-way number
@@ -83,6 +167,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Find or create conversation using associate_id and company_id
+    console.log(
+      `🔍 Looking for conversation: associate_id=${associate.id}, company_id=${associate.company_id}`
+    );
     const { data: conversations, error: conversationError } =
       await supabaseAdmin
         .from("conversations")
@@ -94,8 +181,9 @@ export async function POST(request: NextRequest) {
     let conversation_id: string;
 
     if (conversationError) {
-      console.error("Error fetching conversations:", conversationError);
+      console.error("❌ Error fetching conversations:", conversationError);
       // Create new conversation if fetch failed
+      console.log("📝 Creating new conversation (fetch failed)...");
       const { data: newConversation, error: createError } = await supabaseAdmin
         .from("conversations")
         .insert([
@@ -105,7 +193,7 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (createError || !newConversation) {
-        console.error("Error creating conversation:", createError);
+        console.error("❌ Error creating conversation:", createError);
         // Still return valid TwiML
         const response = new twiml.MessagingResponse();
         return new NextResponse(response.toString(), {
@@ -115,11 +203,14 @@ export async function POST(request: NextRequest) {
       }
 
       conversation_id = newConversation.id;
+      console.log("✅ Created new conversation:", conversation_id);
     } else if (conversations && conversations.length > 0) {
       // Conversation exists
       conversation_id = conversations[0].id;
+      console.log("✅ Found existing conversation:", conversation_id);
     } else {
       // No conversation found, create a new one
+      console.log("📝 Creating new conversation (none found)...");
       const { data: newConversation, error: createError } = await supabaseAdmin
         .from("conversations")
         .insert([
@@ -129,7 +220,7 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (createError || !newConversation) {
-        console.error("Error creating conversation:", createError);
+        console.error("❌ Error creating conversation:", createError);
         // Still return valid TwiML
         const response = new twiml.MessagingResponse();
         return new NextResponse(response.toString(), {
@@ -139,23 +230,43 @@ export async function POST(request: NextRequest) {
       }
 
       conversation_id = newConversation.id;
+      console.log("✅ Created new conversation:", conversation_id);
     }
 
     // Save inbound message
-    const { error: insertError } = await supabaseAdmin.from("messages").insert([
-      {
-        conversation_id,
-        sender_type: "associate",
-        body: Body.trim(),
-        direction: "inbound",
-        sent_at: new Date().toISOString(),
-      },
-    ]);
+    console.log("💾 Attempting to save message to Supabase:", {
+      conversation_id,
+      body_length: Body.trim().length,
+      direction: "inbound",
+    });
+
+    const { data: insertedMessage, error: insertError } = await supabaseAdmin
+      .from("messages")
+      .insert([
+        {
+          conversation_id,
+          sender_type: "associate",
+          body: Body.trim(),
+          direction: "inbound",
+          sent_at: new Date().toISOString(),
+        },
+      ])
+      .select()
+      .single();
 
     if (insertError) {
-      console.error("Error saving message to Supabase:", insertError);
+      console.error("❌ Error saving message to Supabase:", insertError);
+      console.error(
+        "❌ Failed to save message - insert error:",
+        JSON.stringify(insertError, null, 2)
+      );
       // Message received from Twilio but failed to save
       // Log the error but still return success to Twilio
+    } else {
+      console.log(
+        "✅ Successfully saved incoming message to Supabase:",
+        insertedMessage?.id
+      );
     }
 
     // Respond to Twilio with empty TwiML
