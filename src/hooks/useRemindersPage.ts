@@ -98,8 +98,7 @@ export function useRemindersPage(
     if (!authLoading && isAuthenticated) {
       loadJobs();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, isAuthenticated]);
+  }, [authLoading, isAuthenticated, loadJobs]);
 
   // Filter jobs based on search
   const filteredJobs = jobs.filter((job) => {

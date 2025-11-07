@@ -89,7 +89,7 @@ export default function RemindersPagePresenter() {
         model.newStartDate,
         model.newStartTime
       );
-    } catch (error) {
+    } catch {
       alert("Failed to create reminder. Please try again.");
     }
   };
@@ -99,7 +99,7 @@ export default function RemindersPagePresenter() {
     if (window.confirm("Are you sure you want to delete this reminder?")) {
       try {
         await model.deleteReminder(job.id);
-      } catch (error) {
+      } catch {
         alert("Failed to delete reminder. Please try again.");
       }
     }

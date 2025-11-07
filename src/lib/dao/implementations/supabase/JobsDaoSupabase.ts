@@ -47,64 +47,15 @@ export class JobsDaoSupabase implements IJobs {
       JSON.stringify(jobsToInsert, null, 2)
     );
 
-    let { data, error } = await supabase
+    const { data, error } = await supabase
       .from("jobs")
       .insert(jobsToInsert)
       .select();
 
-    // Check if error is about missing start_time column
+    // Handle errors
     if (error) {
-      const hasStartTime = jobsToInsert.some((job) => job.start_time);
-      const errorMessage = error.message || JSON.stringify(error);
-      const errorCode = error.code || "";
-
-      console.error("Insert error:", {
-        errorMessage,
-        errorCode,
-        hasStartTime,
-        errorDetails: error,
-      });
-
-      // If we're trying to save start_time and get a column error, it's likely the column doesn't exist
-      if (
-        hasStartTime &&
-        (errorMessage.includes("column") ||
-          errorCode === "42703" ||
-          errorMessage.includes("start_time") ||
-          errorMessage.toLowerCase().includes("does not exist"))
-      ) {
-        console.error(
-          "ERROR: start_time column does not exist in the jobs table. " +
-            "Please add the column with: ALTER TABLE jobs ADD COLUMN start_time TIMESTAMPTZ NULL;"
-        );
-        throw new Error(
-          "start_time column not found in database. Please add the column to the jobs table. " +
-            "SQL: ALTER TABLE jobs ADD COLUMN start_time TIMESTAMPTZ NULL;"
-        );
-      }
-
-      // If it's a different column error and we don't have start_time, just throw
-      if (!hasStartTime || !errorMessage.includes("column")) {
-        console.error("Supabase error (raw):", JSON.stringify(error, null, 2));
-        throw new Error(JSON.stringify(error));
-      }
-
-      // If it's a column error but not specifically about start_time, retry without it
-      console.warn(
-        "Column error detected (not start_time), retrying without start_time"
-      );
-      const jobsWithoutStartTime = jobs.map(({ start_time, ...job }) => job);
-      const retryResult = await supabase
-        .from("jobs")
-        .insert(jobsWithoutStartTime)
-        .select();
-      data = retryResult.data;
-      error = retryResult.error;
-    }
-
-    if (error) {
-      console.error("Supabase error (raw):", JSON.stringify(error, null, 2));
-      throw new Error(JSON.stringify(error));
+      console.error("Supabase insert error:", JSON.stringify(error, null, 2));
+      throw new Error(error.message || "Failed to insert jobs");
     }
 
     // Defensive: handle possible null 'data' value

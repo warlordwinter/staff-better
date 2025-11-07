@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { Job } from "@/model/interfaces/Job";
 import { JobAssignmentResponse } from "@/utils/statusUtils";
 import {
@@ -13,7 +12,6 @@ export interface ReminderStatus {
 }
 
 export function useReminderDetail(reminderId: string) {
-  const router = useRouter();
   const [job, setJob] = useState<Job | null>(null);
   const [assignments, setAssignments] = useState<JobAssignmentResponse[]>([]);
   const [loading, setLoading] = useState(true);
