@@ -4,6 +4,8 @@ import {
   requireCompanyPhoneNumber,
 } from "@/lib/auth/getCompanyId";
 import { TwilioMessageService } from "@/lib/services/implementations/TwilioMessageService";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 
 /**
  * POST /api/associates/[id]/message
@@ -62,9 +64,7 @@ export async function POST(
     // Get the associate details
     // Note: We need to get the associate to check their phone and opt-out status
     // For now, we'll use a simple select query
-    const supabase = await (
-      await import("@/lib/supabase/server")
-    ).createClient();
+    const supabase = await createClient();
 
     const { data: associate, error: associateError } = await supabase
       .from("associates")
@@ -135,23 +135,35 @@ export async function POST(
 
       // Find or create conversation and save message to database
       try {
-        const supabaseAdmin = await (
-          await import("@/lib/supabase/admin")
-        ).createAdminClient();
+        console.log("💾 [DB DEBUG] Starting database save for individual message");
+        console.log("💾 [DB DEBUG] Associate ID:", associateId);
+        console.log("💾 [DB DEBUG] Company ID:", companyId);
+        
+        const supabaseAdmin = createAdminClient();
+        console.log("💾 [DB DEBUG] Admin client created");
+        console.log("💾 [DB DEBUG] Service role key exists:", !!process.env.SUPABASE_SERVICE_ROLE_KEY);
 
         // Find or create conversation
-        const { data: existingConversations } = await supabaseAdmin
+        const { data: existingConversations, error: searchError } = await supabaseAdmin
           .from("conversations")
           .select("id")
           .eq("associate_id", associateId)
           .eq("company_id", companyId)
           .limit(1);
 
+        if (searchError) {
+          console.error("💾 [DB DEBUG] Error searching conversations:", searchError);
+        }
+        
+        console.log("💾 [DB DEBUG] Existing conversations found:", existingConversations?.length || 0);
+
         let conversationId: string | undefined;
         if (existingConversations && existingConversations.length > 0) {
           conversationId = existingConversations[0].id;
+          console.log("💾 [DB DEBUG] Using existing conversation:", conversationId);
         } else {
           // Create new conversation
+          console.log("💾 [DB DEBUG] Creating new conversation...");
           const { data: newConversation, error: createError } =
             await supabaseAdmin
               .from("conversations")
@@ -165,35 +177,44 @@ export async function POST(
               .single();
 
           if (createError || !newConversation) {
-            console.error("Error creating conversation:", createError);
+            console.error("💾 [DB DEBUG] Error creating conversation:", createError);
             // Continue without saving message - SMS was sent successfully
           } else {
             conversationId = newConversation.id;
+            console.log("💾 [DB DEBUG] New conversation created:", conversationId);
           }
         }
 
         // Save message to database if we have a conversation_id
         if (conversationId) {
-          const { error: insertError } = await supabaseAdmin
+          const messageData = {
+            conversation_id: conversationId,
+            sender_type: "company",
+            body: body.message.trim(),
+            direction: "outbound",
+            status: result.success && result.messageId ? "queued" : null,
+            sent_at: new Date().toISOString(),
+          };
+          
+          console.log("💾 [DB DEBUG] Saving message to database:", messageData);
+          
+          const { data: insertedMessage, error: insertError } = await supabaseAdmin
             .from("messages")
-            .insert([
-              {
-                conversation_id: conversationId,
-                sender_type: "company",
-                body: body.message.trim(),
-                direction: "outbound",
-                status: result.success && result.messageId ? "queued" : null,
-                sent_at: new Date().toISOString(),
-              },
-            ]);
+            .insert([messageData])
+            .select()
+            .single();
 
           if (insertError) {
-            console.error("Error saving message to database:", insertError);
+            console.error("💾 [DB DEBUG] Error saving message to database:", insertError);
             // Continue - SMS was sent successfully
+          } else {
+            console.log("💾 [DB DEBUG] ✅ Message saved successfully:", insertedMessage);
           }
+        } else {
+          console.error("💾 [DB DEBUG] ❌ No conversation ID available - message not saved");
         }
       } catch (dbError) {
-        console.error("Error saving message to database:", dbError);
+        console.error("💾 [DB DEBUG] Exception saving message to database:", dbError);
         // Continue - SMS was sent successfully
       }
 

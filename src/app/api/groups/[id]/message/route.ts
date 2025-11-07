@@ -115,6 +115,95 @@ export async function POST(
             phone: member.phone_number,
             error: "error" in result ? result.error : "Unknown error",
           });
+        } else {
+          // SMS sent successfully - now save to database
+          try {
+            console.log(`💾 [MASS MSG DB] Starting save for associate ${member.id}`);
+            console.log(`💾 [MASS MSG DB] Company ID:`, companyId);
+            console.log(`💾 [MASS MSG DB] Service role key exists:`, !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+            
+            // Find or create conversation for this associate-company pair
+            const { data: existingConversations, error: searchError } = await supabaseAdmin
+              .from("conversations")
+              .select("id")
+              .eq("associate_id", member.id)
+              .eq("company_id", companyId)
+              .limit(1);
+
+            if (searchError) {
+              console.error(`💾 [MASS MSG DB] Error searching conversations:`, searchError);
+            }
+            
+            console.log(`💾 [MASS MSG DB] Existing conversations found:`, existingConversations?.length || 0);
+
+            let conversationId: string | undefined;
+            if (existingConversations && existingConversations.length > 0) {
+              conversationId = existingConversations[0].id;
+              console.log(`💾 [MASS MSG DB] Using existing conversation:`, conversationId);
+            } else {
+              // Create new conversation
+              console.log(`💾 [MASS MSG DB] Creating new conversation...`);
+              const { data: newConversation, error: createError } =
+                await supabaseAdmin
+                  .from("conversations")
+                  .insert([
+                    {
+                      associate_id: member.id,
+                      company_id: companyId,
+                    },
+                  ])
+                  .select()
+                  .single();
+
+              if (createError || !newConversation) {
+                console.error(
+                  `💾 [MASS MSG DB] Error creating conversation for associate ${member.id}:`,
+                  createError
+                );
+              } else {
+                conversationId = newConversation.id;
+                console.log(`💾 [MASS MSG DB] New conversation created:`, conversationId);
+              }
+            }
+
+            // Save message to database if we have a conversation_id
+            if (conversationId) {
+              const messageData = {
+                conversation_id: conversationId,
+                sender_type: "company",
+                body: body.message.trim(),
+                direction: "outbound",
+                status: result.success && result.messageId ? "queued" : null,
+                sent_at: new Date().toISOString(),
+              };
+              
+              console.log(`💾 [MASS MSG DB] Saving message:`, messageData);
+              
+              const { data: insertedMessage, error: insertError } = await supabaseAdmin
+                .from("messages")
+                .insert([messageData])
+                .select()
+                .single();
+
+              if (insertError) {
+                console.error(
+                  `💾 [MASS MSG DB] Error saving message to database for associate ${member.id}:`,
+                  insertError
+                );
+                // Continue - SMS was sent successfully
+              } else {
+                console.log(`💾 [MASS MSG DB] ✅ Message saved successfully:`, insertedMessage);
+              }
+            } else {
+              console.error(`💾 [MASS MSG DB] ❌ No conversation ID for associate ${member.id}`);
+            }
+          } catch (dbError) {
+            console.error(
+              `💾 [MASS MSG DB] Exception for associate ${member.id}:`,
+              dbError
+            );
+            // Continue - SMS was sent successfully
+          }
         }
 
         // Small delay between messages to avoid rate limiting
