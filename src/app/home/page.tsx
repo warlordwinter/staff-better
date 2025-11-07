@@ -6,10 +6,7 @@ import Navbar from "@/components/ui/navBar";
 import Footer from "@/components/ui/footer";
 import LoadingSpinner from "@/components/ui/loadingSpinner";
 import { useAuthCheck } from "@/hooks/useAuthCheck";
-import {
-  MessagesDataService,
-  Conversation,
-} from "@/lib/services/messagesDataService";
+import { MessagesDataService } from "@/lib/services/messagesDataService";
 import { GroupsDataService } from "@/lib/services/groupsDataService";
 import { Job } from "@/model/interfaces/Job";
 
@@ -91,7 +88,11 @@ export default function HomePage() {
               );
             })
             .slice(0, 3)
-            .map(({ sortTime, ...rest }: any) => rest);
+            .map((item: any) => {
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+              const { sortTime, ...rest } = item;
+              return rest;
+            });
 
           setRecentActivity(recentMessages);
         } else {

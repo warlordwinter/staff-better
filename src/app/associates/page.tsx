@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import Navbar from "@/components/ui/navBar";
 import Footer from "@/components/ui/footer";
@@ -12,6 +12,12 @@ import { formatPhoneForDisplay } from "@/utils/phoneUtils";
 import AssociateActions from "@/components/shared/AssociateActions";
 import IndividualMessageModal from "@/components/groups/IndividualMessageModal";
 import MassMessageModal from "@/components/groups/MassMessageModal";
+import { AssociateFormData } from "@/components/shared/AssociateForm";
+import { isValidPhoneNumber } from "@/utils/phoneUtils";
+import {
+  associateGroupToFormData,
+  formDataToAssociateGroup,
+} from "@/utils/associateUtils";
 
 // Helper function to get initials from name
 const getInitials = (firstName: string, lastName: string): string => {
@@ -20,12 +26,178 @@ const getInitials = (firstName: string, lastName: string): string => {
   return `${first}${last}`;
 };
 
+// Custom table row component with avatar
+function AssociateTableRow({
+  associate,
+  onSave,
+  onDelete,
+  onMessage,
+}: {
+  associate: AssociateGroup;
+  onSave: (updatedAssociate: AssociateGroup) => void;
+  onDelete: () => void;
+  onMessage: () => void;
+}) {
+  const [isEditing, setIsEditing] = useState(associate.isNew || false);
+
+  // Memoize the form data to prevent infinite re-renders
+  const initialFormData = useMemo(
+    () => associateGroupToFormData(associate),
+    [associate]
+  );
+
+  const [formData, setFormData] = useState(initialFormData);
+
+  const handleEdit = () => {
+    setIsEditing(true);
+  };
+
+  const handleSave = () => {
+    const updatedAssociate = formDataToAssociateGroup(
+      formData,
+      associate.groupId,
+      associate.id
+    );
+    // Preserve the isNew flag from the original associate
+    updatedAssociate.isNew = associate.isNew;
+    onSave(updatedAssociate);
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    if (associate.isNew) {
+      onDelete();
+    } else {
+      setIsEditing(false);
+    }
+  };
+
+  return (
+    <tr className="hover:bg-gray-50 border-b border-gray-100 transition-colors duration-150">
+      {/* Avatar */}
+      <td className="px-4 py-4">
+        <div className="w-10 h-10 rounded-full bg-gradient-to-r from-[#FFBB87] to-[#FE6F00] flex items-center justify-center text-white text-sm font-semibold">
+          {getInitials(associate.firstName, associate.lastName)}
+        </div>
+      </td>
+
+      {/* First Name */}
+      <td className="px-4 py-4 text-sm text-gray-900 font-medium truncate">
+        {isEditing ? (
+          <input
+            type="text"
+            value={formData.firstName}
+            onChange={(e) => {
+              const updatedData = { ...formData, firstName: e.target.value };
+              setFormData(updatedData);
+            }}
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="First name"
+            autoFocus
+          />
+        ) : (
+          <span className="font-medium text-gray-900">
+            {associate.firstName}
+          </span>
+        )}
+      </td>
+
+      {/* Last Name */}
+      <td className="px-4 py-4 text-sm text-gray-700 truncate">
+        {isEditing ? (
+          <input
+            type="text"
+            value={formData.lastName}
+            onChange={(e) => {
+              const updatedData = { ...formData, lastName: e.target.value };
+              setFormData(updatedData);
+            }}
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Last name"
+          />
+        ) : (
+          associate.lastName
+        )}
+      </td>
+
+      {/* Phone Number */}
+      <td className="px-4 py-4 text-sm text-gray-700 font-mono truncate">
+        {isEditing ? (
+          <input
+            type="tel"
+            value={formData.phoneNumber}
+            onChange={(e) => {
+              const updatedData = { ...formData, phoneNumber: e.target.value };
+              setFormData(updatedData);
+            }}
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Phone number"
+          />
+        ) : (
+          formatPhoneForDisplay(associate.phoneNumber)
+        )}
+      </td>
+
+      {/* Email Address */}
+      <td className="px-4 py-4 text-sm text-gray-700 truncate">
+        {isEditing ? (
+          <input
+            type="email"
+            value={formData.emailAddress}
+            onChange={(e) => {
+              const updatedData = { ...formData, emailAddress: e.target.value };
+              setFormData(updatedData);
+            }}
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Email address"
+          />
+        ) : (
+          associate.emailAddress || "-"
+        )}
+      </td>
+
+      {/* Actions */}
+      <td className="px-4 py-4 text-center">
+        {isEditing ? (
+          <div className="flex items-center justify-center gap-2">
+            <button
+              onClick={handleSave}
+              disabled={!formData.firstName.trim() || !formData.lastName.trim()}
+              className={`px-3 py-1 text-xs text-white rounded focus:outline-none ${
+                !formData.firstName.trim() || !formData.lastName.trim()
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-green-500 hover:bg-green-600"
+              }`}
+            >
+              Save
+            </button>
+            <button
+              onClick={handleCancel}
+              className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 focus:outline-none"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center gap-2">
+            <AssociateActions
+              onEdit={handleEdit}
+              onDelete={onDelete}
+              onMessage={onMessage}
+              showMessageButton={false}
+              size="md"
+            />
+          </div>
+        )}
+      </td>
+    </tr>
+  );
+}
+
 export default function AssociatesPage() {
   const { loading: authLoading, isAuthenticated } = useAuthCheck();
   const [associates, setAssociates] = useState<AssociateGroup[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAddNewModal, setShowAddNewModal] = useState(false);
-  const [showAddExistingModal, setShowAddExistingModal] = useState(false);
   const [showMassMessageModal, setShowMassMessageModal] = useState(false);
   const [showIndividualMessageModal, setShowIndividualMessageModal] =
     useState(false);
@@ -34,13 +206,15 @@ export default function AssociatesPage() {
   const [messageText, setMessageText] = useState("");
   const [sendLoading, setSendLoading] = useState(false);
   const [sendSuccess, setSendSuccess] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editData, setEditData] = useState<{
-    firstName: string;
-    lastName: string;
-    phoneNumber: string;
-    emailAddress: string;
-  } | null>(null);
+  const [showAddNewModal, setShowAddNewModal] = useState(false);
+  const [newAssociateForm, setNewAssociateForm] = useState<AssociateFormData>({
+    firstName: "",
+    lastName: "",
+    phoneNumber: "",
+    emailAddress: "",
+  });
+  const [formErrors, setFormErrors] = useState<Partial<AssociateFormData>>({});
+  const [phoneError, setPhoneError] = useState("");
 
   // Load all associates
   useEffect(() => {
@@ -60,35 +234,19 @@ export default function AssociatesPage() {
     }
   }, [authLoading, isAuthenticated]);
 
-  // Handle edit
-  const handleEdit = (associate: AssociateGroup) => {
-    setEditingId(associate.id);
-    setEditData({
-      firstName: associate.firstName,
-      lastName: associate.lastName,
-      phoneNumber: associate.phoneNumber,
-      emailAddress: associate.emailAddress,
-    });
-  };
-
-  // Handle save
-  const handleSave = async (associateId: string) => {
-    if (!editData || !editData.firstName.trim() || !editData.lastName.trim()) {
-      return;
-    }
-
+  // Handle save associate
+  const handleSave = async (updatedAssociate: AssociateGroup) => {
     try {
-      // Update associate via API
-      const response = await fetch(`/api/associates/${associateId}`, {
+      const response = await fetch(`/api/associates/${updatedAssociate.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          first_name: editData.firstName.trim(),
-          last_name: editData.lastName.trim(),
-          phone_number: editData.phoneNumber.trim(),
-          email_address: editData.emailAddress.trim() || null,
+          first_name: updatedAssociate.firstName.trim(),
+          last_name: updatedAssociate.lastName.trim(),
+          phone_number: updatedAssociate.phoneNumber.trim(),
+          email_address: updatedAssociate.emailAddress.trim() || null,
         }),
       });
 
@@ -98,33 +256,15 @@ export default function AssociatesPage() {
 
       // Update local state
       setAssociates((prev) =>
-        prev.map((a) =>
-          a.id === associateId
-            ? {
-                ...a,
-                firstName: editData.firstName.trim(),
-                lastName: editData.lastName.trim(),
-                phoneNumber: editData.phoneNumber.trim(),
-                emailAddress: editData.emailAddress.trim(),
-              }
-            : a
-        )
+        prev.map((a) => (a.id === updatedAssociate.id ? updatedAssociate : a))
       );
-      setEditingId(null);
-      setEditData(null);
     } catch (error) {
       console.error("Error updating associate:", error);
       alert("Failed to update associate. Please try again.");
     }
   };
 
-  // Handle cancel edit
-  const handleCancelEdit = () => {
-    setEditingId(null);
-    setEditData(null);
-  };
-
-  // Handle delete
+  // Handle delete associate
   const handleDelete = async (associateId: string) => {
     if (
       !window.confirm(
@@ -223,14 +363,129 @@ export default function AssociatesPage() {
 
   // Handle add new associate
   const handleAddNew = () => {
-    // TODO: Implement add new associate functionality
-    alert("Add New Associate functionality coming soon!");
+    setNewAssociateForm({
+      firstName: "",
+      lastName: "",
+      phoneNumber: "",
+      emailAddress: "",
+    });
+    setFormErrors({});
+    setPhoneError("");
+    setShowAddNewModal(true);
   };
 
-  // Handle add existing associate
-  const handleAddExisting = () => {
-    // TODO: Implement add existing associate functionality
-    alert("Add Existing Associate functionality coming soon!");
+  // Handle form input change
+  const handleFormInputChange = (
+    field: keyof AssociateFormData,
+    value: string
+  ) => {
+    setNewAssociateForm((prev) => ({ ...prev, [field]: value }));
+
+    // Clear field error when user starts typing
+    if (formErrors[field]) {
+      setFormErrors((prev) => ({ ...prev, [field]: "" }));
+    }
+
+    // Validate phone number in real-time
+    if (field === "phoneNumber") {
+      if (value.trim() === "") {
+        setPhoneError("");
+      } else {
+        try {
+          if (isValidPhoneNumber(value)) {
+            setPhoneError("");
+          } else {
+            setPhoneError("Invalid phone format");
+          }
+        } catch {
+          setPhoneError("Invalid phone format");
+        }
+      }
+    }
+  };
+
+  // Validate form
+  const validateNewAssociateForm = (): boolean => {
+    const newErrors: Partial<AssociateFormData> = {};
+
+    if (!newAssociateForm.firstName.trim()) {
+      newErrors.firstName = "First name is required";
+    }
+
+    if (!newAssociateForm.lastName.trim()) {
+      newErrors.lastName = "Last name is required";
+    }
+
+    if (newAssociateForm.phoneNumber.trim()) {
+      if (!isValidPhoneNumber(newAssociateForm.phoneNumber)) {
+        setPhoneError("Please enter a valid phone number");
+        return false;
+      }
+    }
+
+    if (
+      newAssociateForm.emailAddress.trim() &&
+      !/\S+@\S+\.\S+/.test(newAssociateForm.emailAddress)
+    ) {
+      newErrors.emailAddress = "Please enter a valid email address";
+    }
+
+    setFormErrors(newErrors);
+    setPhoneError("");
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Handle submit new associate form
+  const handleSubmitNewAssociate = async () => {
+    if (!validateNewAssociateForm()) {
+      return;
+    }
+
+    const formData = newAssociateForm;
+    try {
+      const response = await fetch("/api/associates", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          first_name: formData.firstName.trim(),
+          last_name: formData.lastName.trim(),
+          phone_number: formData.phoneNumber.trim() || null,
+          email_address: formData.emailAddress.trim() || null,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to create associate");
+      }
+
+      const createdAssociates = await response.json();
+      const newAssociate = createdAssociates[0];
+
+      // Convert to AssociateGroup format and add to list
+      const associateGroup: AssociateGroup = {
+        id: newAssociate.id,
+        firstName: newAssociate.first_name || "",
+        lastName: newAssociate.last_name || "",
+        phoneNumber: newAssociate.phone_number || "",
+        emailAddress: newAssociate.email_address || "",
+        groupId: "",
+        createdAt: new Date(newAssociate.created_at || Date.now()),
+        updatedAt: new Date(newAssociate.updated_at || Date.now()),
+      };
+
+      setAssociates((prev) => [associateGroup, ...prev]);
+      setShowAddNewModal(false);
+    } catch (error) {
+      console.error("Error creating associate:", error);
+      alert("Failed to create associate. Please try again.");
+    }
+  };
+
+  // Handle cancel add new associate
+  const handleCancelAddNew = () => {
+    setShowAddNewModal(false);
   };
 
   // Show loading spinner while checking authentication
@@ -308,25 +563,6 @@ export default function AssociatesPage() {
               Add New
             </button>
             <button
-              onClick={handleAddExisting}
-              className="px-4 py-2 bg-gradient-to-r from-[#FFBB87] to-[#FE6F00] text-white rounded-lg font-medium inline-flex items-center gap-2 hover:opacity-90 transition-opacity"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
-              Add Existing
-            </button>
-            <button
               onClick={handleMessageAll}
               className="px-4 py-2 bg-gradient-to-r from-[#FFBB87] to-[#FE6F00] text-white rounded-lg font-medium inline-flex items-center gap-2 hover:opacity-90 transition-opacity"
             >
@@ -357,164 +593,32 @@ export default function AssociatesPage() {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-20">
                     {/* Avatar column */}
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-32">
                     First Name
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-32">
                     Last Name
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-40">
                     Phone Number
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-48">
                     Email Address
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Role
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider w-32">
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider w-24">
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {associates.map((associate) => (
-                  <tr
+                  <AssociateTableRow
                     key={associate.id}
-                    className="hover:bg-gray-50 border-b border-gray-100 transition-colors duration-150"
-                  >
-                    {/* Avatar */}
-                    <td className="px-4 py-4">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-r from-[#FFBB87] to-[#FE6F00] flex items-center justify-center text-white text-sm font-semibold">
-                        {getInitials(associate.firstName, associate.lastName)}
-                      </div>
-                    </td>
-
-                    {/* First Name */}
-                    <td className="px-4 py-4 text-sm text-gray-900 font-medium">
-                      {editingId === associate.id ? (
-                        <input
-                          type="text"
-                          value={editData?.firstName || ""}
-                          onChange={(e) =>
-                            setEditData({
-                              ...editData!,
-                              firstName: e.target.value,
-                            })
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="First name"
-                          autoFocus
-                        />
-                      ) : (
-                        associate.firstName
-                      )}
-                    </td>
-
-                    {/* Last Name */}
-                    <td className="px-4 py-4 text-sm text-gray-700">
-                      {editingId === associate.id ? (
-                        <input
-                          type="text"
-                          value={editData?.lastName || ""}
-                          onChange={(e) =>
-                            setEditData({
-                              ...editData!,
-                              lastName: e.target.value,
-                            })
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="Last name"
-                        />
-                      ) : (
-                        associate.lastName
-                      )}
-                    </td>
-
-                    {/* Phone Number */}
-                    <td className="px-4 py-4 text-sm text-gray-700 font-mono">
-                      {editingId === associate.id ? (
-                        <input
-                          type="tel"
-                          value={editData?.phoneNumber || ""}
-                          onChange={(e) =>
-                            setEditData({
-                              ...editData!,
-                              phoneNumber: e.target.value,
-                            })
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="Phone number"
-                        />
-                      ) : (
-                        formatPhoneForDisplay(associate.phoneNumber)
-                      )}
-                    </td>
-
-                    {/* Email Address */}
-                    <td className="px-4 py-4 text-sm text-gray-700">
-                      {editingId === associate.id ? (
-                        <input
-                          type="email"
-                          value={editData?.emailAddress || ""}
-                          onChange={(e) =>
-                            setEditData({
-                              ...editData!,
-                              emailAddress: e.target.value,
-                            })
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="Email address"
-                        />
-                      ) : (
-                        associate.emailAddress || "-"
-                      )}
-                    </td>
-
-                    {/* Role */}
-                    <td className="px-4 py-4 text-sm text-gray-700">
-                      {/* Role field not yet implemented in database */}
-                      <span className="text-gray-400">-</span>
-                    </td>
-
-                    {/* Actions */}
-                    <td className="px-4 py-4 text-center">
-                      {editingId === associate.id ? (
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={() => handleSave(associate.id)}
-                            disabled={
-                              !editData?.firstName.trim() ||
-                              !editData?.lastName.trim()
-                            }
-                            className={`px-3 py-1 text-xs text-white rounded focus:outline-none ${
-                              !editData?.firstName.trim() ||
-                              !editData?.lastName.trim()
-                                ? "bg-gray-400 cursor-not-allowed"
-                                : "bg-green-500 hover:bg-green-600"
-                            }`}
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={handleCancelEdit}
-                            className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 focus:outline-none"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-center">
-                          <AssociateActions
-                            onEdit={() => handleEdit(associate)}
-                            onDelete={() => handleDelete(associate.id)}
-                            showMessageButton={false}
-                            size="md"
-                          />
-                        </div>
-                      )}
-                    </td>
-                  </tr>
+                    associate={associate}
+                    onSave={handleSave}
+                    onDelete={() => handleDelete(associate.id)}
+                    onMessage={() => handleMessageAssociate(associate)}
+                  />
                 ))}
               </tbody>
             </table>
@@ -553,8 +657,156 @@ export default function AssociatesPage() {
         onCancel={handleCancelMessage}
       />
 
+      {/* Add New Associate Modal */}
+      {showAddNewModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 relative">
+            {/* Close Icon */}
+            <button
+              onClick={handleCancelAddNew}
+              className="absolute top-4 left-4 text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+
+            {/* Title */}
+            <h2 className="text-xl font-bold text-black mb-2 pr-8">
+              Add New Associate to All Associates
+            </h2>
+
+            {/* Description */}
+            <p className="text-sm text-gray-600 mb-6">
+              Create a new associate and add them to this group.
+            </p>
+
+            {/* Form */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSubmitNewAssociate();
+              }}
+              className="mb-4"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex flex-col">
+                  <input
+                    type="text"
+                    placeholder="First Name *"
+                    value={newAssociateForm.firstName}
+                    onChange={(e) =>
+                      handleFormInputChange("firstName", e.target.value)
+                    }
+                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                      formErrors.firstName
+                        ? "border-red-500"
+                        : "border-gray-300"
+                    }`}
+                  />
+                  {formErrors.firstName && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {formErrors.firstName}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex flex-col">
+                  <input
+                    type="text"
+                    placeholder="Last Name *"
+                    value={newAssociateForm.lastName}
+                    onChange={(e) =>
+                      handleFormInputChange("lastName", e.target.value)
+                    }
+                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                      formErrors.lastName ? "border-red-500" : "border-gray-300"
+                    }`}
+                  />
+                  {formErrors.lastName && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {formErrors.lastName}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex flex-col">
+                  <input
+                    type="tel"
+                    placeholder="Phone Number"
+                    value={newAssociateForm.phoneNumber}
+                    onChange={(e) =>
+                      handleFormInputChange("phoneNumber", e.target.value)
+                    }
+                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                      phoneError ? "border-red-500" : "border-gray-300"
+                    }`}
+                  />
+                  {phoneError && (
+                    <p className="text-red-500 text-xs mt-1">{phoneError}</p>
+                  )}
+                </div>
+
+                <div className="flex flex-col">
+                  <input
+                    type="email"
+                    placeholder="Email Address"
+                    value={newAssociateForm.emailAddress}
+                    onChange={(e) =>
+                      handleFormInputChange("emailAddress", e.target.value)
+                    }
+                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                      formErrors.emailAddress
+                        ? "border-red-500"
+                        : "border-gray-300"
+                    }`}
+                  />
+                  {formErrors.emailAddress && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {formErrors.emailAddress}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </form>
+
+            {/* Custom Button Layout to Match Design */}
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={handleCancelAddNew}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmitNewAssociate}
+                disabled={!!phoneError}
+                className={`px-4 py-2 rounded-lg font-medium transition-opacity ${
+                  phoneError
+                    ? "bg-gray-400 text-white cursor-not-allowed"
+                    : "bg-gradient-to-r from-[#FFBB87] to-[#FE6F00] text-white hover:opacity-90"
+                }`}
+              >
+                Add Associate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Footer />
     </div>
   );
 }
-
