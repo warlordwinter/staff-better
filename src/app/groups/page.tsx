@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import Navbar from "@/components/ui/navBar";
 import Footer from "@/components/ui/footer";
@@ -115,10 +114,7 @@ export default function GroupsPage() {
       });
 
       setGroups((prevGroups) => [...prevGroups, newGroup]);
-      setGroupsWithMembers((prev) => [
-        ...prev,
-        { ...newGroup, members: [] },
-      ]);
+      setGroupsWithMembers((prev) => [...prev, { ...newGroup, members: [] }]);
       setNewGroupName("");
       setNewGroupDescription("");
       setShowAddForm(false);
@@ -171,11 +167,8 @@ export default function GroupsPage() {
     const matchesGroupName = group.group_name.toLowerCase().includes(query);
     const matchesDescription =
       group.description?.toLowerCase().includes(query) || false;
-    const matchesMembers = group.members.some(
-      (member) =>
-        `${member.firstName} ${member.lastName}`
-          .toLowerCase()
-          .includes(query)
+    const matchesMembers = group.members.some((member) =>
+      `${member.firstName} ${member.lastName}`.toLowerCase().includes(query)
     );
     return matchesGroupName || matchesDescription || matchesMembers;
   });
@@ -213,20 +206,40 @@ export default function GroupsPage() {
       <main className="flex-1 w-full max-w-7xl mx-auto px-6 py-8 mt-24">
         {/* Header Section */}
         <div className="mb-8">
-          <h1 className="text-black text-5xl font-semibold font-['Inter'] mb-2">
-            Staff Groups
-          </h1>
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-black text-5xl font-semibold font-['Inter']">
+              Groups
+            </h1>
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="px-5 py-3 bg-gradient-to-r from-[#FFBB87] to-[#FE6F00] text-white rounded-lg font-medium inline-flex items-center gap-2 hover:opacity-90 transition-opacity whitespace-nowrap"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 4v16m8-8H4"
+                />
+              </svg>
+              Create Group
+            </button>
+          </div>
           <p className="text-gray-600 text-lg">
             {groups.length} {groups.length === 1 ? "team" : "teams"} •{" "}
-            {totalMembers} total{" "}
-            {totalMembers === 1 ? "member" : "members"}
+            {totalMembers} total {totalMembers === 1 ? "member" : "members"}
           </p>
         </div>
 
-        {/* Search and Create Group Section */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-8 items-start sm:items-center justify-between">
+        {/* Search Section */}
+        <div className="mb-8">
           {/* Search Bar */}
-          <div className="relative flex-1 max-w-md">
+          <div className="relative w-full">
             <svg
               className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400"
               fill="none"
@@ -244,31 +257,17 @@ export default function GroupsPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search groups or members..."
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              placeholder="Search groups or associates..."
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent focus:bg-white"
             />
           </div>
-
-          {/* Create Group Button */}
-          <button
-            onClick={() => setShowAddForm(true)}
-            className="px-5 py-3 bg-gradient-to-r from-[#FFBB87] to-[#FE6F00] text-white rounded-lg font-medium inline-flex items-center gap-2 hover:opacity-90 transition-opacity whitespace-nowrap shadow-sm"
-          >
-            <Image
-              src="/icons/plus-w.svg"
-              alt="Plus"
-              width={20}
-              height={20}
-              className="object-contain"
-            />
-            Create Group
-          </button>
         </div>
 
         {/* Group Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {filteredGroups.map((group, index) => {
-            const remainingMembers = group.totalAssociates - group.members.length;
+            const remainingMembers =
+              group.totalAssociates - group.members.length;
             const iconColor = getGroupIconColor(index);
 
             return (
@@ -333,10 +332,10 @@ export default function GroupsPage() {
                             key={member.id}
                             className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 min-w-0"
                           >
-                          {/* Avatar */}
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-r from-[#FFBB87] to-[#FE6F00] flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
-                            {getInitials(member.firstName, member.lastName)}
-                          </div>
+                            {/* Avatar */}
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-r from-[#FFBB87] to-[#FE6F00] flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
+                              {getInitials(member.firstName, member.lastName)}
+                            </div>
                             {/* Name and Role */}
                             <div className="min-w-0">
                               <p className="text-sm font-medium text-gray-900 truncate">
@@ -347,7 +346,7 @@ export default function GroupsPage() {
                         ))}
                       </div>
                       {remainingMembers > 0 && (
-                      <span className="text-sm text-[#FE6F00] hover:underline">
+                        <span className="text-sm text-[#FE6F00] hover:underline">
                           +{remainingMembers} more{" "}
                           {remainingMembers === 1 ? "member" : "members"}
                         </span>
@@ -362,7 +361,10 @@ export default function GroupsPage() {
                 <div className="border-t border-gray-200 my-4"></div>
 
                 {/* Action Buttons */}
-                <div className="flex gap-3 mt-auto" onClick={(e) => e.stopPropagation()}>
+                <div
+                  className="flex gap-3 mt-auto"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <button
                     onClick={(e) => {
                       e.preventDefault();

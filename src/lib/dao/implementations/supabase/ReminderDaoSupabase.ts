@@ -619,11 +619,17 @@ export class ReminderDaoSupabase implements IReminder {
       .toTimeString()
       .split(" ")[0];
 
-    // Create full datetime strings for proper timestamp comparison
-    const currentDateTime = `${todayString}T${currentTime}`;
-    const futureDateTime = `${todayString}T${futureTime}`;
+    // Extract just the time portion (HH:MM:SS) for comparison
+    // start_time is stored as a time string, not a full datetime
+    const currentTimeOnly = currentTime; // Already in HH:MM:SS format
+    const futureTimeOnly = futureTime; // Already in HH:MM:SS format
 
-    // Use proper timestamp comparison instead of casting to time
+    console.log(
+      `🔍 [DEBUG] getMorningOfReminders: Looking for jobs today (${todayString}) with start_time between ${currentTimeOnly} and ${futureTimeOnly}`
+    );
+
+    // Query: work_date = today AND start_time >= currentTime AND start_time <= futureTime
+    // Since start_time is a time field, we compare it as a time string
     const { data, error } = await supabase
       .from("job_assignments")
       .select(
@@ -648,8 +654,8 @@ export class ReminderDaoSupabase implements IReminder {
         `
       )
       .eq("work_date", todayString)
-      .gte("start_time", currentDateTime) // Compare full timestamps
-      .lte("start_time", futureDateTime) // Compare full timestamps
+      .gte("start_time", currentTimeOnly) // Compare time strings (HH:MM:SS)
+      .lte("start_time", futureTimeOnly) // Compare time strings (HH:MM:SS)
       .gt("num_reminders", 0)
       .order("start_time", { ascending: true });
 
@@ -657,6 +663,10 @@ export class ReminderDaoSupabase implements IReminder {
       console.error("Error grabbing morning-of reminders:", error);
       throw new Error(JSON.stringify(error));
     }
+
+    console.log(
+      `🔍 [DEBUG] getMorningOfReminders: Found ${data?.length || 0} assignments`
+    );
 
     if (!data || data.length === 0) {
       return [];

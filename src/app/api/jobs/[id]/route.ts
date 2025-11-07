@@ -13,9 +13,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
 
-    const job = await jobsDao.getJobById(id);
+    if (!id || id === "undefined") {
+      return NextResponse.json({ error: "Invalid job ID" }, { status: 400 });
+    }
 
-    console.log("JobId in API:", job);
+    const job = await jobsDao.getJobById(id);
 
     if (!job) {
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
@@ -24,7 +26,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json(job);
   } catch (error) {
     console.error("Failed to fetch job:", error);
-    return NextResponse.json({ error: "Failed to fetch job" }, { status: 500 });
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to fetch job";
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
 

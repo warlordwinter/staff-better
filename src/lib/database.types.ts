@@ -266,6 +266,7 @@ export type Database = {
           job_status: Database["public"]["Enums"]["job_status_enum"] | null
           job_title: string | null
           start_date: string | null
+          start_time: string | null
         }
         Insert: {
           company_id: string
@@ -274,6 +275,7 @@ export type Database = {
           job_status?: Database["public"]["Enums"]["job_status_enum"] | null
           job_title?: string | null
           start_date?: string | null
+          start_time?: string | null
         }
         Update: {
           company_id?: string
@@ -282,6 +284,7 @@ export type Database = {
           job_status?: Database["public"]["Enums"]["job_status_enum"] | null
           job_title?: string | null
           start_date?: string | null
+          start_time?: string | null
         }
         Relationships: [
           {
