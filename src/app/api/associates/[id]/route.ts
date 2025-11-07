@@ -79,9 +79,14 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Failed to delete associate:", error);
-    return NextResponse.json(
-      { error: "Failed to delete associate" },
-      { status: 500 }
-    );
+    let errorMessage = "Failed to delete associate";
+
+    if (error instanceof Error) {
+      errorMessage = error.message || errorMessage;
+    } else if (typeof error === "string") {
+      errorMessage = error;
+    }
+
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

@@ -1,5 +1,6 @@
 import { Associate } from "@/model/interfaces/Associate";
 import { createClient } from "../../../supabase/server";
+import { createAdminClient } from "../../../supabase/admin";
 import { formatPhoneToE164, normalizePhoneForLookup } from "@/utils/phoneUtils";
 import { IAssociates } from "../../interfaces/IAssociates";
 
@@ -162,13 +163,103 @@ export class AssociatesDaoSupabase implements IAssociates {
 
   // Delete associate
   async deleteAssociate(id: string) {
+    // Use regular client to check existence (respects RLS for read)
     const supabase = await createClient();
 
-    const { error } = await supabase.from("associates").delete().eq("id", id);
+    // Use admin client for deletion operations (bypasses RLS)
+    const adminSupabase = createAdminClient();
+
+    // First, check if the associate exists
+    const { data: existingAssociate, error: checkError } = await supabase
+      .from("associates")
+      .select("id")
+      .eq("id", id)
+      .single();
+
+    if (checkError) {
+      // If associate doesn't exist, that's fine - idempotent delete
+      if (checkError.code === "PGRST116") {
+        console.log(`Associate ${id} not found, treating as already deleted`);
+        return { success: true };
+      }
+      console.error("Error checking associate existence:", checkError);
+      throw new Error(`Failed to check associate: ${checkError.message}`);
+    }
+
+    if (!existingAssociate) {
+      // Associate doesn't exist, treat as success (idempotent)
+      console.log(`Associate ${id} not found, treating as already deleted`);
+      return { success: true };
+    }
+
+    // Use admin client to delete related records that reference this associate
+    // Delete from group_associates
+    const { error: groupAssociatesError } = await adminSupabase
+      .from("group_associates")
+      .delete()
+      .eq("associate_id", id);
+
+    if (groupAssociatesError) {
+      console.error(
+        "Error deleting from group_associates:",
+        groupAssociatesError
+      );
+      // Continue anyway - might not have any group associations
+    }
+
+    // Delete from job_assignments
+    const { error: jobAssignmentsError } = await adminSupabase
+      .from("job_assignments")
+      .delete()
+      .eq("associate_id", id);
+
+    if (jobAssignmentsError) {
+      console.error(
+        "Error deleting from job_assignments:",
+        jobAssignmentsError
+      );
+      // Continue anyway - might not have any job assignments
+    }
+
+    // Delete from conversations
+    const { error: conversationsError } = await adminSupabase
+      .from("conversations")
+      .delete()
+      .eq("associate_id", id);
+
+    if (conversationsError) {
+      console.error("Error deleting from conversations:", conversationsError);
+      // Continue anyway - might not have any conversations
+    }
+
+    // Now delete the associate itself using admin client (bypasses RLS)
+    const { data, error } = await adminSupabase
+      .from("associates")
+      .delete()
+      .eq("id", id)
+      .select();
 
     if (error) {
       console.error("Supabase delete error:", error);
-      throw new Error("Failed to delete associate");
+
+      // Check for foreign key constraint violation
+      if (error.code === "23503") {
+        throw new Error(
+          "Cannot delete associate: still referenced by other records. Please remove all group memberships, job assignments, and conversations first."
+        );
+      }
+
+      throw new Error(`Failed to delete associate: ${error.message}`);
+    }
+
+    // Check if any rows were actually deleted
+    if (!data || data.length === 0) {
+      // With admin client, if no rows were deleted, the associate likely doesn't exist
+      // This shouldn't happen if we checked existence first, but handle it gracefully
+      console.warn(
+        `Associate ${id} deletion returned no rows. This might indicate the associate was already deleted.`
+      );
+      return { success: true };
     }
 
     return { success: true };

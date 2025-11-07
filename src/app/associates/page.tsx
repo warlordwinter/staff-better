@@ -280,13 +280,19 @@ export default function AssociatesPage() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to delete associate");
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || "Failed to delete associate";
+        throw new Error(errorMessage);
       }
 
       setAssociates((prev) => prev.filter((a) => a.id !== associateId));
     } catch (error) {
       console.error("Error deleting associate:", error);
-      alert("Failed to delete associate. Please try again.");
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to delete associate. Please try again.";
+      alert(errorMessage);
     }
   };
 
