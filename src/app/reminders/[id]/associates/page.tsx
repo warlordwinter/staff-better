@@ -8,47 +8,16 @@ import { Job } from "@/model/interfaces/Job";
 import LoadingSpinner from "@/components/ui/loadingSpinner";
 import { useAuthCheck } from "@/hooks/useAuthCheck";
 import { formatPhoneForDisplay } from "@/utils/phoneUtils";
-import { convertUTCTimeToLocal } from "@/utils/timezoneUtils";
-
-interface JobAssignmentResponse {
-  confirmation_status: string;
-  num_reminders: number;
-  work_date: string;
-  start_time: string;
-  associates: {
-    id: string;
-    first_name: string;
-    last_name: string;
-    phone_number: string;
-    email_address: string;
-  };
-}
-
-// Helper function to format date
-const formatDate = (dateString: string): string => {
-  try {
-    const date = new Date(dateString);
-    const months = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ];
-    const month = months[date.getMonth()];
-    const day = date.getDate();
-    return `${month} ${day}`;
-  } catch {
-    return dateString;
-  }
-};
+import {
+  convertUTCTimeToLocal,
+  convertLocalTimeToUTC,
+} from "@/utils/timezoneUtils";
+import { formatDate } from "@/utils/dateUtils";
+import {
+  getStatusDisplay,
+  getConfirmationStatusColor,
+  type JobAssignmentResponse,
+} from "@/utils/statusUtils";
 
 // Helper function to format time
 const formatTime = (timeString: string, workDate: string): string => {
@@ -64,41 +33,6 @@ const formatTime = (timeString: string, workDate: string): string => {
   }
 };
 
-// Helper function to get status display
-const getStatusDisplay = (job: Job, assignments: JobAssignmentResponse[]) => {
-  // If any reminders have been sent
-  if (assignments.some((a) => a.num_reminders > 0)) {
-    return { label: "Sent", color: "bg-gray-400", textColor: "text-gray-900" };
-  }
-  
-  // Check if any assignments are confirmed
-  if (assignments.some((a) => a.confirmation_status === "CONFIRMED")) {
-    return { label: "Confirmed", color: "bg-green-500", textColor: "text-white" };
-  }
-  
-  if (job.job_status?.includes("FAILED") || job.job_status?.includes("DECLINED")) {
-    return { label: "Failed", color: "bg-red-500", textColor: "text-white" };
-  }
-  
-  return { label: "Scheduled", color: "bg-blue-500", textColor: "text-white" };
-};
-
-// Helper function to get confirmation status color
-const getConfirmationStatusColor = (status: string) => {
-  switch (status) {
-    case "CONFIRMED":
-      return "bg-green-100 text-green-800";
-    case "SOFT_CONFIRMED":
-      return "bg-yellow-100 text-yellow-800";
-    case "LIKELY_CONFIRMED":
-      return "bg-blue-100 text-blue-800";
-    case "DECLINED":
-      return "bg-red-100 text-red-800";
-    default:
-      return "bg-gray-100 text-gray-800";
-  }
-};
-
 export default function ReminderDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -106,6 +40,11 @@ export default function ReminderDetailPage() {
   const [job, setJob] = useState<Job | null>(null);
   const [assignments, setAssignments] = useState<JobAssignmentResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editJobTitle, setEditJobTitle] = useState("");
+  const [editCustomerName, setEditCustomerName] = useState("");
+  const [editStartDate, setEditStartDate] = useState("");
+  const [editStartTime, setEditStartTime] = useState("");
   const { loading: authLoading, isAuthenticated } = useAuthCheck();
 
   useEffect(() => {
@@ -120,7 +59,9 @@ export default function ReminderDetailPage() {
         setJob(jobData);
 
         // Fetch job assignments
-        const assignmentsRes = await fetch(`/api/job-assignments/${reminderId}`);
+        const assignmentsRes = await fetch(
+          `/api/job-assignments/${reminderId}`
+        );
         if (assignmentsRes.ok) {
           const assignmentsData = await assignmentsRes.json();
           setAssignments(assignmentsData || []);
@@ -138,7 +79,11 @@ export default function ReminderDetailPage() {
   }, [reminderId]);
 
   const handleDeleteAssociate = async (associateId: string) => {
-    if (!window.confirm("Are you sure you want to remove this associate from this reminder?")) {
+    if (
+      !window.confirm(
+        "Are you sure you want to remove this associate from this reminder?"
+      )
+    ) {
       return;
     }
 
@@ -163,9 +108,141 @@ export default function ReminderDetailPage() {
     }
   };
 
-  const handleSendToAll = () => {
-    // TODO: Implement send to all functionality
-    alert("Send to all functionality coming soon");
+  const handleEditClick = () => {
+    if (job) {
+      setEditJobTitle(job.job_title || "");
+      setEditCustomerName(job.customer_name || "");
+      setEditStartDate(job.start_date || "");
+
+      // Get start time from first assignment if available, convert to local time for display
+      let localTime = "";
+      if (assignments.length > 0 && assignments[0].start_time) {
+        const workDate = assignments[0].work_date || job.start_date;
+        const localTimeStr = convertUTCTimeToLocal(
+          assignments[0].start_time,
+          workDate
+        );
+        // Convert "HH:mm" to "HH:mm" format for time input (already in correct format)
+        localTime = localTimeStr;
+      }
+      setEditStartTime(localTime);
+
+      setShowEditModal(true);
+    }
+  };
+
+  const handleUpdateReminder = async () => {
+    if (!editJobTitle.trim() || !job) return;
+
+    const updates = {
+      job_title: editJobTitle.trim(),
+      customer_name: editCustomerName.trim() || "Generic Company Name",
+      start_date: editStartDate || job.start_date,
+    };
+
+    try {
+      // Update job details
+      const res = await fetch(`/api/jobs/${reminderId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updates),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to update reminder");
+      }
+
+      const updatedJob = await res.json();
+      setJob(updatedJob);
+
+      // Update start_time for all assignments if provided
+      if (editStartTime.trim()) {
+        const workDate = editStartDate || job.start_date;
+        console.log("Updating time:", {
+          editStartTime: editStartTime.trim(),
+          workDate,
+        });
+        const utcTime = convertLocalTimeToUTC(editStartTime.trim(), workDate);
+        console.log("Converted UTC time:", utcTime);
+
+        if (!utcTime) {
+          console.error("Failed to convert local time to UTC");
+          alert(
+            "Invalid time format. Please use HH:mm format (e.g., 14:30). The reminder details were updated, but the time was not changed."
+          );
+          // Continue to close modal even if time conversion failed
+        } else if (assignments.length === 0) {
+          console.warn("No assignments to update time for");
+          // Time will be set when associates are added
+        } else {
+          console.log(
+            `Updating ${assignments.length} assignments with time ${utcTime}`
+          );
+          // Update all assignments with the new start_time
+          const updatePromises = assignments.map(async (assignment) => {
+            try {
+              const res = await fetch(
+                `/api/job-assignments/${reminderId}/${assignment.associates.id}`,
+                {
+                  method: "PUT",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    start_time: utcTime,
+                    work_date: workDate,
+                  }),
+                }
+              );
+
+              if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(
+                  errorData.error ||
+                    `Failed to update assignment for ${assignment.associates.first_name} ${assignment.associates.last_name}`
+                );
+              }
+
+              return res.json();
+            } catch (error) {
+              console.error(
+                `Failed to update assignment for ${assignment.associates.id}:`,
+                error
+              );
+              throw error;
+            }
+          });
+
+          try {
+            await Promise.all(updatePromises);
+          } catch (error) {
+            console.error("Error updating assignments:", error);
+            alert(
+              `Failed to update some assignments: ${
+                error instanceof Error ? error.message : "Unknown error"
+              }`
+            );
+            // Still refresh to show what was updated
+          }
+
+          // Refresh assignments to get updated data
+          const assignmentsRes = await fetch(
+            `/api/job-assignments/${reminderId}`
+          );
+          if (assignmentsRes.ok) {
+            const assignmentsData = await assignmentsRes.json();
+            setAssignments(assignmentsData || []);
+          }
+        }
+      }
+
+      setShowEditModal(false);
+    } catch (error) {
+      console.error("Failed to update reminder:", error);
+      alert("Failed to update reminder. Please try again.");
+    }
   };
 
   // Show loading spinner while auth is loading or data is loading
@@ -195,8 +272,13 @@ export default function ReminderDetailPage() {
   }
 
   // Get the first assignment's date/time for display (all should be same for same job)
-  const displayDate = assignments.length > 0 ? assignments[0].work_date : job.start_date;
-  const displayTime = assignments.length > 0 ? assignments[0].start_time : "";
+  const displayDate =
+    assignments.length > 0 ? assignments[0].work_date : job.start_date;
+  // Get start time from any assignment that has it, or empty string if none
+  const displayTime =
+    assignments.length > 0 && assignments[0].start_time
+      ? assignments[0].start_time
+      : "";
   const statusDisplay = getStatusDisplay(job, assignments);
 
   return (
@@ -253,7 +335,9 @@ export default function ReminderDetailPage() {
         {/* Reminder Details Card */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 shadow-sm">
           <div className="flex items-start justify-between mb-4">
-            <h2 className="text-xl font-semibold text-black">Reminder Details</h2>
+            <h2 className="text-xl font-semibold text-black">
+              Reminder Details
+            </h2>
             <div className="flex items-center gap-3">
               <span
                 className={`px-3 py-1 rounded ${statusDisplay.color} ${statusDisplay.textColor} text-sm font-medium`}
@@ -261,6 +345,7 @@ export default function ReminderDetailPage() {
                 {statusDisplay.label}
               </span>
               <button
+                onClick={handleEditClick}
                 className="text-gray-400 hover:text-gray-600 transition-colors"
                 title="Edit reminder"
               >
@@ -301,26 +386,26 @@ export default function ReminderDetailPage() {
                 {formatDate(displayDate)}
               </span>
             </div>
-            {displayTime && (
-              <div className="flex items-center gap-2 text-gray-700">
-                <svg
-                  className="w-5 h-5 text-gray-500"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                <span className="text-sm font-medium">
-                  {formatTime(displayTime, displayDate)}
-                </span>
-              </div>
-            )}
+            <div className="flex items-center gap-2 text-gray-700">
+              <svg
+                className="w-5 h-5 text-gray-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <span className="text-sm font-medium">
+                {displayTime
+                  ? formatTime(displayTime, displayDate)
+                  : "Time not set"}
+              </span>
+            </div>
           </div>
 
           {/* Message */}
@@ -335,25 +420,6 @@ export default function ReminderDetailPage() {
             <h2 className="text-xl font-semibold text-black">
               Assigned Associates ({assignments.length})
             </h2>
-            <button
-              onClick={handleSendToAll}
-              className="px-4 py-2 bg-gradient-to-r from-[#FFBB87] to-[#FE6F00] text-white rounded-lg font-medium inline-flex items-center gap-2 hover:opacity-90 transition-opacity"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                />
-              </svg>
-              Send to All
-            </button>
           </div>
 
           {/* Associates List */}
@@ -414,6 +480,108 @@ export default function ReminderDetailPage() {
           )}
         </div>
       </main>
+
+      {/* Edit Reminder Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96 max-w-md mx-4">
+            <h2 className="text-xl font-bold text-black mb-4">Edit Reminder</h2>
+
+            <div className="space-y-4">
+              <div>
+                <label
+                  htmlFor="editJobTitle"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Job Title *
+                </label>
+                <input
+                  type="text"
+                  id="editJobTitle"
+                  value={editJobTitle}
+                  onChange={(e) => setEditJobTitle(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="Enter job title"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="editCustomerName"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Customer Name
+                </label>
+                <input
+                  type="text"
+                  id="editCustomerName"
+                  value={editCustomerName}
+                  onChange={(e) => setEditCustomerName(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="Enter customer name"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="editStartDate"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Start Date
+                </label>
+                <input
+                  type="date"
+                  id="editStartDate"
+                  value={editStartDate}
+                  onChange={(e) => setEditStartDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="editStartTime"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Start Time
+                </label>
+                <input
+                  type="time"
+                  id="editStartTime"
+                  value={editStartTime}
+                  onChange={(e) => setEditStartTime(e.target.value)}
+                  min="08:00"
+                  max="23:00"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditJobTitle("");
+                  setEditCustomerName("");
+                  setEditStartDate("");
+                  setEditStartTime("");
+                }}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpdateReminder}
+                disabled={!editJobTitle.trim()}
+                className="px-4 py-2 bg-gradient-to-r from-[#FFBB87] to-[#FE6F00] text-white rounded-md hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

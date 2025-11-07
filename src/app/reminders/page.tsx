@@ -10,62 +10,8 @@ import { useAuthCheck } from "@/hooks/useAuthCheck";
 import { Job } from "@/model/interfaces/Job";
 import ImportOptions from "@/components/jobTableComp/importOptions";
 import { useExcelUpload } from "@/hooks/useExcelUpload";
-
-// Helper function to format date and time
-const formatDateTime = (dateString: string): string => {
-  try {
-    const date = new Date(dateString);
-    const months = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ];
-    const month = months[date.getMonth()];
-    const day = date.getDate();
-    const hours = date.getHours();
-    const minutes = date.getMinutes();
-    const ampm = hours >= 12 ? "PM" : "AM";
-    const displayHours = hours % 12 || 12;
-    const displayMinutes = minutes.toString().padStart(2, "0");
-    return `${month} ${day}, ${displayHours}:${displayMinutes} ${ampm}`;
-  } catch {
-    return dateString;
-  }
-};
-
-// Helper function to determine status from job
-const getStatus = (job: Job & { associateCount?: number; numReminders?: number }) => {
-  // Default to Scheduled if no other status is determined
-  // In a real implementation, you'd check job assignments for:
-  // - num_reminders > 0 → "Sent"
-  // - confirmation_status === "CONFIRMED" → "Confirmed"
-  // - confirmation_status === "DECLINED" or errors → "Failed"
-  
-  if (job.numReminders && job.numReminders > 0) {
-    // Check if any assignments are confirmed
-    return { label: "Sent", color: "bg-gray-400", textColor: "text-gray-900" };
-  }
-  
-  if (job.job_status?.includes("CONFIRMED")) {
-    return { label: "Confirmed", color: "bg-green-500", textColor: "text-white" };
-  }
-  
-  if (job.job_status?.includes("FAILED") || job.job_status?.includes("DECLINED")) {
-    return { label: "Failed", color: "bg-red-500", textColor: "text-white" };
-  }
-  
-  // Default to Scheduled
-  return { label: "Scheduled", color: "bg-blue-500", textColor: "text-white" };
-};
+import { formatDateTime } from "@/utils/dateUtils";
+import { getStatus } from "@/utils/statusUtils";
 
 export default function RemindersPage() {
   const { loading: authLoading, isAuthenticated } = useAuthCheck();
@@ -103,42 +49,42 @@ export default function RemindersPage() {
 
   // Fetch jobs and their associate counts
   const loadJobs = async () => {
-      try {
-        // Fetch jobs
-        const jobsRes = await fetch("/api/jobs");
-        if (!jobsRes.ok) throw new Error("Failed to fetch jobs");
-        const jobsData: Job[] = await jobsRes.json();
+    try {
+      // Fetch jobs
+      const jobsRes = await fetch("/api/jobs");
+      if (!jobsRes.ok) throw new Error("Failed to fetch jobs");
+      const jobsData: Job[] = await jobsRes.json();
 
-        // Fetch associate counts for each job
-        const jobsWithCounts = await Promise.all(
-          jobsData.map(async (job) => {
-            try {
-              const assignmentsRes = await fetch(
-                `/api/job-assignments/${job.id}`
-              );
-              if (assignmentsRes.ok) {
-                const assignments = await assignmentsRes.json();
-                return {
-                  ...job,
-                  associateCount: Array.isArray(assignments)
-                    ? assignments.length
-                    : 0,
-                };
-              }
-              return { ...job, associateCount: 0 };
-            } catch {
-              return { ...job, associateCount: 0 };
+      // Fetch associate counts for each job
+      const jobsWithCounts = await Promise.all(
+        jobsData.map(async (job) => {
+          try {
+            const assignmentsRes = await fetch(
+              `/api/job-assignments/${job.id}`
+            );
+            if (assignmentsRes.ok) {
+              const assignments = await assignmentsRes.json();
+              return {
+                ...job,
+                associateCount: Array.isArray(assignments)
+                  ? assignments.length
+                  : 0,
+              };
             }
-          })
-        );
+            return { ...job, associateCount: 0 };
+          } catch {
+            return { ...job, associateCount: 0 };
+          }
+        })
+      );
 
-        setJobs(jobsWithCounts);
-      } catch (error) {
-        console.error("Error loading reminders:", error);
-        setJobs([]);
-      } finally {
-        setLoading(false);
-      }
+      setJobs(jobsWithCounts);
+    } catch (error) {
+      console.error("Error loading reminders:", error);
+      setJobs([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -538,7 +484,10 @@ export default function RemindersPage() {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex items-center gap-3 mt-auto" onClick={(e) => e.stopPropagation()}>
+                <div
+                  className="flex items-center gap-3 mt-auto"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <button
                     onClick={(e) => {
                       e.preventDefault();
@@ -707,4 +656,3 @@ export default function RemindersPage() {
     </div>
   );
 }
-
