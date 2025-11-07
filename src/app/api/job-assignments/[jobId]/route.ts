@@ -51,8 +51,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json(data);
   } catch (error) {
     console.error("Failed to create job assignment:", error);
+    const errorMessage = error instanceof Error ? error.message : "Failed to create job assignment";
     return NextResponse.json(
-      { error: "Failed to create job assignment" },
+      { error: errorMessage },
       { status: 500 }
     );
   }

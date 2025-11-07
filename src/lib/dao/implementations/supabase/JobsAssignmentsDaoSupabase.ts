@@ -221,14 +221,7 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
     // Validate and format the start_time field
     let formattedStartTime = assignmentData.start_time;
 
-    // Validate that start_time is not empty or null
-    if (
-      !formattedStartTime ||
-      (typeof formattedStartTime === "string" && !formattedStartTime.trim())
-    ) {
-      throw new Error("start_time cannot be empty or null");
-    }
-
+    // start_time is optional - only validate if provided
     if (formattedStartTime && formattedStartTime.trim()) {
       // Check if it's a time value (like "14:00") and format it properly
       if (/^\d{1,2}:\d{2}$/.test(formattedStartTime.trim())) {
@@ -254,8 +247,8 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
       }
     }
 
-    // Enforce allowed hours
-    if (!this.isWithinAllowedHours(formattedStartTime)) {
+    // Enforce allowed hours (only if start_time is provided)
+    if (formattedStartTime && !this.isWithinAllowedHours(formattedStartTime)) {
       throw new Error(
         `start_time must be between 08:00 and 23:00 (got ${formattedStartTime})`
       );
