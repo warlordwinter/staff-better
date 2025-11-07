@@ -9,7 +9,7 @@ import { useAuthCheck } from "@/hooks/useAuthCheck";
 import { useReminderDetail } from "@/hooks/useReminderDetail";
 import ReminderDetailsCard from "@/components/reminders/ReminderDetailsCard";
 import AssociatesList from "@/components/reminders/AssociatesList";
-import EditReminderModal from "@/components/reminders/EditReminderModal";
+import ReminderModal from "@/components/reminders/ReminderModal";
 import AddAssociateModal from "@/components/reminders/AddAssociateModal";
 
 export default function ReminderDetailPage() {
@@ -143,8 +143,9 @@ export default function ReminderDetailPage() {
         )}
       </main>
 
-      <EditReminderModal
+      <ReminderModal
         show={showEditModal}
+        mode="edit"
         jobTitle={editJobTitle}
         customerName={editCustomerName}
         startDate={editStartDate}
@@ -171,7 +172,11 @@ export default function ReminderDetailPage() {
           workDate={
             assignments.length > 0 ? assignments[0].work_date : job.start_date
           }
-          startTime={assignments.length > 0 ? assignments[0].start_time : null}
+          startTime={
+            assignments.length > 0
+              ? assignments[0].start_time
+              : job.start_time || null
+          }
           onClose={() => setShowAddModal(false)}
           onSuccess={handleAddSuccess}
         />

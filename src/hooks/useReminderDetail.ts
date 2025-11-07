@@ -2,7 +2,10 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Job } from "@/model/interfaces/Job";
 import { JobAssignmentResponse } from "@/utils/statusUtils";
-import { convertUTCTimeToLocal, convertLocalTimeToUTC } from "@/utils/timezoneUtils";
+import {
+  convertUTCTimeToLocal,
+  convertLocalTimeToUTC,
+} from "@/utils/timezoneUtils";
 
 export interface ReminderStatus {
   success: boolean;
@@ -20,7 +23,9 @@ export function useReminderDetail(reminderId: string) {
   const [editStartDate, setEditStartDate] = useState("");
   const [editStartTime, setEditStartTime] = useState("");
   const [processingReminders, setProcessingReminders] = useState(false);
-  const [reminderStatus, setReminderStatus] = useState<ReminderStatus | null>(null);
+  const [reminderStatus, setReminderStatus] = useState<ReminderStatus | null>(
+    null
+  );
   const [showAddModal, setShowAddModal] = useState(false);
 
   // Fetch data
@@ -28,17 +33,34 @@ export function useReminderDetail(reminderId: string) {
     const fetchData = async () => {
       try {
         const jobRes = await fetch(`/api/jobs/${reminderId}`);
-        if (!jobRes.ok) throw new Error("Failed to fetch job");
+
+        if (jobRes.status === 404) {
+          console.warn(`Job with ID ${reminderId} not found`);
+          setJob(null);
+          setAssignments([]);
+          setLoading(false);
+          return;
+        }
+
+        if (!jobRes.ok) {
+          const errorData = await jobRes.json().catch(() => ({}));
+          throw new Error(errorData.error || "Failed to fetch job");
+        }
+
         const jobData = await jobRes.json();
         setJob(jobData);
 
-        const assignmentsRes = await fetch(`/api/job-assignments/${reminderId}`);
+        const assignmentsRes = await fetch(
+          `/api/job-assignments/${reminderId}`
+        );
         if (assignmentsRes.ok) {
           const assignmentsData = await assignmentsRes.json();
           setAssignments(assignmentsData || []);
         }
       } catch (error) {
         console.error("Failed to fetch data:", error);
+        setJob(null);
+        setAssignments([]);
       } finally {
         setLoading(false);
       }
@@ -58,14 +80,21 @@ export function useReminderDetail(reminderId: string) {
   };
 
   const handleDeleteAssociate = async (associateId: string) => {
-    if (!window.confirm("Are you sure you want to remove this associate from this reminder?")) {
+    if (
+      !window.confirm(
+        "Are you sure you want to remove this associate from this reminder?"
+      )
+    ) {
       return;
     }
 
     try {
-      const res = await fetch(`/api/job-assignments/${reminderId}/${associateId}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(
+        `/api/job-assignments/${reminderId}/${associateId}`,
+        {
+          method: "DELETE",
+        }
+      );
       if (!res.ok) throw new Error("Failed to remove associate");
       await refreshAssignments();
     } catch (error) {
@@ -75,7 +104,11 @@ export function useReminderDetail(reminderId: string) {
   };
 
   const handleProcessReminders = async () => {
-    if (!window.confirm("This will process and send reminders to all associates for this job. Continue?")) {
+    if (
+      !window.confirm(
+        "This will process and send reminders to all associates for this job. Continue?"
+      )
+    ) {
       return;
     }
 
@@ -89,7 +122,9 @@ export function useReminderDetail(reminderId: string) {
       if (res.ok && data.success) {
         setReminderStatus({
           success: true,
-          message: data.message || `Processed ${data.processed} reminders. ${data.successful} successful, ${data.failed} failed.`,
+          message:
+            data.message ||
+            `Processed ${data.processed} reminders. ${data.successful} successful, ${data.failed} failed.`,
         });
         await refreshAssignments();
       } else {
@@ -102,7 +137,10 @@ export function useReminderDetail(reminderId: string) {
       console.error("Failed to process reminders:", error);
       setReminderStatus({
         success: false,
-        message: error instanceof Error ? error.message : "Failed to process reminders",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to process reminders",
       });
     } finally {
       setProcessingReminders(false);
@@ -116,7 +154,11 @@ export function useReminderDetail(reminderId: string) {
       setEditStartDate(job.start_date || "");
 
       let localTime = "";
-      if (assignments.length > 0 && assignments[0].start_time) {
+      // First try to get start_time from job, then from assignments
+      if (job.start_time) {
+        const workDate = job.start_date || "";
+        localTime = convertUTCTimeToLocal(job.start_time, workDate);
+      } else if (assignments.length > 0 && assignments[0].start_time) {
         const workDate = assignments[0].work_date || job.start_date;
         localTime = convertUTCTimeToLocal(assignments[0].start_time, workDate);
       }
@@ -128,10 +170,22 @@ export function useReminderDetail(reminderId: string) {
   const handleUpdateReminder = async () => {
     if (!editJobTitle.trim() || !job) return;
 
+    const workDate = editStartDate || job.start_date;
+    let formattedStartTime: string | null = null;
+
+    // Convert local time to UTC timestamp if provided
+    if (editStartTime.trim()) {
+      const utcTime = convertLocalTimeToUTC(editStartTime.trim(), workDate);
+      if (utcTime) {
+        formattedStartTime = `${workDate}T${utcTime}:00Z`;
+      }
+    }
+
     const updates = {
       job_title: editJobTitle.trim(),
       customer_name: editCustomerName.trim() || "Generic Company Name",
-      start_date: editStartDate || job.start_date,
+      start_date: workDate,
+      start_time: formattedStartTime,
     };
 
     try {
@@ -146,24 +200,35 @@ export function useReminderDetail(reminderId: string) {
       const updatedJob = await res.json();
       setJob(updatedJob);
 
-      if (editStartTime.trim()) {
-        const workDate = editStartDate || job.start_date;
+      // Also update job assignments if they exist
+      if (editStartTime.trim() && assignments.length > 0) {
         const utcTime = convertLocalTimeToUTC(editStartTime.trim(), workDate);
 
         if (!utcTime) {
-          alert("Invalid time format. The reminder details were updated, but the time was not changed.");
-        } else if (assignments.length > 0) {
+          alert(
+            "Invalid time format. The reminder details were updated, but the time was not changed."
+          );
+        } else {
           const updatePromises = assignments.map(async (assignment) => {
             try {
-              const res = await fetch(`/api/job-assignments/${reminderId}/${assignment.associates.id}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ start_time: utcTime, work_date: workDate }),
-              });
+              const res = await fetch(
+                `/api/job-assignments/${reminderId}/${assignment.associates.id}`,
+                {
+                  method: "PUT",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    start_time: utcTime,
+                    work_date: workDate,
+                  }),
+                }
+              );
 
               if (!res.ok) {
                 const errorData = await res.json().catch(() => ({}));
-                throw new Error(errorData.error || `Failed to update assignment for ${assignment.associates.first_name}`);
+                throw new Error(
+                  errorData.error ||
+                    `Failed to update assignment for ${assignment.associates.first_name}`
+                );
               }
               return res.json();
             } catch (error) {
@@ -175,7 +240,11 @@ export function useReminderDetail(reminderId: string) {
           try {
             await Promise.all(updatePromises);
           } catch (error) {
-            alert(`Failed to update some assignments: ${error instanceof Error ? error.message : "Unknown error"}`);
+            alert(
+              `Failed to update some assignments: ${
+                error instanceof Error ? error.message : "Unknown error"
+              }`
+            );
           }
         }
       }
@@ -226,4 +295,3 @@ export function useReminderDetail(reminderId: string) {
     refreshAssignments,
   };
 }
-

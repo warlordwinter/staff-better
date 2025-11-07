@@ -11,7 +11,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "test:ci": "jest --coverage --watchAll=false"
+    "test:ci": "jest --coverage --watchAll=false",
+    "types:generate": "npx supabase gen types typescript --project-id tjotqmnwxapflhdaxtrh > src/lib/database.types.ts"
   },
   "dependencies": {
     "@google/genai": "^1.27.0",

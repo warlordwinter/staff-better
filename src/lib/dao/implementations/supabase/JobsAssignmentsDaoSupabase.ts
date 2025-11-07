@@ -186,7 +186,14 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
       throw new Error(JSON.stringify(error));
     }
 
-    console.log("Raw data from Supabase:", JSON.stringify(data[0], null, 2));
+    // Handle empty array case (new jobs have no assignments yet)
+    if (!data || data.length === 0) {
+      console.log(`No job assignments found for job ID: ${jobId}`);
+      return [];
+    }
+
+    console.log(`Found ${data.length} job assignment(s) for job ID: ${jobId}`);
+    console.log("Raw data from Supabase:", JSON.stringify(data, null, 2));
 
     // Format work_date to return only the date portion (YYYY-MM-DD)
     const formatted = data.map((assignment) => ({
@@ -196,7 +203,7 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
         : null,
     }));
 
-    console.log("Formatted data:", JSON.stringify(formatted[0], null, 2));
+    console.log("Formatted data:", JSON.stringify(formatted, null, 2));
 
     return formatted;
   }

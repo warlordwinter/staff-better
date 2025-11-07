@@ -33,8 +33,13 @@ export default function ReminderDetailsCard({
   onEditClick,
   onDismissStatus,
 }: ReminderDetailsCardProps) {
-  const displayDate = assignments.length > 0 ? assignments[0].work_date : job.start_date;
-  const displayTime = assignments.length > 0 && assignments[0].start_time ? assignments[0].start_time : "";
+  const displayDate =
+    assignments.length > 0 ? assignments[0].work_date : job.start_date;
+  // Prioritize start_time from assignments, but fall back to job.start_time if no assignments
+  const displayTime =
+    assignments.length > 0 && assignments[0].start_time
+      ? assignments[0].start_time
+      : job.start_time || "";
   const statusDisplay = getStatusDisplay(job, assignments);
 
   return (
@@ -42,7 +47,9 @@ export default function ReminderDetailsCard({
       <div className="flex items-start justify-between mb-4">
         <h2 className="text-xl font-semibold text-black">Reminder Details</h2>
         <div className="flex items-center gap-3">
-          <span className={`px-3 py-1 rounded ${statusDisplay.color} ${statusDisplay.textColor} text-sm font-medium`}>
+          <span
+            className={`px-3 py-1 rounded ${statusDisplay.color} ${statusDisplay.textColor} text-sm font-medium`}
+          >
             {statusDisplay.label}
           </span>
           <button
@@ -50,7 +57,12 @@ export default function ReminderDetailsCard({
             className="text-gray-400 hover:text-gray-600 transition-colors"
             title="Edit reminder"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -64,7 +76,12 @@ export default function ReminderDetailsCard({
 
       <div className="flex items-center gap-6 mb-4">
         <div className="flex items-center gap-2 text-gray-700">
-          <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg
+            className="w-5 h-5 text-gray-500"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -75,7 +92,12 @@ export default function ReminderDetailsCard({
           <span className="text-sm font-medium">{formatDate(displayDate)}</span>
         </div>
         <div className="flex items-center gap-2 text-gray-700">
-          <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg
+            className="w-5 h-5 text-gray-500"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -84,12 +106,16 @@ export default function ReminderDetailsCard({
             />
           </svg>
           <span className="text-sm font-medium">
-            {displayTime ? formatTime(displayTime, displayDate) : "Time not set"}
+            {displayTime
+              ? formatTime(displayTime, displayDate)
+              : "Time not set"}
           </span>
         </div>
       </div>
 
-      <p className="text-gray-700">{job.customer_name || "No additional details provided."}</p>
+      <p className="text-gray-700">
+        {job.customer_name || "No additional details provided."}
+      </p>
 
       {reminderStatus && (
         <div
@@ -101,9 +127,22 @@ export default function ReminderDetailsCard({
         >
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium">{reminderStatus.message}</p>
-            <button onClick={onDismissStatus} className="text-gray-400 hover:text-gray-600">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <button
+              onClick={onDismissStatus}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -112,4 +151,3 @@ export default function ReminderDetailsCard({
     </div>
   );
 }
-
