@@ -115,6 +115,80 @@ export async function POST(
             phone: member.phone_number,
             error: "error" in result ? result.error : "Unknown error",
           });
+        } else {
+          // Save message to database if SMS was sent successfully
+          try {
+            // Find or create conversation
+            const { data: existingConversations } = await supabaseAdmin
+              .from("conversations")
+              .select("id")
+              .eq("associate_id", member.id)
+              .eq("company_id", companyId)
+              .limit(1);
+
+            let conversationId: string | undefined;
+            if (existingConversations && existingConversations.length > 0) {
+              conversationId = existingConversations[0].id;
+            } else {
+              // Create new conversation
+              const { data: newConversation, error: createError } =
+                await supabaseAdmin
+                  .from("conversations")
+                  .insert([
+                    {
+                      associate_id: member.id,
+                      company_id: companyId,
+                    },
+                  ])
+                  .select()
+                  .single();
+
+              if (createError || !newConversation) {
+                console.error(
+                  `Error creating conversation for associate ${member.id}:`,
+                  createError
+                );
+                // Continue without saving message - SMS was sent successfully
+              } else {
+                conversationId = newConversation.id;
+              }
+            }
+
+            // Save message to database if we have a conversation_id
+            if (conversationId) {
+              const { error: insertError } = await supabaseAdmin
+                .from("messages")
+                .insert([
+                  {
+                    conversation_id: conversationId,
+                    sender_type: "company",
+                    body: body.message.trim(),
+                    direction: "outbound",
+                    status:
+                      result.success &&
+                      "messageId" in result &&
+                      result.messageId
+                        ? "queued"
+                        : null,
+                    sent_at: new Date().toISOString(),
+                  },
+                ]);
+
+              if (insertError) {
+                console.error(
+                  `Error saving message to database for associate ${member.id}:`,
+                  insertError
+                );
+                // Continue - SMS was sent successfully
+              }
+            }
+          } catch (dbError) {
+            console.error(
+              `Error saving message to database for associate ${member.id}:`,
+              dbError
+            );
+            // Continue - SMS was sent successfully
+          }
         }
 
         // Small delay between messages to avoid rate limiting
