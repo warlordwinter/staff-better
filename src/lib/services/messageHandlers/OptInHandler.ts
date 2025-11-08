@@ -1,4 +1,4 @@
-// Handler for opt-out messages
+// Handler for opt-in messages
 
 import { IMessageHandler } from "./IMessageHandler";
 import { IAssociateRepository, IMessageService } from "../interfaces/index";
@@ -7,7 +7,7 @@ import { IncomingMessageResult, MessageAction } from "../types";
 import { TWILIO_PHONE_NUMBER_REMINDERS } from "@/lib/twilio/client";
 import { getCompanyPhoneNumberAdmin } from "@/lib/auth/getCompanyId";
 
-export class OptOutHandler implements IMessageHandler {
+export class OptInHandler implements IMessageHandler {
   constructor(
     private readonly associateRepository: IAssociateRepository,
     private readonly messageService: IMessageService,
@@ -15,7 +15,7 @@ export class OptOutHandler implements IMessageHandler {
   ) {}
 
   canHandle(action: MessageAction): boolean {
-    return action === MessageAction.OPT_OUT;
+    return action === MessageAction.OPT_IN;
   }
 
   async handle(
@@ -26,12 +26,11 @@ export class OptOutHandler implements IMessageHandler {
     companyId?: string
   ): Promise<IncomingMessageResult> {
     try {
-      // Update associate to opt them out of SMS
-      await this.associateRepository.optOutAssociate(associate.id);
+      // Update associate to opt them in to SMS
+      await this.associateRepository.optInAssociate(associate.id);
 
-      const optOutMessage =
-        `${associate.first_name}, you have been unsubscribed from our text reminders. ` +
-        `You can still receive calls about your assignments. Reply START to re-subscribe anytime.`;
+      const optInMessage =
+        `${associate.first_name}, you've been re-subscribed to text reminders. Reply STOP to opt out anytime.`;
 
       // Determine which number to reply from
       // If message was sent to reminder number, reply from reminder number
@@ -39,7 +38,7 @@ export class OptOutHandler implements IMessageHandler {
       if (toNumber === TWILIO_PHONE_NUMBER_REMINDERS) {
         await this.messageService.sendReminderSMS({
           to: phoneNumber,
-          body: optOutMessage,
+          body: optInMessage,
         });
       } else if (companyId) {
         // Get company phone number and reply from it
@@ -48,7 +47,7 @@ export class OptOutHandler implements IMessageHandler {
           await this.messageService.sendTwoWaySMS(
             {
               to: phoneNumber,
-              body: optOutMessage,
+              body: optInMessage,
             },
             companyPhoneNumber
           );
@@ -56,28 +55,29 @@ export class OptOutHandler implements IMessageHandler {
           // Fallback to reminder number if company number not found
           await this.messageService.sendReminderSMS({
             to: phoneNumber,
-            body: optOutMessage,
+            body: optInMessage,
           });
         }
       } else {
         // Fallback to reminder number if no company ID
         await this.messageService.sendReminderSMS({
           to: phoneNumber,
-          body: optOutMessage,
+          body: optInMessage,
         });
       }
 
       return {
         success: true,
-        action: MessageAction.OPT_OUT,
+        action: MessageAction.OPT_IN,
         associate_id: associate.id,
         phone_number: phoneNumber,
         message: message,
-        response_sent: optOutMessage,
+        response_sent: optInMessage,
       };
     } catch (error) {
-      this.logger.error("Error handling opt-out:", error);
+      this.logger.error("Error handling opt-in:", error);
       throw error;
     }
   }
 }
+

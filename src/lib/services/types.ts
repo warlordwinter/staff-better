@@ -50,6 +50,7 @@ export enum MessageAction {
   CONFIRMATION = "confirmation",
   HELP_REQUEST = "help_request",
   OPT_OUT = "opt_out",
+  OPT_IN = "opt_in",
   UNKNOWN = "unknown",
 }
 

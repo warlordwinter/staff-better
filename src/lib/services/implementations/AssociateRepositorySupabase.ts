@@ -14,4 +14,8 @@ export class AssociateRepositorySupabase implements IAssociateRepository {
   async optOutAssociate(associateId: string): Promise<void> {
     await this.associatesDao.optOutAssociate(associateId);
   }
+
+  async optInAssociate(associateId: string): Promise<void> {
+    await this.associatesDao.optInAssociate(associateId);
+  }
 }

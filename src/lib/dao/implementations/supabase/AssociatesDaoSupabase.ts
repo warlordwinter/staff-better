@@ -337,4 +337,18 @@ export class AssociatesDaoSupabase implements IAssociates {
       throw new Error("Failed to opt out associate of sms");
     }
   }
+
+  async optInAssociate(associateId: string): Promise<void> {
+    const supabase = await createClient();
+
+    const { error } = await supabase
+      .from("associates")
+      .update({ sms_opt_out: false })
+      .eq("id", associateId);
+
+    if (error) {
+      console.error("Supabase Update Error", error);
+      throw new Error("Failed to opt in associate to sms");
+    }
+  }
 }

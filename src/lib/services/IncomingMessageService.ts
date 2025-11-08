@@ -12,6 +12,7 @@ import { IMessageHandler } from "./messageHandlers/IMessageHandler";
 import { ConfirmationHandler } from "./messageHandlers/ConfirmationHandler";
 import { HelpHandler } from "./messageHandlers/HelpHandler";
 import { OptOutHandler } from "./messageHandlers/OptOutHandler";
+import { OptInHandler } from "./messageHandlers/OptInHandler";
 
 // Re-export from the types file
 export type { IncomingMessageResult } from "./types";
@@ -32,10 +33,16 @@ export class IncomingMessageService {
   /**
    * Main method to process incoming SMS messages
    * This should be called by your Twilio webhook endpoint
+   * @param fromNumber The phone number that sent the message
+   * @param messageBody The message content
+   * @param toNumber The phone number that received the message (optional)
+   * @param companyId The company ID associated with the associate (optional)
    */
   async processIncomingMessage(
     fromNumber: string,
-    messageBody: string
+    messageBody: string,
+    toNumber?: string,
+    companyId?: string
   ): Promise<IncomingMessageResult> {
     try {
       this.logger.info(
@@ -67,11 +74,19 @@ export class IncomingMessageService {
         return this.handleUnknownMessage(
           associate,
           messageBody,
-          normalizedPhone
+          normalizedPhone,
+          toNumber,
+          companyId
         );
       }
 
-      return await handler.handle(associate, messageBody, normalizedPhone);
+      return await handler.handle(
+        associate,
+        messageBody,
+        normalizedPhone,
+        toNumber,
+        companyId
+      );
     } catch (error) {
       this.logger.error("Error processing incoming message", error as Error);
       return {
@@ -105,6 +120,14 @@ export class IncomingMessageService {
         this.logger
       )
     );
+    this.messageHandlers.set(
+      MessageAction.OPT_IN,
+      new OptInHandler(
+        this.associateRepository,
+        this.messageService,
+        this.logger
+      )
+    );
   }
 
   /**
@@ -119,6 +142,17 @@ export class IncomingMessageService {
 
     if (normalizedMessage === "help") {
       return MessageAction.HELP_REQUEST;
+    }
+
+    // Check for opt-in keywords before opt-out to avoid conflicts
+    if (
+      normalizedMessage === "start" ||
+      normalizedMessage === "subscribe" ||
+      normalizedMessage === "yes" ||
+      normalizedMessage === "optin" ||
+      normalizedMessage === "opt-in"
+    ) {
+      return MessageAction.OPT_IN;
     }
 
     if (normalizedMessage === "stop" || normalizedMessage === "unsubscribe") {
@@ -156,14 +190,44 @@ export class IncomingMessageService {
   private async handleUnknownMessage(
     associate: Associate,
     message: string,
-    phoneNumber: string
+    phoneNumber: string,
+    toNumber?: string,
+    companyId?: string
   ): Promise<IncomingMessageResult> {
     const unknownMessage = `Hi ${associate.first_name}!\n\nI didn't understand that message.\n\nReply "C" to confirm, "HELP" for help, or call us directly.`;
 
-    await this.messageService.sendReminderSMS({
-      to: phoneNumber,
-      body: unknownMessage,
-    });
+    // Determine which number to reply from
+    const { TWILIO_PHONE_NUMBER_REMINDERS } = await import(
+      "@/lib/twilio/client"
+    );
+    const { getCompanyPhoneNumberAdmin } = await import(
+      "@/lib/auth/getCompanyId"
+    );
+
+    if (toNumber === TWILIO_PHONE_NUMBER_REMINDERS) {
+      await this.messageService.sendReminderSMS({
+        to: phoneNumber,
+        body: unknownMessage,
+      });
+    } else if (companyId) {
+      const companyPhoneNumber = await getCompanyPhoneNumberAdmin(companyId);
+      if (companyPhoneNumber) {
+        await this.messageService.sendTwoWaySMS(
+          { to: phoneNumber, body: unknownMessage },
+          companyPhoneNumber
+        );
+      } else {
+        await this.messageService.sendReminderSMS({
+          to: phoneNumber,
+          body: unknownMessage,
+        });
+      }
+    } else {
+      await this.messageService.sendReminderSMS({
+        to: phoneNumber,
+        body: unknownMessage,
+      });
+    }
 
     return {
       success: true,

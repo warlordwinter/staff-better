@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log("Parsed values:", { fromNumber, messageBody });
+    console.log("Parsed values:", { fromNumber, messageBody, toNumber });
 
     if (!fromNumber || !messageBody) {
       console.error("Missing required fields:", {
@@ -84,10 +84,50 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Find the associate first to get company_id for message processing
+    const supabaseAdmin = createAdminClient();
+    const { normalizePhoneForLookup } = await import("@/utils/phoneUtils");
+    const normalizedFrom = normalizePhoneForLookup(fromNumber);
+
+    console.log(
+      `🔍 Looking up associate: ${fromNumber} → normalized: ${normalizedFrom}`
+    );
+
+    // Try normalized phone number first
+    let { data: associate, error: associateError } = await supabaseAdmin
+      .from("associates")
+      .select("id, company_id, phone_number")
+      .eq("phone_number", normalizedFrom)
+      .single();
+
+    // If no match and numbers are different, try original format
+    if (
+      associateError &&
+      associateError.code === "PGRST116" &&
+      normalizedFrom !== fromNumber
+    ) {
+      console.log(
+        `⚠️ No match for normalized phone, trying original: ${fromNumber}`
+      );
+      const result = await supabaseAdmin
+        .from("associates")
+        .select("id, company_id, phone_number")
+        .eq("phone_number", fromNumber)
+        .single();
+
+      associate = result.data;
+      associateError = result.error;
+    }
+
+    const companyId = associate?.company_id || undefined;
+
     // Process message for reminders/confirmations (existing functionality)
+    // Pass toNumber and companyId so handlers can reply from correct number
     const result = await messageService.processIncomingMessage(
       fromNumber,
-      messageBody
+      messageBody,
+      toNumber || undefined,
+      companyId
     );
 
     console.log("Message processing result:", result);
@@ -96,43 +136,6 @@ export async function POST(request: NextRequest) {
     // Note: toNumber is optional - we can find the conversation by associate_id alone
     try {
       if (fromNumber && messageBody) {
-        const supabaseAdmin = createAdminClient();
-
-        // Find the associate by phone number (phone numbers are unique)
-        // Use the same normalization logic as AssociatesDaoSupabase
-        const { normalizePhoneForLookup } = await import("@/utils/phoneUtils");
-        const normalizedFrom = normalizePhoneForLookup(fromNumber);
-
-        console.log(
-          `🔍 Looking up associate: ${fromNumber} → normalized: ${normalizedFrom}`
-        );
-
-        // Try normalized phone number first
-        let { data: associate, error: associateError } = await supabaseAdmin
-          .from("associates")
-          .select("id, company_id, phone_number")
-          .eq("phone_number", normalizedFrom)
-          .single();
-
-        // If no match and numbers are different, try original format
-        if (
-          associateError &&
-          associateError.code === "PGRST116" &&
-          normalizedFrom !== fromNumber
-        ) {
-          console.log(
-            `⚠️ No match for normalized phone, trying original: ${fromNumber}`
-          );
-          const result = await supabaseAdmin
-            .from("associates")
-            .select("id, company_id, phone_number")
-            .eq("phone_number", fromNumber)
-            .single();
-
-          associate = result.data;
-          associateError = result.error;
-        }
-
         if (associateError || !associate || !associate.company_id) {
           console.error(
             "❌ Error finding associate for conversation:",
