@@ -206,6 +206,7 @@ export default function AssociatesPage() {
   const [messageText, setMessageText] = useState("");
   const [sendLoading, setSendLoading] = useState(false);
   const [sendSuccess, setSendSuccess] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const [showAddNewModal, setShowAddNewModal] = useState(false);
   const [newAssociateForm, setNewAssociateForm] = useState<AssociateFormData>({
     firstName: "",
@@ -317,6 +318,7 @@ export default function AssociatesPage() {
 
     setSendLoading(true);
     setSendSuccess(false);
+    setSendError(null);
 
     try {
       if (selectedAssociate) {
@@ -349,10 +351,15 @@ export default function AssociatesPage() {
         setSelectedAssociate(null);
         setMessageText("");
         setSendSuccess(false);
+        setSendError(null);
       }, 1500);
     } catch (error) {
       console.error("Error sending message:", error);
-      alert("Failed to send message. Please try again.");
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to send message. Please try again.";
+      setSendError(errorMessage);
     } finally {
       setSendLoading(false);
     }
@@ -365,6 +372,7 @@ export default function AssociatesPage() {
     setSelectedAssociate(null);
     setMessageText("");
     setSendSuccess(false);
+    setSendError(null);
   };
 
   // Handle add new associate
@@ -650,6 +658,7 @@ export default function AssociatesPage() {
         onSend={handleSendMessage}
         sendLoading={sendLoading}
         sendSuccess={sendSuccess}
+        error={sendError}
         onCancel={handleCancelMessage}
       />
 

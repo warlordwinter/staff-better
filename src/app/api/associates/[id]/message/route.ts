@@ -124,10 +124,27 @@ export async function POST(
       });
 
       if (!result.success) {
+        // Check for specific Twilio error codes
+        const errorCode = "code" in result ? result.code : null;
+
+        // Twilio error code 21610 = "Attempt to send to unsubscribed recipient"
+        if (errorCode === "21610") {
+          return NextResponse.json(
+            {
+              error:
+                "You cannot message this employee because they have unsubscribed from SMS notifications.",
+              code: errorCode,
+              userFriendly: true,
+            },
+            { status: 400 }
+          );
+        }
+
         return NextResponse.json(
           {
             error: "Failed to send message",
             details: "error" in result ? result.error : "Unknown error",
+            code: errorCode,
           },
           { status: 500 }
         );

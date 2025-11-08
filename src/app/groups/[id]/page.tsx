@@ -45,6 +45,7 @@ export default function GroupPage({ params }: GroupPageProps) {
   const [loadingAssociates, setLoadingAssociates] = useState(false);
   const [sendSuccess, setSendSuccess] = useState(false);
   const [sendLoading, setSendLoading] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   // Load group and associates data using the data service
   useEffect(() => {
@@ -234,8 +235,11 @@ export default function GroupPage({ params }: GroupPageProps) {
   const handleSendMessage = async () => {
     if (!messageText.trim()) return;
 
+    setSendLoading(true);
+    setSendSuccess(false);
+    setSendError(null);
+
     try {
-      setSendLoading(true);
       if (selectedAssociate) {
         // Send individual message
         await GroupsDataService.sendMessageToAssociate(
@@ -249,18 +253,23 @@ export default function GroupPage({ params }: GroupPageProps) {
 
       // Show success check briefly, then close/reset
       setSendSuccess(true);
-      setSendLoading(false);
       setTimeout(() => {
         setSendSuccess(false);
         setMessageText("");
         setShowMassMessageModal(false);
         setShowIndividualMessageModal(false);
         setSelectedAssociate(null);
+        setSendError(null);
       }, 1000);
     } catch (error) {
       console.error("Error sending message:", error);
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to send message. Please try again.";
+      setSendError(errorMessage);
+    } finally {
       setSendLoading(false);
-      // Handle error appropriately in your app
     }
   };
 
@@ -269,6 +278,7 @@ export default function GroupPage({ params }: GroupPageProps) {
     setShowMassMessageModal(false);
     setShowIndividualMessageModal(false);
     setSelectedAssociate(null);
+    setSendError(null);
   };
 
   // Show loading spinner while checking authentication
@@ -359,6 +369,7 @@ export default function GroupPage({ params }: GroupPageProps) {
         onSend={handleSendMessage}
         sendLoading={sendLoading}
         sendSuccess={sendSuccess}
+        error={sendError}
         onCancel={handleCancelMessage}
       />
 

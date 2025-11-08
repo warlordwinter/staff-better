@@ -12,6 +12,7 @@ interface IndividualMessageModalProps {
   onCancel: () => void;
   sendLoading?: boolean;
   sendSuccess?: boolean;
+  error?: string | null;
 }
 
 export default function IndividualMessageModal({
@@ -23,6 +24,7 @@ export default function IndividualMessageModal({
   onCancel,
   sendLoading = false,
   sendSuccess = false,
+  error = null,
 }: IndividualMessageModalProps) {
   if (!isOpen || !associate) return null;
 
@@ -33,6 +35,27 @@ export default function IndividualMessageModal({
           Message {associate.firstName} {associate.lastName}
         </h2>
         <p className="text-sm text-gray-600 mb-4">What do you want to say?</p>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+            <div className="flex items-start gap-2">
+              <svg
+                className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <p className="text-sm text-red-800">{error}</p>
+            </div>
+          </div>
+        )}
 
         <div className="relative">
           <textarea
