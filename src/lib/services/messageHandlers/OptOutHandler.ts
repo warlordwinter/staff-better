@@ -6,6 +6,7 @@ import { Associate } from "@/model/interfaces/Associate";
 import { IncomingMessageResult, MessageAction } from "../types";
 import { TWILIO_PHONE_NUMBER_REMINDERS } from "@/lib/twilio/client";
 import { getCompanyPhoneNumberAdmin } from "@/lib/auth/getCompanyId";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export class OptOutHandler implements IMessageHandler {
   constructor(
@@ -28,6 +29,83 @@ export class OptOutHandler implements IMessageHandler {
     try {
       // Update associate to opt them out of SMS
       await this.associateRepository.optOutAssociate(associate.id);
+
+      // Update opt_info table based on which number received the STOP message
+      const supabaseAdmin = createAdminClient();
+      const currentTimestamp = new Date().toISOString();
+
+      // Check if opt_info record exists
+      const { data: existingOptInfo } = await supabaseAdmin
+        .from("opt_info")
+        .select("associate_id")
+        .eq("associate_id", associate.id)
+        .single();
+
+      if (toNumber === TWILIO_PHONE_NUMBER_REMINDERS) {
+        // STOP received on reminder number - update reminder_opt_out_time
+        if (existingOptInfo) {
+          const { error: updateError } = await supabaseAdmin
+            .from("opt_info")
+            .update({
+              reminder_opt_out_time: currentTimestamp,
+            })
+            .eq("associate_id", associate.id);
+
+          if (updateError) {
+            this.logger.error(
+              `Failed to update opt_info.reminder_opt_out_time for associate ${associate.id}:`,
+              updateError
+            );
+          }
+        } else {
+          // Create new record if it doesn't exist
+          const { error: insertError } = await supabaseAdmin
+            .from("opt_info")
+            .insert({
+              associate_id: associate.id,
+              reminder_opt_out_time: currentTimestamp,
+            });
+
+          if (insertError) {
+            this.logger.error(
+              `Failed to create opt_info with reminder_opt_out_time for associate ${associate.id}:`,
+              insertError
+            );
+          }
+        }
+      } else {
+        // STOP received on company number - update sms_opt_out_time
+        if (existingOptInfo) {
+          const { error: updateError } = await supabaseAdmin
+            .from("opt_info")
+            .update({
+              sms_opt_out_time: currentTimestamp,
+            })
+            .eq("associate_id", associate.id);
+
+          if (updateError) {
+            this.logger.error(
+              `Failed to update opt_info.sms_opt_out_time for associate ${associate.id}:`,
+              updateError
+            );
+          }
+        } else {
+          // Create new record if it doesn't exist
+          const { error: insertError } = await supabaseAdmin
+            .from("opt_info")
+            .insert({
+              associate_id: associate.id,
+              sms_opt_out_time: currentTimestamp,
+            });
+
+          if (insertError) {
+            this.logger.error(
+              `Failed to create opt_info with sms_opt_out_time for associate ${associate.id}:`,
+              insertError
+            );
+          }
+        }
+      }
 
       const optOutMessage =
         `${associate.first_name}, you have been unsubscribed from our text reminders. ` +

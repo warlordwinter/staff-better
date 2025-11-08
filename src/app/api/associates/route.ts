@@ -4,7 +4,8 @@ import {
   requireCompanyId,
   requireCompanyPhoneNumber,
 } from "@/lib/auth/getCompanyId";
-import { sendTwoWaySMS, formatPhoneNumber } from "@/lib/twilio/sms";
+import { sendTwoWaySMS, sendReminderSMS, formatPhoneNumber } from "@/lib/twilio/sms";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 const associatesDao = new AssociatesDaoSupabase();
 
@@ -32,10 +33,24 @@ export async function POST(request: NextRequest) {
       associatesToInsert
     );
 
-    // Send opt-in message to each new associate
+    // Send opt-in messages to each new associate and create/update opt_info
     try {
       const companyId = await requireCompanyId();
       const companyPhoneNumber = await requireCompanyPhoneNumber(companyId);
+      const supabaseAdmin = createAdminClient();
+
+      // Fetch company name
+      const { data: company, error: companyError } = await supabaseAdmin
+        .from("companies")
+        .select("company_name")
+        .eq("id", companyId)
+        .single();
+
+      if (companyError) {
+        console.error("Failed to fetch company name:", companyError);
+      }
+
+      const companyName = company?.company_name || "our company";
 
       // Only send if company phone number is configured
       if (companyPhoneNumber) {
@@ -44,20 +59,70 @@ export async function POST(request: NextRequest) {
           if (associate.phone_number) {
             try {
               const formattedPhone = formatPhoneNumber(associate.phone_number);
-              const firstName = associate.first_name || "there";
-              const optInMessage = `Hi ${firstName}! You've been added to our system. Reply START to receive text reminders about your assignments. Reply STOP to opt out anytime.`;
 
+              // Message 1: From company number
+              const companyMessage = `This is ${companyName} you have opted in to be contacted by phone number. You may opt out at anytime using STOP keyword.`;
+              
               await sendTwoWaySMS(
                 {
                   to: formattedPhone,
-                  body: optInMessage,
+                  body: companyMessage,
                 },
                 companyPhoneNumber
               );
+
+              // Message 2: From reminder number
+              const reminderMessage = `This is ${companyName} reminder phone number. This number is purely for information and notification about your upcoming job. You have opted in to be contacted by phone number. You may opt out at anytime using STOP keyword.`;
+              
+              await sendReminderSMS({
+                to: formattedPhone,
+                body: reminderMessage,
+              });
+
+              // Create or update opt_info record
+              const { data: existingOptInfo } = await supabaseAdmin
+                .from("opt_info")
+                .select("associate_id")
+                .eq("associate_id", associate.id)
+                .single();
+
+              if (existingOptInfo) {
+                // Update existing record
+                const { error: updateError } = await supabaseAdmin
+                  .from("opt_info")
+                  .update({
+                    first_sms_opt_out: true,
+                    first_reminder_opt_out: true,
+                  })
+                  .eq("associate_id", associate.id);
+
+                if (updateError) {
+                  console.error(
+                    `Failed to update opt_info for associate ${associate.id}:`,
+                    updateError
+                  );
+                }
+              } else {
+                // Insert new record
+                const { error: insertError } = await supabaseAdmin
+                  .from("opt_info")
+                  .insert({
+                    associate_id: associate.id,
+                    first_sms_opt_out: true,
+                    first_reminder_opt_out: true,
+                  });
+
+                if (insertError) {
+                  console.error(
+                    `Failed to create opt_info for associate ${associate.id}:`,
+                    insertError
+                  );
+                }
+              }
             } catch (smsError) {
               // Log error but don't fail associate creation
               console.error(
-                `Failed to send opt-in message to associate ${associate.id}:`,
+                `Failed to send opt-in messages to associate ${associate.id}:`,
                 smsError
               );
             }
