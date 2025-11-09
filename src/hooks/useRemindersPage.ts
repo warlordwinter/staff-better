@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Job } from "@/model/interfaces/Job";
 import { convertLocalTimeToUTC } from "@/utils/timezoneUtils";
 
@@ -55,7 +55,7 @@ export function useRemindersPage(
   const [newStartTime, setNewStartTime] = useState("");
 
   // Fetch jobs and their associate counts
-  const loadJobs = async () => {
+  const loadJobs = useCallback(async () => {
     try {
       // Fetch jobs
       const jobsRes = await fetch("/api/jobs");
@@ -92,7 +92,7 @@ export function useRemindersPage(
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) {

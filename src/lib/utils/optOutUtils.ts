@@ -1,5 +1,9 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendReminderSMS, sendTwoWaySMS, formatPhoneNumber } from "@/lib/twilio/sms";
+import {
+  sendReminderSMS,
+  sendTwoWaySMS,
+  formatPhoneNumber,
+} from "@/lib/twilio/sms";
 import { getCompanyPhoneNumberAdmin } from "@/lib/auth/getCompanyId";
 
 /**
@@ -19,7 +23,7 @@ export async function sendReminderOptOutIfNeeded(
     const formattedPhone = formatPhoneNumber(phoneNumber);
 
     // Get opt_info record
-    const { data: optInfo, error: optInfoError } = await supabaseAdmin
+    const { data: optInfo } = await supabaseAdmin
       .from("opt_info")
       .select("first_reminder_opt_out")
       .eq("associate_id", associateId)
@@ -27,7 +31,9 @@ export async function sendReminderOptOutIfNeeded(
 
     // If record doesn't exist or flag is false/null, we need to send the message
     const needsOptOutMessage =
-      !optInfo || optInfo.first_reminder_opt_out === false || optInfo.first_reminder_opt_out === null;
+      !optInfo ||
+      optInfo.first_reminder_opt_out === false ||
+      optInfo.first_reminder_opt_out === null;
 
     if (!needsOptOutMessage) {
       return false; // Already sent
@@ -41,7 +47,10 @@ export async function sendReminderOptOutIfNeeded(
       .single();
 
     if (companyError) {
-      console.error("Failed to fetch company name for opt-out message:", companyError);
+      console.error(
+        "Failed to fetch company name for opt-out message:",
+        companyError
+      );
       return false;
     }
 
@@ -126,7 +135,7 @@ export async function sendSMSOptOutIfNeeded(
     const formattedPhone = formatPhoneNumber(phoneNumber);
 
     // Get opt_info record
-    const { data: optInfo, error: optInfoError } = await supabaseAdmin
+    const { data: optInfo } = await supabaseAdmin
       .from("opt_info")
       .select("first_sms_opt_out")
       .eq("associate_id", associateId)
@@ -134,16 +143,18 @@ export async function sendSMSOptOutIfNeeded(
 
     // If record doesn't exist or flag is false/null, we need to send the message
     const needsOptOutMessage =
-      !optInfo || optInfo.first_sms_opt_out === false || optInfo.first_sms_opt_out === null;
+      !optInfo ||
+      optInfo.first_sms_opt_out === false ||
+      optInfo.first_sms_opt_out === null;
 
     if (!needsOptOutMessage) {
       return false; // Already sent
     }
 
     // Get company phone number if not provided
-    let twoWayPhoneNumber = companyPhoneNumber;
+    let twoWayPhoneNumber: string | undefined = companyPhoneNumber;
     if (!twoWayPhoneNumber) {
-      twoWayPhoneNumber = await getCompanyPhoneNumberAdmin(companyId);
+      twoWayPhoneNumber = (await getCompanyPhoneNumberAdmin(companyId)) || "";
       if (!twoWayPhoneNumber) {
         console.error(
           `Company phone number not found for company ${companyId}, cannot send SMS opt-out message`
@@ -160,7 +171,10 @@ export async function sendSMSOptOutIfNeeded(
       .single();
 
     if (companyError) {
-      console.error("Failed to fetch company name for opt-out message:", companyError);
+      console.error(
+        "Failed to fetch company name for opt-out message:",
+        companyError
+      );
       return false;
     }
 
@@ -228,4 +242,3 @@ export async function sendSMSOptOutIfNeeded(
     return false;
   }
 }
-

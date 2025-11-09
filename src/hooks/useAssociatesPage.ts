@@ -2,10 +2,6 @@ import { useState, useEffect } from "react";
 import { AssociateGroup } from "@/model/interfaces/AssociateGroup";
 import { AssociateFormData } from "@/components/shared/AssociateForm";
 import { GroupsDataService } from "@/lib/services/groupsDataService";
-import {
-  associateGroupToFormData,
-  formDataToAssociateGroup,
-} from "@/utils/associateUtils";
 import { isValidPhoneNumber } from "@/utils/phoneUtils";
 
 export interface UseAssociatesPageReturn {

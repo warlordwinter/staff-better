@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AssociatesDaoSupabase } from "@/lib/dao/implementations/supabase/AssociatesDaoSupabase";
-import { requireCompanyId } from "@/lib/auth/getCompanyId";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const associatesDao = new AssociatesDaoSupabase();
@@ -31,7 +30,6 @@ export async function POST(request: NextRequest) {
 
     // Create opt_info records for new associates (opt-out messages will be sent on first contact)
     try {
-      const companyId = await requireCompanyId();
       const supabaseAdmin = createAdminClient();
 
       for (const associate of insertedAssociates) {
