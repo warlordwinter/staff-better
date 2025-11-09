@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AssociatesDaoSupabase } from "@/lib/dao/implementations/supabase/AssociatesDaoSupabase";
-import {
-  requireCompanyId,
-  requireCompanyPhoneNumber,
-} from "@/lib/auth/getCompanyId";
-import { sendTwoWaySMS, sendReminderSMS, formatPhoneNumber } from "@/lib/twilio/sms";
+import { requireCompanyId } from "@/lib/auth/getCompanyId";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const associatesDao = new AssociatesDaoSupabase();
@@ -33,105 +29,51 @@ export async function POST(request: NextRequest) {
       associatesToInsert
     );
 
-    // Send opt-in messages to each new associate and create/update opt_info
+    // Create opt_info records for new associates (opt-out messages will be sent on first contact)
     try {
       const companyId = await requireCompanyId();
-      const companyPhoneNumber = await requireCompanyPhoneNumber(companyId);
       const supabaseAdmin = createAdminClient();
 
-      // Fetch company name
-      const { data: company, error: companyError } = await supabaseAdmin
-        .from("companies")
-        .select("company_name")
-        .eq("id", companyId)
-        .single();
+      for (const associate of insertedAssociates) {
+        // Only create opt_info if associate has a phone number
+        if (associate.phone_number) {
+          try {
+            // Check if opt_info record already exists
+            const { data: existingOptInfo } = await supabaseAdmin
+              .from("opt_info")
+              .select("associate_id")
+              .eq("associate_id", associate.id)
+              .single();
 
-      if (companyError) {
-        console.error("Failed to fetch company name:", companyError);
-      }
-
-      const companyName = company?.company_name || "our company";
-
-      // Only send if company phone number is configured
-      if (companyPhoneNumber) {
-        for (const associate of insertedAssociates) {
-          // Only send if associate has a phone number
-          if (associate.phone_number) {
-            try {
-              const formattedPhone = formatPhoneNumber(associate.phone_number);
-
-              // Message 1: From company number
-              const companyMessage = `This is ${companyName} you have opted in to be contacted by phone number. You may opt out at anytime using STOP keyword.`;
-              
-              await sendTwoWaySMS(
-                {
-                  to: formattedPhone,
-                  body: companyMessage,
-                },
-                companyPhoneNumber
-              );
-
-              // Message 2: From reminder number
-              const reminderMessage = `This is ${companyName} reminder phone number. This number is purely for information and notification about your upcoming job. You have opted in to be contacted by phone number. You may opt out at anytime using STOP keyword.`;
-              
-              await sendReminderSMS({
-                to: formattedPhone,
-                body: reminderMessage,
-              });
-
-              // Create or update opt_info record
-              const { data: existingOptInfo } = await supabaseAdmin
+            if (!existingOptInfo) {
+              // Insert new record with flags set to false (opt-out messages not sent yet)
+              const { error: insertError } = await supabaseAdmin
                 .from("opt_info")
-                .select("associate_id")
-                .eq("associate_id", associate.id)
-                .single();
+                .insert({
+                  associate_id: associate.id,
+                  first_sms_opt_out: false,
+                  first_reminder_opt_out: false,
+                });
 
-              if (existingOptInfo) {
-                // Update existing record
-                const { error: updateError } = await supabaseAdmin
-                  .from("opt_info")
-                  .update({
-                    first_sms_opt_out: true,
-                    first_reminder_opt_out: true,
-                  })
-                  .eq("associate_id", associate.id);
-
-                if (updateError) {
-                  console.error(
-                    `Failed to update opt_info for associate ${associate.id}:`,
-                    updateError
-                  );
-                }
-              } else {
-                // Insert new record
-                const { error: insertError } = await supabaseAdmin
-                  .from("opt_info")
-                  .insert({
-                    associate_id: associate.id,
-                    first_sms_opt_out: true,
-                    first_reminder_opt_out: true,
-                  });
-
-                if (insertError) {
-                  console.error(
-                    `Failed to create opt_info for associate ${associate.id}:`,
-                    insertError
-                  );
-                }
+              if (insertError) {
+                console.error(
+                  `Failed to create opt_info for associate ${associate.id}:`,
+                  insertError
+                );
               }
-            } catch (smsError) {
-              // Log error but don't fail associate creation
-              console.error(
-                `Failed to send opt-in messages to associate ${associate.id}:`,
-                smsError
-              );
             }
+          } catch (optInfoError) {
+            // Log error but don't fail associate creation
+            console.error(
+              `Failed to create opt_info for associate ${associate.id}:`,
+              optInfoError
+            );
           }
         }
       }
-    } catch (optInError) {
+    } catch (optInfoError) {
       // Log error but don't fail associate creation
-      console.error("Failed to send opt-in messages:", optInError);
+      console.error("Failed to create opt_info records:", optInfoError);
     }
 
     return NextResponse.json(insertedAssociates, { status: 201 });

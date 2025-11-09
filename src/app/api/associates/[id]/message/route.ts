@@ -150,6 +150,25 @@ export async function POST(
         );
       }
 
+      // Send opt-out message if this is the first direct message (after sending the message)
+      try {
+        const { sendSMSOptOutIfNeeded } = await import(
+          "@/lib/utils/optOutUtils"
+        );
+        await sendSMSOptOutIfNeeded(
+          associate.id,
+          associate.phone_number,
+          companyId,
+          twoWayPhoneNumber
+        );
+      } catch (optOutError) {
+        // Log error but don't fail the message send
+        console.error(
+          `Failed to send opt-out message for direct message to associate ${associate.id}:`,
+          optOutError
+        );
+      }
+
       // Find or create conversation and save message to database
       try {
         const supabaseAdmin = await (

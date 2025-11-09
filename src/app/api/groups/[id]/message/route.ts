@@ -116,6 +116,25 @@ export async function POST(
             error: "error" in result ? result.error : "Unknown error",
           });
         } else {
+          // Send opt-out message if this is the first group message for this member (after sending the message)
+          try {
+            const { sendSMSOptOutIfNeeded } = await import(
+              "@/lib/utils/optOutUtils"
+            );
+            await sendSMSOptOutIfNeeded(
+              member.id,
+              member.phone_number,
+              companyId,
+              twoWayPhoneNumber
+            );
+          } catch (optOutError) {
+            // Log error but don't fail the message send
+            console.error(
+              `Failed to send opt-out message for group message to member ${member.id}:`,
+              optOutError
+            );
+          }
+
           // Save message to database if SMS was sent successfully
           try {
             // Find or create conversation
