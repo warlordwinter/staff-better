@@ -291,7 +291,7 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
       confirmation_status: assignmentData.confirmation_status || "UNCONFIRMED",
       work_date: formattedWorkDate,
       start_time: formattedStartTime,
-      num_reminders: assignmentData.num_reminders || 0,
+      num_reminders: assignmentData.num_reminders || 3,
     };
 
     // Log the data being inserted for debugging
@@ -595,7 +595,7 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
         ? assignment.work_date.split("T")[0]
         : null, // Format to YYYY-MM-DD
       start_time: assignment.start_time,
-      num_reminders: 0, // Default value
+      num_reminders: 3, // Default value
     }));
   }
 }

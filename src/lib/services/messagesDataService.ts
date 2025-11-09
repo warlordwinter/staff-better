@@ -119,7 +119,13 @@ export class MessagesDataService {
 
     const data: SendMessageResponse = await response.json();
 
-    if (!response.ok || !data.success) {
+    if (!response.ok) {
+      // Check if it's a user-friendly error message
+      const errorMessage = data.error || data.details || "Failed to send message";
+      throw new Error(errorMessage);
+    }
+
+    if (!data.success) {
       throw new Error(data.error || data.details || "Failed to send message");
     }
 

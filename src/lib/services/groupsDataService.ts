@@ -331,8 +331,25 @@ export class GroupsDataService {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || "Failed to send message");
+      const error = await response
+        .json()
+        .catch(() => ({ error: "Failed to send message" }));
+      const errorObj = new Error(
+        error.error || error.details || "Failed to send message"
+      ) as Error & {
+        code?: string;
+        isUnsubscribed?: boolean;
+      };
+      errorObj.code = error.code;
+      // Check for unsubscription in multiple ways
+      const errorMessage = (error.error || error.details || "").toLowerCase();
+      errorObj.isUnsubscribed =
+        error.code === "21610" ||
+        error.code === 21610 ||
+        errorMessage.includes("unsubscribed") ||
+        errorMessage.includes("opted out") ||
+        errorMessage.includes("cannot message this employee");
+      throw errorObj;
     }
 
     return true;
@@ -344,7 +361,14 @@ export class GroupsDataService {
   static async sendMassMessageToGroup(
     groupId: string,
     message: string
-  ): Promise<boolean> {
+  ): Promise<{
+    success: boolean;
+    unsubscribed_members?: Array<{
+      id: string;
+      first_name: string;
+      last_name: string;
+    }>;
+  }> {
     const response = await fetch(`/api/groups/${groupId}/message`, {
       method: "POST",
       headers: {
@@ -355,10 +379,18 @@ export class GroupsDataService {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || "Failed to send mass message");
+      // Return unsubscribed members even on error
+      return {
+        success: false,
+        unsubscribed_members: error.unsubscribed_members || [],
+      };
     }
 
-    return true;
+    const data = await response.json();
+    return {
+      success: true,
+      unsubscribed_members: data.unsubscribed_members || [],
+    };
   }
 
   /**

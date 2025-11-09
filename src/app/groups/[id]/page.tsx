@@ -16,6 +16,7 @@ import GroupAssociateTable from "@/components/groups/GroupAssociateTable";
 import MassMessageModal from "@/components/groups/MassMessageModal";
 import IndividualMessageModal from "@/components/groups/IndividualMessageModal";
 import AddExistingModal from "@/components/groups/AddExistingModal";
+import Toast from "@/components/ui/Toast";
 
 interface GroupPageProps {
   params: Promise<{
@@ -45,6 +46,12 @@ export default function GroupPage({ params }: GroupPageProps) {
   const [loadingAssociates, setLoadingAssociates] = useState(false);
   const [sendSuccess, setSendSuccess] = useState(false);
   const [sendLoading, setSendLoading] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState("");
+  const [toastType, setToastType] = useState<"error" | "success" | "info">(
+    "info"
+  );
+  const [showToast, setShowToast] = useState(false);
 
   // Load group and associates data using the data service
   useEffect(() => {
@@ -234,8 +241,12 @@ export default function GroupPage({ params }: GroupPageProps) {
   const handleSendMessage = async () => {
     if (!messageText.trim()) return;
 
+    setSendLoading(true);
+    setSendSuccess(false);
+    setSendError(null);
+    setShowToast(false);
+
     try {
-      setSendLoading(true);
       if (selectedAssociate) {
         // Send individual message
         await GroupsDataService.sendMessageToAssociate(
@@ -244,23 +255,58 @@ export default function GroupPage({ params }: GroupPageProps) {
         );
       } else {
         // Send mass message
-        await GroupsDataService.sendMassMessageToGroup(groupId, messageText);
+        const result = await GroupsDataService.sendMassMessageToGroup(
+          groupId,
+          messageText
+        );
+
+        // Show toast if there are unsubscribed members
+        if (
+          result.unsubscribed_members &&
+          result.unsubscribed_members.length > 0
+        ) {
+          const names = result.unsubscribed_members.map(
+            (m) => `${m.first_name} ${m.last_name}`
+          );
+          let message = "The message was sent to everyone except ";
+
+          if (names.length === 1) {
+            message += `${names[0]}`;
+          } else if (names.length === 2) {
+            message += `${names[0]} and ${names[1]}`;
+          } else {
+            const namesCopy = [...names];
+            const last = namesCopy.pop();
+            message += `${namesCopy.join(", ")}, and ${last}`;
+          }
+
+          message += " all of which have unsubscribed";
+
+          setToastMessage(message);
+          setToastType("info");
+          setShowToast(true);
+        }
       }
 
       // Show success check briefly, then close/reset
       setSendSuccess(true);
-      setSendLoading(false);
       setTimeout(() => {
         setSendSuccess(false);
         setMessageText("");
         setShowMassMessageModal(false);
         setShowIndividualMessageModal(false);
         setSelectedAssociate(null);
+        setSendError(null);
       }, 1000);
     } catch (error) {
       console.error("Error sending message:", error);
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to send message. Please try again.";
+      setSendError(errorMessage);
+    } finally {
       setSendLoading(false);
-      // Handle error appropriately in your app
     }
   };
 
@@ -269,6 +315,7 @@ export default function GroupPage({ params }: GroupPageProps) {
     setShowMassMessageModal(false);
     setShowIndividualMessageModal(false);
     setSelectedAssociate(null);
+    setSendError(null);
   };
 
   // Show loading spinner while checking authentication
@@ -359,6 +406,7 @@ export default function GroupPage({ params }: GroupPageProps) {
         onSend={handleSendMessage}
         sendLoading={sendLoading}
         sendSuccess={sendSuccess}
+        error={sendError}
         onCancel={handleCancelMessage}
       />
 
@@ -372,6 +420,15 @@ export default function GroupPage({ params }: GroupPageProps) {
       />
 
       <Footer />
+
+      {/* Toast Notification */}
+      <Toast
+        message={toastMessage}
+        type={toastType}
+        isVisible={showToast}
+        onClose={() => setShowToast(false)}
+        duration={7000}
+      />
     </div>
   );
 }
