@@ -76,6 +76,11 @@ export async function POST(
       (member) => !member.sms_opt_out && member.phone_number
     );
 
+    // Track unsubscribed members (opted out or missing phone)
+    const unsubscribedMembers = members.filter(
+      (member) => member.sms_opt_out || !member.phone_number
+    );
+
     if (eligibleMembers.length === 0) {
       return NextResponse.json(
         {
@@ -83,6 +88,11 @@ export async function POST(
             "No eligible members to message (all opted out or missing phone numbers)",
           total_members: members.length,
           eligible_members: 0,
+          unsubscribed_members: unsubscribedMembers.map((m) => ({
+            id: m.id,
+            first_name: m.first_name,
+            last_name: m.last_name,
+          })),
         },
         { status: 400 }
       );
@@ -91,6 +101,11 @@ export async function POST(
     // Send SMS to each eligible member
     const results = [];
     const errors = [];
+    const twilioUnsubscribedMembers: Array<{
+      id: string;
+      first_name: string;
+      last_name: string;
+    }> = [];
 
     for (const member of eligibleMembers) {
       try {
@@ -110,6 +125,16 @@ export async function POST(
         });
 
         if (!result.success) {
+          // Check if error is due to unsubscription (Twilio error code 21610)
+          const errorCode = "code" in result ? result.code : null;
+          if (errorCode === "21610") {
+            twilioUnsubscribedMembers.push({
+              id: member.id,
+              first_name: member.first_name,
+              last_name: member.last_name,
+            });
+          }
+
           errors.push({
             member_id: member.id,
             phone: member.phone_number,
@@ -227,6 +252,31 @@ export async function POST(
 
     const successCount = results.filter((r) => r.success).length;
 
+    // Combine database unsubscribed members with Twilio unsubscribed members
+    // Use a Map to deduplicate by member ID
+    const unsubscribedMap = new Map<
+      string,
+      { id: string; first_name: string; last_name: string }
+    >();
+
+    unsubscribedMembers.forEach((m) => {
+      unsubscribedMap.set(m.id, {
+        id: m.id,
+        first_name: m.first_name,
+        last_name: m.last_name,
+      });
+    });
+
+    twilioUnsubscribedMembers.forEach((m) => {
+      unsubscribedMap.set(m.id, {
+        id: m.id,
+        first_name: m.first_name,
+        last_name: m.last_name,
+      });
+    });
+
+    const allUnsubscribedMembers = Array.from(unsubscribedMap.values());
+
     return NextResponse.json({
       success: true,
       total_members: members.length,
@@ -234,6 +284,7 @@ export async function POST(
       messages_sent: successCount,
       messages_failed: errors.length,
       errors: errors.length > 0 ? errors : undefined,
+      unsubscribed_members: allUnsubscribedMembers,
     });
   } catch (error: unknown) {
     console.error("Failed to send mass message:", error);

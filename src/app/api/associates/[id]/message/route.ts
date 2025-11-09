@@ -126,14 +126,21 @@ export async function POST(
       if (!result.success) {
         // Check for specific Twilio error codes
         const errorCode = "code" in result ? result.code : null;
+        const errorMessage = "error" in result ? result.error : "Unknown error";
 
         // Twilio error code 21610 = "Attempt to send to unsubscribed recipient"
-        if (errorCode === "21610") {
+        // Check for both string and number format
+        if (
+          errorCode === "21610" ||
+          String(errorCode) === "21610" ||
+          (typeof errorMessage === "string" &&
+            errorMessage.toLowerCase().includes("unsubscribed"))
+        ) {
           return NextResponse.json(
             {
               error:
                 "You cannot message this employee because they have unsubscribed from SMS notifications.",
-              code: errorCode,
+              code: errorCode || "21610",
               userFriendly: true,
             },
             { status: 400 }
@@ -143,7 +150,7 @@ export async function POST(
         return NextResponse.json(
           {
             error: "Failed to send message",
-            details: "error" in result ? result.error : "Unknown error",
+            details: errorMessage,
             code: errorCode,
           },
           { status: 500 }

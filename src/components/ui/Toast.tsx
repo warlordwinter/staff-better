@@ -25,9 +25,16 @@ export default function Toast({
 
       return () => clearTimeout(timer);
     }
-  }, [isVisible, duration, onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isVisible, duration]);
 
-  if (!isVisible) return null;
+  useEffect(() => {
+    console.log("Toast render - isVisible:", isVisible, "message:", message, "type:", type);
+  }, [isVisible, message, type]);
+
+  if (!isVisible || !message) {
+    return null;
+  }
 
   const bgColor =
     type === "error"
@@ -44,7 +51,7 @@ export default function Toast({
       : "text-blue-600";
 
   return (
-    <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-[100] animate-slide-down pointer-events-auto">
+    <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-[9999] animate-slide-down pointer-events-auto">
       <div
         className={`${bgColor} border-2 rounded-lg shadow-2xl px-5 py-4 min-w-96 max-w-lg flex items-start gap-3`}
       >
