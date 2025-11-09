@@ -21,7 +21,7 @@ const ImportOptions: React.FC<ImportOptionsProps> = ({ onUploadCSV, onAddManuall
           width={16}
           height={16}
         />
-        <span className="text-xs text-black font-inter">Upload CSV</span>
+        <span className="text-xs text-black font-inter">Upload File</span>
       </button>
 
       <button

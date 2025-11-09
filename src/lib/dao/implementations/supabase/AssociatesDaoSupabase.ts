@@ -27,7 +27,7 @@ export class AssociatesDaoSupabase implements IAssociates {
     associates: {
       first_name: string | null;
       last_name: string | null;
-      phone_number: string;
+      phone_number: string | null;
       email_address: string | null;
     }[]
   ) {
@@ -35,7 +35,7 @@ export class AssociatesDaoSupabase implements IAssociates {
 
     // Format phone numbers before insertion
     const formattedAssociates = associates.map((associate) => {
-      let formattedPhone = associate.phone_number;
+      let formattedPhone: string | null = associate.phone_number;
 
       if (associate.phone_number && associate.phone_number.trim()) {
         try {
@@ -47,6 +47,8 @@ export class AssociatesDaoSupabase implements IAssociates {
           );
           // Keep original if formatting fails
         }
+      } else {
+        formattedPhone = null;
       }
 
       return {

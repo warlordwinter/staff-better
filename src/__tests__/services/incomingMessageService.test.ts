@@ -20,6 +20,7 @@ const mockAssignmentRepository: jest.Mocked<IAssignmentRepository> = {
 
 const mockMessageService: jest.Mocked<IMessageService> = {
   sendSMS: jest.fn<Promise<SMSResult>, [SMSMessage]>(),
+  sendReminderSMS: jest.fn<Promise<SMSResult>, [Omit<SMSMessage, "from">]>(),
   formatPhoneNumber: jest.fn<string, [string]>(),
 };
 
@@ -70,7 +71,7 @@ it("Processing an incoming message should return a success result", async () => 
   ] as any);
 
   mockAssignmentRepository.updateAssignmentStatus.mockResolvedValue(void 0);
-  mockMessageService.sendSMS.mockResolvedValue({ success: true } as any);
+  mockMessageService.sendReminderSMS.mockResolvedValue({ success: true } as any);
 
   const result = await service.processIncomingMessage("1234567890", "C");
   expect(result.success).toBe(true);
@@ -78,7 +79,7 @@ it("Processing an incoming message should return a success result", async () => 
     "1"
   );
   expect(mockAssignmentRepository.updateAssignmentStatus).toHaveBeenCalled();
-  expect(mockMessageService.sendSMS).toHaveBeenCalled();
+  expect(mockMessageService.sendReminderSMS).toHaveBeenCalled();
 });
 
 it("Processing an incoming message should return a failure result", async () => {
@@ -99,12 +100,15 @@ it("Processing an incoming message for help should return success and HELP actio
     email_address: "wile@acme.com",
   } as any);
 
-  mockMessageService.sendSMS.mockResolvedValue({ success: true } as any);
+  mockMessageService.sendReminderSMS.mockResolvedValue({ success: true } as any);
 
   const result = await service.processIncomingMessage("1234567890", "help");
   expect(result.success).toBe(true);
   expect(result.action).toBe(MessageAction.HELP_REQUEST);
-  expect(mockMessageService.sendSMS).toHaveBeenCalled();
+  expect(mockMessageService.sendReminderSMS).toHaveBeenCalled();
+  expect(
+    mockMessageService.sendReminderSMS.mock.calls[0][0].body
+  ).toContain("801-361-0540");
 });
 
 // TODO: Add a test for processing an unknown message

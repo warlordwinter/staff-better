@@ -21,11 +21,12 @@ export class HelpHandler implements IMessageHandler {
     phoneNumber: string
   ): Promise<IncomingMessageResult> {
     const helpMessage =
-      `Hi ${associate.first_name}!\n\nHere's how to use our text system:\n\n` +
-      `• Reply "C" or "Confirm" to confirm your assignment\n` +
-      `• Reply "HELP" for this message\n` +
-      `• Reply "STOP" to stop receiving texts\n\n` +
-      `Questions? Call us at [YOUR_PHONE_NUMBER]`;
+      `Hi ${associate.first_name}!\n\n` +
+      `Here’s what you can do right from this text thread:\n\n` +
+      `• Reply "C" (or "Confirm") to confirm your next assignment\n` +
+      `• Reply "HELP" anytime to see this info again\n` +
+      `• Reply "STOP" to opt out of future texts\n\n` +
+      `Need a person right now? Call or text us at 801-361-0540 and we’ll get you connected.`;
 
     await this.messageService.sendReminderSMS({
       to: phoneNumber,

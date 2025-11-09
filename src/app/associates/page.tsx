@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+} from "react";
 import Link from "next/link";
 import Navbar from "@/components/ui/navBar";
 import Footer from "@/components/ui/footer";
@@ -18,6 +24,8 @@ import {
   associateGroupToFormData,
   formDataToAssociateGroup,
 } from "@/utils/associateUtils";
+import ImportOptions from "@/components/jobTableComp/importOptions";
+import { extractDataWithHeaders } from "@/utils/excelParser";
 
 // Helper function to get initials from name
 const getInitials = (firstName: string, lastName: string): string => {
@@ -215,24 +223,78 @@ export default function AssociatesPage() {
   });
   const [formErrors, setFormErrors] = useState<Partial<AssociateFormData>>({});
   const [phoneError, setPhoneError] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+  const [showImportOptions, setShowImportOptions] = useState(false);
+  type UploadStep =
+    | "idle"
+    | "parsing"
+    | "validating"
+    | "uploading"
+    | "complete"
+    | "error";
+  const [uploadStatus, setUploadStatus] = useState<{
+    step: UploadStep;
+    message: string;
+  }>({ step: "idle", message: "" });
+  const statusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+
+  const loadAssociates = useCallback(async () => {
+    try {
+      const associatesData = await GroupsDataService.fetchAllAssociates();
+      setAssociates(associatesData);
+    } catch (error) {
+      console.error("Error loading associates:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   // Load all associates
   useEffect(() => {
-    const loadAssociates = async () => {
-      try {
-        const associatesData = await GroupsDataService.fetchAllAssociates();
-        setAssociates(associatesData);
-      } catch (error) {
-        console.error("Error loading associates:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     if (!authLoading && isAuthenticated) {
       loadAssociates();
     }
-  }, [authLoading, isAuthenticated]);
+  }, [authLoading, isAuthenticated, loadAssociates]);
+
+  const clearStatusTimeout = useCallback(() => {
+    if (statusTimeoutRef.current) {
+      clearTimeout(statusTimeoutRef.current);
+      statusTimeoutRef.current = null;
+    }
+  }, []);
+
+  const resetUploadStatus = useCallback(() => {
+    clearStatusTimeout();
+    setUploadStatus({ step: "idle", message: "" });
+  }, [clearStatusTimeout]);
+
+  useEffect(() => {
+    return () => {
+      clearStatusTimeout();
+    };
+  }, [clearStatusTimeout]);
+
+  const showUploadMessage = useCallback(
+    (step: UploadStep, message: string) => {
+      clearStatusTimeout();
+      setUploadStatus({ step, message });
+
+      if (step === "complete" || step === "error") {
+        statusTimeoutRef.current = setTimeout(() => {
+          resetUploadStatus();
+        }, 4000);
+      }
+    },
+    [clearStatusTimeout, resetUploadStatus]
+  );
+
+  const handleUploadClick = useCallback(() => {
+    resetUploadStatus();
+    fileInputRef.current?.click();
+    setShowImportOptions(false);
+  }, [resetUploadStatus]);
 
   // Handle save associate
   const handleSave = async (updatedAssociate: AssociateGroup) => {
@@ -378,7 +440,29 @@ export default function AssociatesPage() {
     setFormErrors({});
     setPhoneError("");
     setShowAddNewModal(true);
+    setShowImportOptions(false);
   };
+
+
+  // Handle click outside dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowImportOptions(false);
+      }
+    };
+
+    if (showImportOptions) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showImportOptions]);
 
   // Handle form input change
   const handleFormInputChange = (
@@ -489,6 +573,385 @@ export default function AssociatesPage() {
     }
   };
 
+  const normalizeHeaderKey = (header: string) =>
+    header.toLowerCase().replace(/[\s_-]/g, "");
+
+  const buildHeaderMapping = (headers: string[]) => {
+    const canonicalMap: Record<
+      "first_name" | "last_name" | "phone_number" | "email_address" | "name",
+      string[]
+    > = {
+      first_name: ["firstname", "first"],
+      last_name: ["lastname", "last", "surname"],
+      phone_number: ["phonenumber", "phone", "mobile", "contactnumber", "contact", "tel"],
+      email_address: ["emailaddress", "email", "e-mail"],
+      name: ["name", "fullname", "fullname"],
+    };
+
+    const mapping: Partial<
+      Record<"first_name" | "last_name" | "phone_number" | "email_address" | "name", string>
+    > = {};
+
+    headers.forEach((header) => {
+      const normalized = normalizeHeaderKey(header);
+      (Object.keys(canonicalMap) as Array<
+        "first_name" | "last_name" | "phone_number" | "email_address" | "name"
+      >).forEach((key) => {
+        if (canonicalMap[key].includes(normalized)) {
+          if (!mapping[key]) {
+            mapping[key] = header;
+          }
+        }
+      });
+    });
+
+    return mapping;
+  };
+
+  const validateRows = (
+    rows: Array<{
+      firstName: string;
+      lastName: string;
+      phoneNumber: string;
+      emailAddress: string | null;
+      sourceRow: number;
+    }>
+  ) => {
+    const emailRegex = /\S+@\S+\.\S+/;
+
+    for (const row of rows) {
+      // At least first name OR last name is required
+      if ((!row.firstName || !row.firstName.trim()) && (!row.lastName || !row.lastName.trim())) {
+        return `Row ${row.sourceRow}: Name is required (first name or last name).`;
+      }
+      // Phone number is optional - if provided, do basic validation
+      if (row.phoneNumber && row.phoneNumber.trim()) {
+        // Check if it has at least some digits (7+ digits for local numbers, 10+ for full numbers)
+        const digitsOnly = row.phoneNumber.replace(/\D/g, "");
+        if (digitsOnly.length < 7) {
+          return `Row ${row.sourceRow}: Phone number appears to be too short.`;
+        }
+        // If it has 10+ digits, validate format more strictly
+        if (digitsOnly.length >= 10 && !isValidPhoneNumber(row.phoneNumber)) {
+          return `Row ${row.sourceRow}: Invalid phone number format.`;
+        }
+      }
+      // Email is optional, but if provided, validate it
+      if (row.emailAddress && row.emailAddress.trim() && !emailRegex.test(row.emailAddress)) {
+        return `Row ${row.sourceRow}: Invalid email address.`;
+      }
+    }
+
+    return "";
+  };
+
+  const handleFileChange = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    setIsUploading(true);
+    const fileExtension = file.name.toLowerCase().split('.').pop();
+    const fileType = fileExtension === 'csv' ? 'CSV' : 'Excel';
+    showUploadMessage("parsing", `Parsing ${fileType} file...`);
+
+    try {
+      const { headers, rows } = await extractDataWithHeaders(file);
+
+      if (!headers.length || !rows.length) {
+        throw new Error("No data found in the file.");
+      }
+
+      const headerMapping = buildHeaderMapping(headers);
+      
+      // Check if we have a "name" column but no separate first/last name columns
+      const hasNameColumn = !!headerMapping.name;
+      const hasFirstNameColumn = !!headerMapping.first_name;
+      const hasLastNameColumn = !!headerMapping.last_name;
+      const hasPhoneColumn = !!headerMapping.phone_number;
+
+      // Validate required fields
+      if (!hasPhoneColumn) {
+        throw new Error("Missing required column: phone number");
+      }
+
+      // We need either (first_name AND last_name) OR name column
+      if (!hasNameColumn && (!hasFirstNameColumn || !hasLastNameColumn)) {
+        throw new Error(
+          "Missing required columns: Please provide either 'Name' column or both 'First Name' and 'Last Name' columns"
+        );
+      }
+
+      showUploadMessage("validating", "Validating data...");
+
+      const mapping = headerMapping as Partial<Record<
+        "first_name" | "last_name" | "phone_number" | "email_address" | "name",
+        string
+      >>;
+
+      // Helper function to extract phone number from any string
+      const extractPhoneNumber = (value: string | undefined): string => {
+        if (!value) return "";
+        const str = typeof value === "string" ? value.trim() : String(value).trim();
+        if (!str) return "";
+        
+        // Remove common extension markers (EXT, ext, x, X, extension, etc.)
+        const cleaned = str.replace(/\s*(EXT|ext|x|X|extension|Extension)[\s\-:]*\d*/gi, "").trim();
+        
+        // Check if it looks like a phone number (has digits)
+        const digitsOnly = cleaned.replace(/\D/g, "");
+        // Accept if it has at least 7 digits (some formats might be shorter)
+        // But prefer 10+ digits for standard US numbers
+        if (digitsOnly.length >= 7) {
+          return cleaned; // Return cleaned format (without extension)
+        }
+        return "";
+      };
+
+      // Helper function to extract email from any string
+      const extractEmail = (value: string | undefined): string | null => {
+        if (!value) return null;
+        const str = typeof value === "string" ? value.trim() : String(value).trim();
+        if (!str) return null;
+        // Check if it looks like an email
+        const emailRegex = /\S+@\S+\.\S+/;
+        if (emailRegex.test(str)) {
+          return str;
+        }
+        return null;
+      };
+
+      // Helper function to parse name (handles "Last, First" format)
+      const parseName = (fullName: string): { firstName: string; lastName: string } => {
+        const trimmed = fullName.trim();
+        if (!trimmed) return { firstName: "", lastName: "" };
+
+        // Handle "Last, First" format (e.g., "Chen, Lisa")
+        if (trimmed.includes(",")) {
+          const parts = trimmed.split(",").map((p) => p.trim()).filter((p) => p.length > 0);
+          if (parts.length >= 2) {
+            return { firstName: parts[1], lastName: parts[0] };
+          }
+          // If comma but only one part, treat as last name
+          if (parts.length === 1) {
+            return { firstName: "", lastName: parts[0] };
+          }
+        }
+
+        // Handle normal "First Last" format
+        const nameParts = trimmed.split(/\s+/).filter((part) => part.length > 0);
+        if (nameParts.length === 0) {
+          return { firstName: "", lastName: "" };
+        }
+        if (nameParts.length === 1) {
+          return { firstName: nameParts[0], lastName: "" };
+        }
+        // First word is first name, rest is last name
+        return {
+          firstName: nameParts[0],
+          lastName: nameParts.slice(1).join(" "),
+        };
+      };
+
+      const processedRows = rows
+        .map((row, index) => {
+          const sourceRow = index + 2;
+          let firstName = "";
+          let lastName = "";
+          let phoneNumber = "";
+          let emailAddress: string | null = null;
+
+          // Handle name splitting if we have a "name" column
+          if (hasNameColumn && mapping.name) {
+            const rawName = row[mapping.name];
+            const fullName =
+              typeof rawName === "string"
+                ? rawName.trim()
+                : rawName
+                ? String(rawName).trim()
+                : "";
+
+            if (fullName) {
+              const parsed = parseName(fullName);
+              firstName = parsed.firstName;
+              lastName = parsed.lastName;
+            }
+          } else {
+            // Use separate first_name and last_name columns
+            const rawFirstName = mapping.first_name ? row[mapping.first_name] : undefined;
+            const rawLastName = mapping.last_name ? row[mapping.last_name] : undefined;
+
+            firstName =
+              typeof rawFirstName === "string"
+                ? rawFirstName.trim()
+                : rawFirstName
+                ? String(rawFirstName).trim()
+                : "";
+            lastName =
+              typeof rawLastName === "string"
+                ? rawLastName.trim()
+                : rawLastName
+                ? String(rawLastName).trim()
+                : "";
+          }
+
+          // Extract phone number from phone_number column
+          const rawPhoneNumber = mapping.phone_number ? row[mapping.phone_number] : undefined;
+          phoneNumber = extractPhoneNumber(rawPhoneNumber);
+
+          // Extract email from email_address column
+          const rawEmailAddress = mapping.email_address ? row[mapping.email_address] : undefined;
+          emailAddress = extractEmail(rawEmailAddress);
+
+          // If we didn't find phone/email in their expected columns, try searching all columns
+          // Search for phone if missing
+          if (!phoneNumber) {
+            Object.entries(row).forEach(([header, value]) => {
+              if (header !== mapping.phone_number) {
+                const potentialPhone = extractPhoneNumber(value);
+                if (potentialPhone) {
+                  phoneNumber = potentialPhone;
+                }
+              }
+            });
+          }
+          // Search for email if missing
+          if (!emailAddress) {
+            Object.entries(row).forEach(([header, value]) => {
+              if (header !== mapping.email_address) {
+                const potentialEmail = extractEmail(value);
+                if (potentialEmail) {
+                  emailAddress = potentialEmail;
+                }
+              }
+            });
+          }
+
+          // Skip rows that don't have at least a name
+          // Phone number is optional - user can add it later
+          if ((!firstName || !firstName.trim()) && (!lastName || !lastName.trim())) {
+            return null; // No name at all - skip this row
+          }
+
+          // If no phone number found, set to empty string (will be null in API)
+          // User can add it later
+          return {
+            firstName: firstName || "Unknown",
+            lastName: lastName || "",
+            phoneNumber: phoneNumber || "",
+            emailAddress,
+            sourceRow,
+          };
+        })
+        .filter(
+          (
+            row
+          ): row is {
+            firstName: string;
+            lastName: string;
+            phoneNumber: string;
+            emailAddress: string | null;
+            sourceRow: number;
+          } => row !== null
+        );
+
+      if (!processedRows.length) {
+        throw new Error("No valid rows found in the file.");
+      }
+
+      const validationError = validateRows(processedRows);
+      if (validationError) {
+        throw new Error(validationError);
+      }
+
+      showUploadMessage(
+        "uploading",
+        `Uploading ${processedRows.length} associates...`
+      );
+
+      const payload = processedRows.map((row) => ({
+        first_name: row.firstName,
+        last_name: row.lastName,
+        phone_number: row.phoneNumber && row.phoneNumber.trim() ? row.phoneNumber : null,
+        email_address: row.emailAddress || null,
+      }));
+
+      const response = await fetch("/api/associates", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(
+          errorData?.error ||
+            "Failed to upload associates. Please try again."
+        );
+      }
+
+      const insertedAssociates: Array<{
+        id: string;
+        first_name: string;
+        last_name: string;
+        phone_number: string;
+        email_address: string;
+        created_at?: string;
+        updated_at?: string;
+      }> = await response.json();
+
+      const newAssociates: AssociateGroup[] = insertedAssociates.map(
+        (associate) => ({
+          id: associate.id,
+          firstName: associate.first_name || "",
+          lastName: associate.last_name || "",
+          phoneNumber: associate.phone_number || "",
+          emailAddress: associate.email_address || "",
+          groupId: "",
+          createdAt: associate.created_at
+            ? new Date(associate.created_at)
+            : new Date(),
+          updatedAt: associate.updated_at
+            ? new Date(associate.updated_at)
+            : new Date(),
+        })
+      );
+
+      setAssociates((prev) => {
+        const existingIds = new Set(prev.map((associate) => associate.id));
+        const uniqueNewAssociates = newAssociates.filter(
+          (associate) => !existingIds.has(associate.id)
+        );
+        return [...uniqueNewAssociates, ...prev];
+      });
+
+      showUploadMessage(
+        "complete",
+        `Successfully uploaded ${processedRows.length} associates.`
+      );
+    } catch (error) {
+      console.error("Error uploading associates:", error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Upload failed. Please try again.";
+      showUploadMessage("error", message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleUploadStatusDismiss = () => {
+    resetUploadStatus();
+  };
+
   // Handle cancel add new associate
   const handleCancelAddNew = () => {
     setShowAddNewModal(false);
@@ -549,25 +1012,39 @@ export default function AssociatesPage() {
             <h1 className="text-4xl font-bold text-black">All Associates</h1>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              onClick={handleAddNew}
-              className="px-4 py-2 bg-gradient-to-r from-[#FFBB87] to-[#FE6F00] text-white rounded-lg font-medium inline-flex items-center gap-2 hover:opacity-90 transition-opacity"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setShowImportOptions((prev) => !prev)}
+                disabled={isUploading}
+                className="px-4 py-2 bg-gradient-to-r from-[#FFBB87] to-[#FE6F00] text-white rounded-lg font-medium inline-flex items-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
-              Add New
-            </button>
+                <span className="text-sm font-normal font-['Inter']">
+                  {isUploading ? "Processing..." : "Add"}
+                </span>
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+              </button>
+
+              {showImportOptions && (
+                <div className="absolute right-0 mt-2 z-10">
+                  <ImportOptions
+                    onUploadCSV={handleUploadClick}
+                    onAddManually={handleAddNew}
+                  />
+                </div>
+              )}
+            </div>
             <button
               onClick={handleMessageAll}
               className="px-4 py-2 bg-gradient-to-r from-[#FFBB87] to-[#FE6F00] text-white rounded-lg font-medium inline-flex items-center gap-2 hover:opacity-90 transition-opacity"
@@ -589,6 +1066,43 @@ export default function AssociatesPage() {
             </button>
           </div>
         </div>
+
+        {uploadStatus.step !== "idle" && (
+          <div
+            className={`mb-4 max-w-lg rounded-lg border px-4 py-3 text-sm shadow-sm ${
+              uploadStatus.step === "error"
+                ? "border-red-200 bg-red-50 text-red-800"
+                : uploadStatus.step === "complete"
+                ? "border-green-200 bg-green-50 text-green-800"
+                : "border-blue-200 bg-blue-50 text-blue-800"
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-semibold">
+                  {uploadStatus.step === "error"
+                    ? "Upload Failed"
+                    : uploadStatus.step === "complete"
+                    ? "Upload Complete"
+                    : uploadStatus.step === "uploading"
+                    ? "Uploading..."
+                    : uploadStatus.step === "validating"
+                    ? "Validating..."
+                    : "Parsing..."}
+                </p>
+                <p className="mt-1 text-xs text-inherit">
+                  {uploadStatus.message}
+                </p>
+              </div>
+              <button
+                onClick={handleUploadStatusDismiss}
+                className="text-xs text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Associates Table */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -639,6 +1153,14 @@ export default function AssociatesPage() {
             </div>
           )}
         </div>
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileChange}
+          accept=".csv,.xlsx,.xls,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          className="hidden"
+          disabled={isUploading}
+        />
       </main>
 
       {/* Modals */}
