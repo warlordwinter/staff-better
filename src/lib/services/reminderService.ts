@@ -83,6 +83,37 @@ export class ReminderService {
         body: messageBody,
       });
 
+      // Send opt-out message if this is the first reminder (after sending the reminder)
+      if (smsResult.success) {
+        try {
+          // Fetch company_id from associate
+          const { createAdminClient } = await import("@/lib/supabase/admin");
+          const supabaseAdmin = createAdminClient();
+          const { data: associate } = await supabaseAdmin
+            .from("associates")
+            .select("company_id")
+            .eq("id", assignment.associate_id)
+            .single();
+
+          if (associate?.company_id) {
+            const { sendReminderOptOutIfNeeded } = await import(
+              "@/lib/utils/optOutUtils"
+            );
+            await sendReminderOptOutIfNeeded(
+              assignment.associate_id,
+              assignment.phone_number,
+              associate.company_id
+            );
+          }
+        } catch (optOutError) {
+          // Log error but don't fail the reminder send
+          this.logger.error(
+            `Failed to send opt-out message for reminder to associate ${assignment.associate_id}:`,
+            optOutError as Error
+          );
+        }
+      }
+
       return {
         success: smsResult.success,
         assignment_id: `${assignment.job_id}-${assignment.associate_id}`,

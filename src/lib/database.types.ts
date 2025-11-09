@@ -22,6 +22,7 @@ export type Database = {
           id: string
           last_name: string | null
           phone_number: string
+          reminder_opt_out: boolean | null
           sms_opt_out: boolean | null
           updated_at: string | null
         }
@@ -32,6 +33,7 @@ export type Database = {
           id?: string
           last_name?: string | null
           phone_number: string
+          reminder_opt_out?: boolean | null
           sms_opt_out?: boolean | null
           updated_at?: string | null
         }
@@ -42,6 +44,7 @@ export type Database = {
           id?: string
           last_name?: string | null
           phone_number?: string
+          reminder_opt_out?: boolean | null
           sms_opt_out?: boolean | null
           updated_at?: string | null
         }
@@ -333,6 +336,38 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      opt_info: {
+        Row: {
+          associate_id: string
+          first_reminder_opt_out: boolean
+          first_sms_opt_out: boolean
+          reminder_opt_out_time: string | null
+          sms_opt_out_time: string | null
+        }
+        Insert: {
+          associate_id: string
+          first_reminder_opt_out?: boolean
+          first_sms_opt_out?: boolean
+          reminder_opt_out_time?: string | null
+          sms_opt_out_time?: string | null
+        }
+        Update: {
+          associate_id?: string
+          first_reminder_opt_out?: boolean
+          first_sms_opt_out?: boolean
+          reminder_opt_out_time?: string | null
+          sms_opt_out_time?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opt_info_associate_id_fkey"
+            columns: ["associate_id"]
+            isOneToOne: true
+            referencedRelation: "associates"
             referencedColumns: ["id"]
           },
         ]

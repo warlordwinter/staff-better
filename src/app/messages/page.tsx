@@ -1,10 +1,11 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import Navbar from "@/components/ui/navBar";
 import Footer from "@/components/ui/footer";
 import LoadingSpinner from "@/components/ui/loadingSpinner";
 import MessageList from "@/components/ui/messageList";
+import { useToast } from "@/components/ui/ToastProvider";
 import { useAuthCheck } from "@/hooks/useAuthCheck";
 import { useMessages } from "@/hooks/useMessages";
 
@@ -24,6 +25,19 @@ export default function MessagesPage() {
     setMessageText,
     handleSendMessage,
   } = useMessages(isAuthenticated, authLoading);
+
+  const { showToast } = useToast();
+
+  // Show toast when error occurs
+  useEffect(() => {
+    if (error) {
+      // Use the specific error message or default message
+      const message = error.includes("unsubscribed")
+        ? error
+        : "You cannot message this user because they have unsubscribed from SMS notifications.";
+      showToast(message, "error");
+    }
+  }, [error, showToast]);
 
   // Show loading spinner while checking authentication or loading data
   if (authLoading || !mounted || loading) {
@@ -128,11 +142,6 @@ export default function MessagesPage() {
 
               {/* Message Input */}
               <div className="p-4 border-t border-gray-200 flex-shrink-0">
-                {error && (
-                  <div className="mb-2 p-2 bg-red-100 border border-red-400 text-red-700 rounded text-sm">
-                    {error}
-                  </div>
-                )}
                 <div className="flex items-center gap-3">
                   <input
                     type="text"

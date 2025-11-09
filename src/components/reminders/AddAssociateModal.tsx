@@ -131,7 +131,7 @@ export default function AddAssociateModal({
               confirmation_status: "UNCONFIRMED",
               work_date: workDate,
               start_time: startTime,
-              num_reminders: 0,
+              num_reminders: 3,
             }),
           });
 

@@ -79,7 +79,10 @@ export async function POST(request: NextRequest) {
           );
         }
         // If it has 10+ digits, validate format more strictly
-        if (digitsOnly.length >= 10 && !isValidPhoneNumber(associate.phone_number)) {
+        if (
+          digitsOnly.length >= 10 &&
+          !isValidPhoneNumber(associate.phone_number)
+        ) {
           return NextResponse.json(
             { error: `${rowLabel}: Invalid phone number format.` },
             { status: 400 }
@@ -104,8 +107,7 @@ export async function POST(request: NextRequest) {
       email_address: rest.email_address || null,
     }));
 
-    const insertedAssociates =
-      await associatesDao.insertAssociates(payload);
+    const insertedAssociates = await associatesDao.insertAssociates(payload);
     return NextResponse.json(insertedAssociates, { status: 201 });
   } catch (error) {
     console.error("Failed to create associate:", error);

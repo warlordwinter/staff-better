@@ -8,6 +8,8 @@ export interface IMessageHandler {
   handle(
     associate: Associate,
     message: string,
-    phoneNumber: string
+    phoneNumber: string,
+    toNumber?: string,
+    companyId?: string
   ): Promise<IncomingMessageResult>;
 }

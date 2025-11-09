@@ -5,6 +5,8 @@ import { IAssignmentRepository, IMessageService } from "../interfaces/index";
 import { Associate } from "@/model/interfaces/Associate";
 import { IncomingMessageResult, MessageAction } from "../types";
 import { ConfirmationStatus } from "@/model/enums/ConfirmationStatus";
+import { TWILIO_PHONE_NUMBER_REMINDERS } from "@/lib/twilio/client";
+import { getCompanyPhoneNumberAdmin } from "@/lib/auth/getCompanyId";
 
 export class ConfirmationHandler implements IMessageHandler {
   constructor(
@@ -20,7 +22,9 @@ export class ConfirmationHandler implements IMessageHandler {
   async handle(
     associate: Associate,
     message: string,
-    phoneNumber: string
+    phoneNumber: string,
+    toNumber?: string,
+    companyId?: string
   ): Promise<IncomingMessageResult> {
     try {
       const activeAssignments =
@@ -29,10 +33,31 @@ export class ConfirmationHandler implements IMessageHandler {
       if (activeAssignments.length === 0) {
         const response = `Hi ${associate.first_name}!\n\nWe don't have any upcoming assignments for you to confirm right now.\n\nIf you think this is an error, please call us.`;
 
-        await this.messageService.sendReminderSMS({
-          to: phoneNumber,
-          body: response,
-        });
+        // Determine which number to reply from
+        if (toNumber === TWILIO_PHONE_NUMBER_REMINDERS) {
+          await this.messageService.sendReminderSMS({
+            to: phoneNumber,
+            body: response,
+          });
+        } else if (companyId) {
+          const companyPhoneNumber = await getCompanyPhoneNumberAdmin(companyId);
+          if (companyPhoneNumber) {
+            await this.messageService.sendTwoWaySMS(
+              { to: phoneNumber, body: response },
+              companyPhoneNumber
+            );
+          } else {
+            await this.messageService.sendReminderSMS({
+              to: phoneNumber,
+              body: response,
+            });
+          }
+        } else {
+          await this.messageService.sendReminderSMS({
+            to: phoneNumber,
+            body: response,
+          });
+        }
 
         return {
           success: true,
@@ -62,10 +87,31 @@ export class ConfirmationHandler implements IMessageHandler {
           ? `Thanks ${associate.first_name}!\n\nYour assignment is confirmed.\n\nWe'll see you there!`
           : `Thanks ${associate.first_name}!\n\nYour ${updatedCount} assignments are confirmed.\n\nWe'll see you there!`;
 
-      await this.messageService.sendReminderSMS({
-        to: phoneNumber,
-        body: response,
-      });
+      // Determine which number to reply from
+      if (toNumber === TWILIO_PHONE_NUMBER_REMINDERS) {
+        await this.messageService.sendReminderSMS({
+          to: phoneNumber,
+          body: response,
+        });
+      } else if (companyId) {
+        const companyPhoneNumber = await getCompanyPhoneNumberAdmin(companyId);
+        if (companyPhoneNumber) {
+          await this.messageService.sendTwoWaySMS(
+            { to: phoneNumber, body: response },
+            companyPhoneNumber
+          );
+        } else {
+          await this.messageService.sendReminderSMS({
+            to: phoneNumber,
+            body: response,
+          });
+        }
+      } else {
+        await this.messageService.sendReminderSMS({
+          to: phoneNumber,
+          body: response,
+        });
+      }
 
       return {
         success: true,

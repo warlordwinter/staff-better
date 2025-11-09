@@ -173,7 +173,7 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
                 updatedData.confirmation_status || "UNCONFIRMED",
               work_date: updatedData.job_work_date,
               start_time: utcJobTime, // UTC for API
-              num_reminders: updatedData.num_reminders || 0,
+              num_reminders: updatedData.num_reminders || 3,
             }),
           });
           if (!assignmentRes.ok)
@@ -323,7 +323,7 @@ export default function AssociateTable({ jobId, job }: AssociateTableProps) {
       // Job assignment fields if in job context
       ...(jobId && {
         confirmation_status: "UNCONFIRMED",
-        num_reminders: 0,
+        num_reminders: 3,
         job_work_date: workDateISO,
         job_start_time: localTime,
       }),

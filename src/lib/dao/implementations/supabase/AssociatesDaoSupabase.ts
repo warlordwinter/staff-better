@@ -195,6 +195,53 @@ export class AssociatesDaoSupabase implements IAssociates {
     }
 
     // Use admin client to delete related records that reference this associate
+    // Delete in order to respect foreign key constraints
+
+    // First, find all conversations for this associate
+    const { data: conversations, error: conversationsFetchError } =
+      await adminSupabase
+        .from("conversations")
+        .select("id")
+        .eq("associate_id", id);
+
+    if (conversationsFetchError) {
+      console.error("Error fetching conversations:", conversationsFetchError);
+    } else if (conversations && conversations.length > 0) {
+      // Delete messages that belong to these conversations
+      const conversationIds = conversations.map((c) => c.id);
+      const { error: messagesError } = await adminSupabase
+        .from("messages")
+        .delete()
+        .in("conversation_id", conversationIds);
+
+      if (messagesError) {
+        console.error("Error deleting messages:", messagesError);
+        // Continue anyway - might not have any messages
+      }
+
+      // Now delete the conversations
+      const { error: conversationsError } = await adminSupabase
+        .from("conversations")
+        .delete()
+        .eq("associate_id", id);
+
+      if (conversationsError) {
+        console.error("Error deleting from conversations:", conversationsError);
+        // Continue anyway - might not have any conversations
+      }
+    }
+
+    // Delete from opt_info (one-to-one relationship)
+    const { error: optInfoError } = await adminSupabase
+      .from("opt_info")
+      .delete()
+      .eq("associate_id", id);
+
+    if (optInfoError) {
+      console.error("Error deleting from opt_info:", optInfoError);
+      // Continue anyway - might not have opt_info record
+    }
+
     // Delete from group_associates
     const { error: groupAssociatesError } = await adminSupabase
       .from("group_associates")
@@ -221,17 +268,6 @@ export class AssociatesDaoSupabase implements IAssociates {
         jobAssignmentsError
       );
       // Continue anyway - might not have any job assignments
-    }
-
-    // Delete from conversations
-    const { error: conversationsError } = await adminSupabase
-      .from("conversations")
-      .delete()
-      .eq("associate_id", id);
-
-    if (conversationsError) {
-      console.error("Error deleting from conversations:", conversationsError);
-      // Continue anyway - might not have any conversations
     }
 
     // Now delete the associate itself using admin client (bypasses RLS)
@@ -337,6 +373,20 @@ export class AssociatesDaoSupabase implements IAssociates {
     if (error) {
       console.error("Supabase Update Error", error);
       throw new Error("Failed to opt out associate of sms");
+    }
+  }
+
+  async optInAssociate(associateId: string): Promise<void> {
+    const supabase = await createClient();
+
+    const { error } = await supabase
+      .from("associates")
+      .update({ sms_opt_out: false })
+      .eq("id", associateId);
+
+    if (error) {
+      console.error("Supabase Update Error", error);
+      throw new Error("Failed to opt in associate to sms");
     }
   }
 }

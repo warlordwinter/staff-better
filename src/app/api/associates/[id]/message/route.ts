@@ -124,12 +124,55 @@ export async function POST(
       });
 
       if (!result.success) {
+        // Check for specific Twilio error codes
+        const errorCode = "code" in result ? result.code : null;
+        const errorMessage = "error" in result ? result.error : "Unknown error";
+
+        // Twilio error code 21610 = "Attempt to send to unsubscribed recipient"
+        // Check for both string and number format
+        if (
+          errorCode === "21610" ||
+          String(errorCode) === "21610" ||
+          (typeof errorMessage === "string" &&
+            errorMessage.toLowerCase().includes("unsubscribed"))
+        ) {
+          return NextResponse.json(
+            {
+              error:
+                "You cannot message this employee because they have unsubscribed from SMS notifications.",
+              code: errorCode || "21610",
+              userFriendly: true,
+            },
+            { status: 400 }
+          );
+        }
+
         return NextResponse.json(
           {
             error: "Failed to send message",
-            details: "error" in result ? result.error : "Unknown error",
+            details: errorMessage,
+            code: errorCode,
           },
           { status: 500 }
+        );
+      }
+
+      // Send opt-out message if this is the first direct message (after sending the message)
+      try {
+        const { sendSMSOptOutIfNeeded } = await import(
+          "@/lib/utils/optOutUtils"
+        );
+        await sendSMSOptOutIfNeeded(
+          associate.id,
+          associate.phone_number,
+          companyId,
+          twoWayPhoneNumber
+        );
+      } catch (optOutError) {
+        // Log error but don't fail the message send
+        console.error(
+          `Failed to send opt-out message for direct message to associate ${associate.id}:`,
+          optOutError
         );
       }
 
