@@ -2,6 +2,20 @@
 // Utility functions for handling phone numbers
 
 /**
+ * Placeholder phone number used when a real phone number is not available
+ * This is required because the database has a NOT NULL constraint on phone_number
+ * Format: E.164 format with all zeros (clearly not a real number)
+ */
+export const PLACEHOLDER_PHONE_NUMBER = "+10000000000";
+
+/**
+ * Check if a phone number is a placeholder (not a real phone number)
+ */
+export function isPlaceholderPhoneNumber(phoneNumber: string | null): boolean {
+  return phoneNumber === PLACEHOLDER_PHONE_NUMBER;
+}
+
+/**
  * Format phone number to E.164 format (what Twilio uses)
  * Handles US numbers primarily, but can be extended
  */
@@ -34,6 +48,13 @@ export function formatPhoneToE164(
   // For other cases, try to add default country code
   if (digitsOnly.length >= 10) {
     return `${defaultCountryCode}${digitsOnly}`;
+  }
+
+  // Reject 7-9 digit numbers as they are incomplete (need at least 10 digits)
+  if (digitsOnly.length >= 7 && digitsOnly.length < 10) {
+    throw new Error(
+      `Invalid phone number format: ${phoneNumber}. Phone numbers must have at least 10 digits.`
+    );
   }
 
   throw new Error(`Invalid phone number format: ${phoneNumber}`);

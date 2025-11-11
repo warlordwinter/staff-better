@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import Link from "next/link";
 import Navbar from "@/components/ui/navBar";
 import Footer from "@/components/ui/footer";
@@ -119,7 +119,7 @@ function AssociateTableRow({
       </td>
 
       {/* Phone Number */}
-      <td className="px-4 py-4 text-sm text-gray-700 font-mono truncate">
+      <td className="px-4 py-4 text-sm text-gray-700 font-mono whitespace-nowrap">
         {isEditing ? (
           <input
             type="tel"
@@ -227,6 +227,8 @@ interface AssociatesPageViewProps {
   onMessageAssociate: (associate: AssociateGroup) => void;
   onMessageAll: () => void;
   onCloseToast: () => void;
+  onUploadCSV: (file: File) => void;
+  isUploading?: boolean;
 }
 
 export default function AssociatesPageView({
@@ -261,7 +263,52 @@ export default function AssociatesPageView({
   onMessageAssociate,
   onMessageAll,
   onCloseToast,
+  onUploadCSV,
+  isUploading = false,
 }: AssociatesPageViewProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUploadClick = () => {
+    console.log("🖱️ Upload button clicked!");
+    console.log("📎 File input ref:", fileInputRef.current);
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      console.log("⚠️ No file selected");
+      return;
+    }
+
+    console.log("📁 File selected:", file.name, file.type);
+
+    // Accept CSV and Excel files
+    const fileName = file.name.toLowerCase();
+    const isValidFile =
+      fileName.endsWith(".csv") ||
+      fileName.endsWith(".xlsx") ||
+      fileName.endsWith(".xls");
+
+    if (!isValidFile) {
+      console.error("Invalid file type. Expected .csv, .xlsx, or .xls");
+      e.target.value = "";
+      return;
+    }
+
+    console.log("✅ File is valid, calling onUploadCSV...");
+    // Call the upload handler with the file
+    try {
+      await onUploadCSV(file);
+      console.log("✅ onUploadCSV completed");
+    } catch (error) {
+      console.error("❌ Error in onUploadCSV:", error);
+    }
+
+    // Clear the input
+    e.target.value = "";
+  };
+
   // Show loading spinner while checking authentication
   if (authLoading) {
     return (
@@ -317,6 +364,37 @@ export default function AssociatesPageView({
             <h1 className="text-4xl font-bold text-black">All Associates</h1>
           </div>
           <div className="flex items-center gap-3">
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept=".csv,.xlsx,.xls,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleUploadClick();
+              }}
+              disabled={isUploading}
+              className="px-4 py-2 bg-gradient-to-r from-[#FFBB87] to-[#FE6F00] text-white rounded-lg font-medium inline-flex items-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                />
+              </svg>
+              {isUploading ? "Uploading..." : "Upload CSV/Excel"}
+            </button>
             <button
               onClick={onAddNew}
               className="px-4 py-2 bg-gradient-to-r from-[#FFBB87] to-[#FE6F00] text-white rounded-lg font-medium inline-flex items-center gap-2 hover:opacity-90 transition-opacity"
@@ -373,7 +451,7 @@ export default function AssociatesPageView({
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-32">
                     Last Name
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-40">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-48">
                     Phone Number
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-48">
@@ -595,4 +673,3 @@ export default function AssociatesPageView({
     </div>
   );
 }
-

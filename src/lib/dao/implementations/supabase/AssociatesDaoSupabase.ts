@@ -1,7 +1,11 @@
 import { Associate } from "@/model/interfaces/Associate";
 import { createClient } from "../../../supabase/server";
 import { createAdminClient } from "../../../supabase/admin";
-import { formatPhoneToE164, normalizePhoneForLookup } from "@/utils/phoneUtils";
+import {
+  formatPhoneToE164,
+  normalizePhoneForLookup,
+  PLACEHOLDER_PHONE_NUMBER,
+} from "@/utils/phoneUtils";
 import { IAssociates } from "../../interfaces/IAssociates";
 
 export class AssociatesDaoSupabase implements IAssociates {
@@ -34,8 +38,9 @@ export class AssociatesDaoSupabase implements IAssociates {
     const supabase = await createClient();
 
     // Format phone numbers before insertion
+    // Note: phone_number is required (NOT NULL) in the database, so we use a placeholder for null values
     const formattedAssociates = associates.map((associate) => {
-      let formattedPhone: string | null = associate.phone_number;
+      let formattedPhone: string;
 
       if (associate.phone_number && associate.phone_number.trim()) {
         try {
@@ -45,10 +50,12 @@ export class AssociatesDaoSupabase implements IAssociates {
             `Could not format phone number during insert: ${associate.phone_number}`,
             error
           );
-          // Keep original if formatting fails
+          // Use placeholder if formatting fails and original is invalid
+          formattedPhone = PLACEHOLDER_PHONE_NUMBER;
         }
       } else {
-        formattedPhone = null;
+        // Database requires phone_number to be NOT NULL, so use placeholder
+        formattedPhone = PLACEHOLDER_PHONE_NUMBER;
       }
 
       return {

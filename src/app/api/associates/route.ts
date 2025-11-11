@@ -33,14 +33,17 @@ export async function POST(request: NextRequest) {
         typeof associate.last_name === "string"
           ? associate.last_name.trim()
           : "";
+      // Handle phone_number: keep null if null, convert empty string to null, otherwise trim
       const phoneNumber =
-        typeof associate.phone_number === "string"
-          ? associate.phone_number.trim()
-          : "";
+        associate.phone_number === null || associate.phone_number === undefined
+          ? null
+          : typeof associate.phone_number === "string"
+          ? associate.phone_number.trim() || null
+          : null;
       const emailAddress =
         typeof associate.email_address === "string"
-          ? associate.email_address.trim()
-          : "";
+          ? associate.email_address.trim() || null
+          : null;
 
       return {
         first_name: firstName,
@@ -69,20 +72,24 @@ export async function POST(request: NextRequest) {
         );
       }
       // Phone number is optional - if provided, do basic validation
-      if (associate.phone_number && associate.phone_number.trim()) {
-        // Check if it has at least some digits (7+ digits for local numbers, 10+ for full numbers)
+      if (
+        associate.phone_number !== null &&
+        associate.phone_number !== undefined &&
+        typeof associate.phone_number === "string" &&
+        associate.phone_number.trim()
+      ) {
         const digitsOnly = associate.phone_number.replace(/\D/g, "");
-        if (digitsOnly.length < 7) {
+        // Require at least 10 digits for valid phone numbers (7-digit local numbers are not valid)
+        if (digitsOnly.length < 10) {
           return NextResponse.json(
-            { error: `${rowLabel}: Phone number appears to be too short.` },
+            {
+              error: `${rowLabel}: Phone number must have at least 10 digits. Found ${digitsOnly.length} digit(s).`,
+            },
             { status: 400 }
           );
         }
-        // If it has 10+ digits, validate format more strictly
-        if (
-          digitsOnly.length >= 10 &&
-          !isValidPhoneNumber(associate.phone_number)
-        ) {
+        // Validate format for 10+ digit numbers
+        if (!isValidPhoneNumber(associate.phone_number)) {
           return NextResponse.json(
             { error: `${rowLabel}: Invalid phone number format.` },
             { status: 400 }
@@ -91,7 +98,9 @@ export async function POST(request: NextRequest) {
       }
       // Email is optional, but if provided, validate it
       if (
-        associate.email_address &&
+        associate.email_address !== null &&
+        associate.email_address !== undefined &&
+        typeof associate.email_address === "string" &&
         associate.email_address.trim() &&
         !emailRegex.test(associate.email_address)
       ) {
@@ -104,6 +113,7 @@ export async function POST(request: NextRequest) {
 
     const payload = sanitizedAssociates.map(({ _originalIndex, ...rest }) => ({
       ...rest,
+      phone_number: rest.phone_number || null,
       email_address: rest.email_address || null,
     }));
 
@@ -111,8 +121,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(insertedAssociates, { status: 201 });
   } catch (error) {
     console.error("Failed to create associate:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to create associate";
+    // Include more details in development
+    const errorDetails =
+      process.env.NODE_ENV === "development" ? { details: String(error) } : {};
     return NextResponse.json(
-      { error: "Failed to create associate" },
+      { error: errorMessage, ...errorDetails },
       { status: 500 }
     );
   }

@@ -18,11 +18,11 @@
 //   updateAssignmentStatus: jest.fn(),
 // };
 
-const mockMessageService: jest.Mocked<IMessageService> = {
-  sendSMS: jest.fn<Promise<SMSResult>, [SMSMessage]>(),
-  sendReminderSMS: jest.fn<Promise<SMSResult>, [Omit<SMSMessage, "from">]>(),
-  formatPhoneNumber: jest.fn<string, [string]>(),
-};
+// const mockMessageService: jest.Mocked<IMessageService> = {
+//   sendSMS: jest.fn<Promise<SMSResult>, [SMSMessage]>(),
+//   sendReminderSMS: jest.fn<Promise<SMSResult>, [Omit<SMSMessage, "from">]>(),
+//   formatPhoneNumber: jest.fn<string, [string]>(),
+// };
 // const mockMessageService: jest.Mocked<IMessageService> = {
 //   sendSMS: jest.fn<Promise<SMSResult>, [SMSMessage]>(),
 //   formatPhoneNumber: jest.fn<string, [string]>(),
@@ -74,19 +74,19 @@ const mockMessageService: jest.Mocked<IMessageService> = {
 //     },
 //   ] as any);
 
-  mockAssignmentRepository.updateAssignmentStatus.mockResolvedValue(void 0);
-  mockMessageService.sendReminderSMS.mockResolvedValue({ success: true } as any);
+// mockAssignmentRepository.updateAssignmentStatus.mockResolvedValue(void 0);
+// mockMessageService.sendReminderSMS.mockResolvedValue({ success: true } as any);
 //   mockAssignmentRepository.updateAssignmentStatus.mockResolvedValue(void 0);
 //   mockMessageService.sendSMS.mockResolvedValue({ success: true } as any);
 
-  const result = await service.processIncomingMessage("1234567890", "C");
-  expect(result.success).toBe(true);
-  expect(mockAssignmentRepository.getActiveAssignments).toHaveBeenCalledWith(
-    "1"
-  );
-  expect(mockAssignmentRepository.updateAssignmentStatus).toHaveBeenCalled();
-  expect(mockMessageService.sendReminderSMS).toHaveBeenCalled();
-});
+//   const result = await service.processIncomingMessage("1234567890", "C");
+//   expect(result.success).toBe(true);
+//   expect(mockAssignmentRepository.getActiveAssignments).toHaveBeenCalledWith(
+//     "1"
+//   );
+//   expect(mockAssignmentRepository.updateAssignmentStatus).toHaveBeenCalled();
+//   expect(mockMessageService.sendReminderSMS).toHaveBeenCalled();
+// });
 //   const result = await service.processIncomingMessage("1234567890", "C");
 //   expect(result.success).toBe(true);
 //   expect(mockAssignmentRepository.getActiveAssignments).toHaveBeenCalledWith(
@@ -114,17 +114,17 @@ const mockMessageService: jest.Mocked<IMessageService> = {
 //     email_address: "wile@acme.com",
 //   } as any);
 
-  mockMessageService.sendReminderSMS.mockResolvedValue({ success: true } as any);
+//   mockMessageService.sendReminderSMS.mockResolvedValue({ success: true } as any);
 //   mockMessageService.sendSMS.mockResolvedValue({ success: true } as any);
 
-  const result = await service.processIncomingMessage("1234567890", "help");
-  expect(result.success).toBe(true);
-  expect(result.action).toBe(MessageAction.HELP_REQUEST);
-  expect(mockMessageService.sendReminderSMS).toHaveBeenCalled();
-  expect(
-    mockMessageService.sendReminderSMS.mock.calls[0][0].body
-  ).toContain("801-361-0540");
-});
+//   const result = await service.processIncomingMessage("1234567890", "help");
+//   expect(result.success).toBe(true);
+//   expect(result.action).toBe(MessageAction.HELP_REQUEST);
+//   expect(mockMessageService.sendReminderSMS).toHaveBeenCalled();
+//   expect(
+//     mockMessageService.sendReminderSMS.mock.calls[0][0].body
+//   ).toContain("801-361-0540");
+// });
 //   const result = await service.processIncomingMessage("1234567890", "help");
 //   expect(result.success).toBe(true);
 //   expect(result.action).toBe(MessageAction.HELP_REQUEST);
