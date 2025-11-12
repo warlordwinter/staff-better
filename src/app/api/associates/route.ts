@@ -117,6 +117,21 @@ export async function POST(request: NextRequest) {
       email_address: rest.email_address || null,
     }));
 
+    // Log what we're sending to the DAO
+    console.log(
+      "[API Route] Payload being sent to DAO:",
+      JSON.stringify(
+        payload.map((p) => ({
+          first_name: p.first_name,
+          last_name: p.last_name,
+          phone_number: p.phone_number,
+          email_address: p.email_address,
+        })),
+        null,
+        2
+      )
+    );
+
     const insertedAssociates = await associatesDao.insertAssociates(payload);
     return NextResponse.json(insertedAssociates, { status: 201 });
   } catch (error) {

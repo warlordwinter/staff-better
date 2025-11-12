@@ -39,15 +39,28 @@ export class AssociatesDaoSupabase implements IAssociates {
 
     // Format phone numbers before insertion
     // Note: phone_number is required (NOT NULL) in the database, so we use a placeholder for null values
-    const formattedAssociates = associates.map((associate) => {
+    const formattedAssociates = associates.map((associate, index) => {
       let formattedPhone: string;
 
-      if (associate.phone_number && associate.phone_number.trim()) {
+      // Check if phone_number exists and is a non-empty string
+      if (
+        associate.phone_number !== null &&
+        associate.phone_number !== undefined &&
+        typeof associate.phone_number === "string" &&
+        associate.phone_number.trim().length > 0
+      ) {
         try {
           formattedPhone = formatPhoneToE164(associate.phone_number);
+          console.log(
+            `[insertAssociates] Associate ${index + 1}: Formatted phone "${
+              associate.phone_number
+            }" → "${formattedPhone}"`
+          );
         } catch (error) {
           console.warn(
-            `Could not format phone number during insert: ${associate.phone_number}`,
+            `[insertAssociates] Associate ${
+              index + 1
+            }: Could not format phone number "${associate.phone_number}"`,
             error
           );
           // Use placeholder if formatting fails and original is invalid
@@ -55,6 +68,14 @@ export class AssociatesDaoSupabase implements IAssociates {
         }
       } else {
         // Database requires phone_number to be NOT NULL, so use placeholder
+        // This handles: null, undefined, empty string, or non-string values
+        console.log(
+          `[insertAssociates] Associate ${
+            index + 1
+          }: Phone number is null/empty/undefined (value: ${JSON.stringify(
+            associate.phone_number
+          )}), using placeholder`
+        );
         formattedPhone = PLACEHOLDER_PHONE_NUMBER;
       }
 
