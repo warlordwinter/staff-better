@@ -111,6 +111,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const payload = sanitizedAssociates.map(({ _originalIndex, ...rest }) => ({
       ...rest,
       phone_number: rest.phone_number || null,
