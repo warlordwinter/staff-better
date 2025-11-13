@@ -1,16 +1,53 @@
 import ExcelJS from "exceljs";
 
 function getFileExtension(filename: string): string {
-  return filename.split(".").pop()?.toLowerCase() || "";
+  return filename?.split(".").pop()?.toLowerCase() || "";
+}
+
+function getFileType(file: File | Blob): string {
+  // Try to get extension from filename first
+  const filename = (file as File).name;
+  if (filename) {
+    return getFileExtension(filename);
+  }
+
+  // Fallback to MIME type
+  if (file.type === "text/csv") {
+    return "csv";
+  } else if (
+    file.type ===
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  ) {
+    return "xlsx";
+  }
+
+  return "";
 }
 
 function normalizePhoneNumber(phoneValue: string): string {
   if (!phoneValue?.trim()) return phoneValue;
   let normalized = phoneValue.trim();
+
+  // Handle scientific notation
   if (normalized.includes("e") || normalized.includes("E")) {
     const numValue = parseFloat(normalized);
     if (!isNaN(numValue)) normalized = numValue.toFixed(0).replace(/\.0+$/, "");
   }
+
+  // Check for extensions before stripping all non-digits
+  const extMatch = normalized.match(/(.*?)\s+(ext(?:ension)?|x)\s*(\d+)/i);
+  if (extMatch) {
+    const phonepart = extMatch[1].trim();
+    const extension = extMatch[2] + " " + extMatch[3];
+    const digitsOnly = phonepart.replace(/\D/g, "");
+    return digitsOnly.length >= 10
+      ? digitsOnly + " " + extension
+      : digitsOnly.length > 0
+      ? digitsOnly + " " + extension
+      : normalized;
+  }
+
+  // No extension found, proceed with normal normalization
   const digitsOnly = normalized.replace(/\D/g, "");
   return digitsOnly.length >= 10
     ? digitsOnly
@@ -23,28 +60,39 @@ function parseCSVLine(line: string): string[] {
   const values: string[] = [];
   let current = "";
   let inQuotes = false;
+  let wasQuoted = false;
+
   for (let i = 0; i < line.length; i++) {
     const char = line[i];
     if (char === '"') {
       if (inQuotes && line[i + 1] === '"') {
+        // Escaped quote - add a single quote to the current value
         current += '"';
-        i++;
+        i++; // Skip the next quote
       } else {
+        // Toggle quote state
         inQuotes = !inQuotes;
+        if (!inQuotes) {
+          wasQuoted = true;
+        }
       }
     } else if (char === "," && !inQuotes) {
-      values.push(current.trim().replace(/^"|"$/g, ""));
+      // End of field
+      values.push(wasQuoted ? current : current.trim());
       current = "";
+      wasQuoted = false;
     } else {
       current += char;
     }
   }
-  values.push(current.trim().replace(/^"|"$/g, ""));
+
+  // Add the last field
+  values.push(wasQuoted ? current : current.trim());
   return values;
 }
 
 export async function extractHeaders(file: File): Promise<string[]> {
-  const ext = getFileExtension(file.name);
+  const ext = getFileType(file);
   if (ext === "csv") {
     const text = await file.text();
     const firstLine = text.split("\n")[0].replace("\r", "");
@@ -67,7 +115,7 @@ export async function extractHeaders(file: File): Promise<string[]> {
 export async function extractDataWithHeaders(
   file: File
 ): Promise<{ headers: string[]; rows: Record<string, string>[] }> {
-  const ext = getFileExtension(file.name);
+  const ext = getFileType(file);
 
   if (ext === "csv") {
     const text = await file.text();
@@ -103,24 +151,31 @@ export async function extractDataWithHeaders(
     worksheet.eachRow((row, rowNumber) => {
       if (rowNumber === 1) return;
       const rowData: Record<string, string> = {};
+      // Initialize all headers with empty strings
+      headers.forEach((header) => {
+        rowData[header] = "";
+      });
+
       row.eachCell({ includeEmpty: false }, (cell, colNumber) => {
         const header = headers[colNumber - 1];
-        let cellValue: string;
-        if (cell.type === ExcelJS.ValueType.Number) {
-          const numValue = cell.value as number;
-          const numStr = numValue.toString();
-          if (numStr.includes("e") || numStr.includes("E")) {
-            cellValue = numValue.toFixed(0).replace(/\.0+$/, "");
+        if (header) {
+          let cellValue: string;
+          if (cell.type === ExcelJS.ValueType.Number) {
+            const numValue = cell.value as number;
+            const numStr = numValue.toString();
+            if (numStr.includes("e") || numStr.includes("E")) {
+              cellValue = numValue.toFixed(0).replace(/\.0+$/, "");
+            } else {
+              cellValue = numStr;
+            }
           } else {
-            cellValue = numStr;
+            cellValue = cell.text || cell.value?.toString() || "";
           }
-        } else {
-          cellValue = cell.text || cell.value?.toString() || "";
+          if (header.toLowerCase().includes("phone") && cellValue) {
+            cellValue = normalizePhoneNumber(cellValue);
+          }
+          rowData[header] = cellValue;
         }
-        if (header.toLowerCase().includes("phone") && cellValue) {
-          cellValue = normalizePhoneNumber(cellValue);
-        }
-        rowData[header] = cellValue;
       });
       rows.push(rowData);
     });

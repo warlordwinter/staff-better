@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const payload = sanitizedAssociates.map(({ _originalIndex, ...rest }) => ({
+    const payload = sanitizedAssociates.map(({ ...rest }) => ({
       ...rest,
       phone_number: rest.phone_number || null,
       email_address: rest.email_address || null,

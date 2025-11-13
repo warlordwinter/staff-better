@@ -385,7 +385,6 @@ describe("POST /api/column-mapping", () => {
 
       // Use Promise.resolve to handle the async retry
       const response = await POST(req);
-      const data = await response.json();
 
       expect(response.status).toBe(200);
       expect(mockGenerateContent).toHaveBeenCalledTimes(2);

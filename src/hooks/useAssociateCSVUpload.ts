@@ -216,7 +216,7 @@ export function useAssociateCSVUpload(): UseAssociateCSVUploadReturn {
           const errorData = await response.json();
           errorMessage = errorData.error || errorMessage;
           console.error("API Error Response:", errorData);
-        } catch (parseError) {
+        } catch {
           // If JSON parsing fails, try to get text
           const errorText = await response.text().catch(() => "");
           console.error("API Error (non-JSON):", errorText);

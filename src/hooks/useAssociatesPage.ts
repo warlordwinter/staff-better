@@ -78,7 +78,7 @@ export function useAssociatesPage(
 
   // Wrapper for sendMessage that uses associates list
   const sendMessage = async () => {
-    await messaging.sendMessage(associates.associates, (names) => {
+    await messaging.sendMessage(associates.associates, () => {
       // This callback is already handled in useAssociateMessaging
     });
   };
@@ -93,7 +93,7 @@ export function useAssociatesPage(
     await csvUpload.uploadCSVFile(
       file,
       associates.loadAssociates,
-      (error) => {
+      () => {
         // Error handling is done in the hook via toast
       },
       toast.showToastMessage
