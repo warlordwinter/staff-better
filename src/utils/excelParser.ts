@@ -1,4 +1,7 @@
 import ExcelJS from "exceljs";
+import { ConsoleLogger } from "../lib/services/implementations/ConsoleLogger";
+
+const logger = new ConsoleLogger();
 
 function getFileExtension(filename: string): string {
   return filename?.split(".").pop()?.toLowerCase() || "";
@@ -40,6 +43,25 @@ function normalizePhoneNumber(phoneValue: string): string {
     const phonepart = extMatch[1].trim();
     const extension = extMatch[2] + " " + extMatch[3];
     const digitsOnly = phonepart.replace(/\D/g, "");
+
+    // Check for international numbers in extensions
+    if (
+      digitsOnly.length > 11 ||
+      (digitsOnly.length === 11 && !digitsOnly.startsWith("1"))
+    ) {
+      logger.error(
+        "International phone number detected in Excel file",
+        new Error(
+          `Phone number ${phoneValue} appears to be international - system only supports US numbers`
+        ),
+        {
+          originalValue: phoneValue,
+          normalizedDigits: digitsOnly,
+          hasExtension: true,
+        }
+      );
+    }
+
     return digitsOnly.length >= 10
       ? digitsOnly + " " + extension
       : digitsOnly.length > 0
@@ -49,6 +71,25 @@ function normalizePhoneNumber(phoneValue: string): string {
 
   // No extension found, proceed with normal normalization
   const digitsOnly = normalized.replace(/\D/g, "");
+
+  // Check for international numbers (more than 11 digits, or 11 digits not starting with 1)
+  if (
+    digitsOnly.length > 11 ||
+    (digitsOnly.length === 11 && !digitsOnly.startsWith("1"))
+  ) {
+    logger.error(
+      "International phone number detected in Excel file",
+      new Error(
+        `Phone number ${phoneValue} appears to be international - system only supports US numbers`
+      ),
+      {
+        originalValue: phoneValue,
+        normalizedDigits: digitsOnly,
+        hasExtension: false,
+      }
+    );
+  }
+
   return digitsOnly.length >= 10
     ? digitsOnly
     : digitsOnly.length > 0
