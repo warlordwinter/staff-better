@@ -181,6 +181,13 @@ const Navbar = () => {
                 {/* Profile Dropdown */}
                 {profileDropdownOpen && (
                   <div className="absolute right-0 mt-2 w-32 bg-white rounded-md shadow-lg py-1 z-50">
+                    <Link
+                      href="/settings"
+                      onClick={() => setProfileDropdownOpen(false)}
+                      className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                    >
+                      Settings
+                    </Link>
                     <button
                       onClick={handleSignOut}
                       className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
@@ -285,6 +292,14 @@ const Navbar = () => {
                 }`}
               >
                 Associates
+              </Link>
+              <Link
+                href="/settings"
+                className={`text-white text-lg font-bold transition-colors ${
+                  isActiveLink("/settings") ? "" : "hover:opacity-80"
+                }`}
+              >
+                Settings
               </Link>
               <div className="flex items-center gap-3">
                 <button
