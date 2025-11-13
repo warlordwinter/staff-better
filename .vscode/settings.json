@@ -1,0 +1,4 @@
+{
+  "debug.javascript.autoAttachFilter": "disabled",
+  "debug.javascript.usePreviewAutoAttach": false
+}
