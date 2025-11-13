@@ -411,7 +411,7 @@ describe("POST /api/column-mapping", () => {
 
       const req = createMockRequest({ headers: ["Name", "Phone"] });
       const response = await POST(req);
-      const data = await response.json();
+      // const data = await response.json();
 
       expect(response.status).toBe(200);
       expect(mockGenerateContent).toHaveBeenCalledTimes(2);
