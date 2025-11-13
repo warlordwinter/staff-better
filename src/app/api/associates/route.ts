@@ -111,11 +111,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const payload = sanitizedAssociates.map(({ _originalIndex, ...rest }) => ({
-      ...rest,
-      phone_number: rest.phone_number || null,
-      email_address: rest.email_address || null,
+    const payload = sanitizedAssociates.map((associate) => ({
+      first_name: associate.first_name,
+      last_name: associate.last_name,
+      phone_number: associate.phone_number || null,
+      email_address: associate.email_address || null,
     }));
 
     // Log what we're sending to the DAO
