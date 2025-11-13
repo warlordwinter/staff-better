@@ -13,7 +13,7 @@ export const useAuthCheck = () => {
     if (!loading) {
       // If user was previously authenticated but is now null, they logged out
       if (wasAuthenticatedRef.current && !user) {
-        router.push("/landingpage");
+        router.push("/");
       }
       // If user was never authenticated and is still null, redirect to login
       else if (!wasAuthenticatedRef.current && !user) {

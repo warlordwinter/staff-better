@@ -103,9 +103,9 @@ export default function RemindersPageView({
   // Show loading spinner while fetching data
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col bg-white">
+      <div className="min-h-screen flex flex-col bg-white overflow-hidden">
         <Navbar />
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex-1 flex items-center justify-center min-h-0">
           <LoadingSpinner />
         </div>
         <Footer />
@@ -114,7 +114,7 @@ export default function RemindersPageView({
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
+    <div className="min-h-screen flex flex-col bg-white overflow-hidden">
       <Navbar />
       <main className="flex-1 w-full max-w-7xl mx-auto px-6 py-8 mt-24">
         {/* Header Section */}

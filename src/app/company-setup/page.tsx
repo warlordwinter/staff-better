@@ -18,7 +18,7 @@ export default function CompanySetupPage() {
         user.user_metadata?.company_setup_completed === true;
 
       if (hasCompletedSetup) {
-        router.push("/jobs");
+        router.push("/home");
       }
     }
   }, [user, authLoading, router]);
