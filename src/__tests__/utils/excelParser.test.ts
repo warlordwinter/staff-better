@@ -671,5 +671,5 @@ describe("excelParser", () => {
         expect(result.rows[0].Phone).toBe("abc");
       });
     });
+    });
   });
-});
