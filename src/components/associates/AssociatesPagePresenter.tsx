@@ -9,6 +9,11 @@ export default function AssociatesPagePresenter() {
   const { loading: authLoading, isAuthenticated } = useAuthCheck();
   const model = useAssociatesPage(isAuthenticated, authLoading);
 
+  const handleUploadCSV = async (file: File) => {
+    console.log("🎯 Presenter: handleUploadCSV called with file:", file.name);
+    await model.uploadCSVFile(file);
+  };
+
   return (
     <AssociatesPageView
       // Auth state
@@ -32,6 +37,7 @@ export default function AssociatesPagePresenter() {
       sendSuccess={model.sendSuccess}
       sendError={model.sendError}
       isSubmitting={model.isSubmitting}
+      isUploading={model.isUploading}
       // Actions
       onMessageTextChange={model.setMessageText}
       onSendMessage={model.sendMessage}
@@ -44,6 +50,7 @@ export default function AssociatesPagePresenter() {
       onDeleteAssociate={model.deleteAssociate}
       onMessageAssociate={model.messageAssociate}
       onMessageAll={model.messageAll}
+      onUploadCSV={handleUploadCSV}
       onCloseToast={() => {
         console.log("Closing toast");
         model.setShowToast(false);
@@ -51,4 +58,3 @@ export default function AssociatesPagePresenter() {
     />
   );
 }
-

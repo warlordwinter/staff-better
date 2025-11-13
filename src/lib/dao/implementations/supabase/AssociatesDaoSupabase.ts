@@ -1,7 +1,11 @@
 import { Associate } from "@/model/interfaces/Associate";
 import { createClient } from "../../../supabase/server";
 import { createAdminClient } from "../../../supabase/admin";
-import { formatPhoneToE164, normalizePhoneForLookup } from "@/utils/phoneUtils";
+import {
+  formatPhoneToE164,
+  normalizePhoneForLookup,
+  PLACEHOLDER_PHONE_NUMBER,
+} from "@/utils/phoneUtils";
 import { IAssociates } from "../../interfaces/IAssociates";
 
 export class AssociatesDaoSupabase implements IAssociates {
@@ -27,26 +31,52 @@ export class AssociatesDaoSupabase implements IAssociates {
     associates: {
       first_name: string | null;
       last_name: string | null;
-      phone_number: string;
+      phone_number: string | null;
       email_address: string | null;
     }[]
   ) {
     const supabase = await createClient();
 
     // Format phone numbers before insertion
-    const formattedAssociates = associates.map((associate) => {
-      let formattedPhone = associate.phone_number;
+    // Note: phone_number is required (NOT NULL) in the database, so we use a placeholder for null values
+    const formattedAssociates = associates.map((associate, index) => {
+      let formattedPhone: string;
 
-      if (associate.phone_number && associate.phone_number.trim()) {
+      // Check if phone_number exists and is a non-empty string
+      if (
+        associate.phone_number !== null &&
+        associate.phone_number !== undefined &&
+        typeof associate.phone_number === "string" &&
+        associate.phone_number.trim().length > 0
+      ) {
         try {
           formattedPhone = formatPhoneToE164(associate.phone_number);
+          console.log(
+            `[insertAssociates] Associate ${index + 1}: Formatted phone "${
+              associate.phone_number
+            }" → "${formattedPhone}"`
+          );
         } catch (error) {
           console.warn(
-            `Could not format phone number during insert: ${associate.phone_number}`,
+            `[insertAssociates] Associate ${
+              index + 1
+            }: Could not format phone number "${associate.phone_number}"`,
             error
           );
-          // Keep original if formatting fails
+          // Use placeholder if formatting fails and original is invalid
+          formattedPhone = PLACEHOLDER_PHONE_NUMBER;
         }
+      } else {
+        // Database requires phone_number to be NOT NULL, so use placeholder
+        // This handles: null, undefined, empty string, or non-string values
+        console.log(
+          `[insertAssociates] Associate ${
+            index + 1
+          }: Phone number is null/empty/undefined (value: ${JSON.stringify(
+            associate.phone_number
+          )}), using placeholder`
+        );
+        formattedPhone = PLACEHOLDER_PHONE_NUMBER;
       }
 
       return {

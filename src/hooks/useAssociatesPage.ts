@@ -1,8 +1,10 @@
-import { useState, useEffect } from "react";
 import { AssociateGroup } from "@/model/interfaces/AssociateGroup";
 import { AssociateFormData } from "@/components/shared/AssociateForm";
-import { GroupsDataService } from "@/lib/services/groupsDataService";
-import { isValidPhoneNumber } from "@/utils/phoneUtils";
+import { useAssociates } from "./useAssociates";
+import { useAssociateMessaging } from "./useAssociateMessaging";
+import { useAssociateForm } from "./useAssociateForm";
+import { useAssociateCSVUpload } from "./useAssociateCSVUpload";
+import { useToast } from "./useToast";
 
 export interface UseAssociatesPageReturn {
   // State
@@ -23,6 +25,7 @@ export interface UseAssociatesPageReturn {
   sendSuccess: boolean;
   sendError: string | null;
   isSubmitting: boolean;
+  isUploading: boolean;
 
   // Actions
   setMessageText: (text: string) => void;
@@ -45,450 +48,113 @@ export interface UseAssociatesPageReturn {
   submitNewAssociate: () => Promise<void>;
   messageAssociate: (associate: AssociateGroup) => void;
   messageAll: () => void;
+  uploadCSVFile: (file: File) => Promise<void>;
 }
 
 export function useAssociatesPage(
   isAuthenticated: boolean,
   authLoading: boolean
 ): UseAssociatesPageReturn {
-  const [associates, setAssociates] = useState<AssociateGroup[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showMassMessageModal, setShowMassMessageModal] = useState(false);
-  const [showIndividualMessageModal, setShowIndividualMessageModal] =
-    useState(false);
-  const [selectedAssociate, setSelectedAssociate] =
-    useState<AssociateGroup | null>(null);
-  const [messageText, setMessageText] = useState("");
-  const [sendLoading, setSendLoading] = useState(false);
-  const [sendSuccess, setSendSuccess] = useState(false);
-  const [sendError, setSendError] = useState<string | null>(null);
-  const [showAddNewModal, setShowAddNewModal] = useState(false);
-  const [newAssociateForm, setNewAssociateForm] = useState<AssociateFormData>({
-    firstName: "",
-    lastName: "",
-    phoneNumber: "",
-    emailAddress: "",
+  // Toast hook
+  const toast = useToast();
+
+  // Associates data management
+  const associates = useAssociates(isAuthenticated, authLoading, (message) => {
+    toast.showToastMessage(message, "error");
   });
-  const [formErrors, setFormErrors] = useState<Partial<AssociateFormData>>({});
-  const [phoneError, setPhoneError] = useState("");
-  const [toastMessage, setToastMessage] = useState("");
-  const [toastType, setToastType] = useState<"error" | "success" | "info">(
-    "info"
-  );
-  const [showToast, setShowToast] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Load all associates
-  const loadAssociates = async () => {
-    try {
-      const associatesData = await GroupsDataService.fetchAllAssociates();
-      setAssociates(associatesData);
-    } catch (error) {
-      console.error("Error loading associates:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Messaging functionality
+  const messaging = useAssociateMessaging((message, type) => {
+    toast.showToastMessage(message, type);
+  });
 
-  useEffect(() => {
-    if (!authLoading && isAuthenticated) {
-      loadAssociates();
-    }
-  }, [authLoading, isAuthenticated]);
+  // Form management
+  const form = useAssociateForm((message) => {
+    toast.showToastMessage(message, "error");
+  });
 
-  // Handle save associate
-  const saveAssociate = async (updatedAssociate: AssociateGroup) => {
-    try {
-      const response = await fetch(`/api/associates/${updatedAssociate.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          first_name: updatedAssociate.firstName.trim(),
-          last_name: updatedAssociate.lastName.trim(),
-          phone_number: updatedAssociate.phoneNumber.trim(),
-          email_address: updatedAssociate.emailAddress.trim() || null,
-        }),
-      });
+  // CSV upload
+  const csvUpload = useAssociateCSVUpload();
 
-      if (!response.ok) {
-        throw new Error("Failed to update associate");
-      }
-
-      // Update local state
-      setAssociates((prev) =>
-        prev.map((a) => (a.id === updatedAssociate.id ? updatedAssociate : a))
-      );
-    } catch (error) {
-      console.error("Error updating associate:", error);
-      alert("Failed to update associate. Please try again.");
-    }
-  };
-
-  // Handle delete associate
-  const deleteAssociate = async (associateId: string) => {
-    if (
-      !window.confirm(
-        "Are you sure you want to delete this associate? This action cannot be undone."
-      )
-    ) {
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/associates/${associateId}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error || "Failed to delete associate";
-        throw new Error(errorMessage);
-      }
-
-      setAssociates((prev) => prev.filter((a) => a.id !== associateId));
-    } catch (error) {
-      console.error("Error deleting associate:", error);
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Failed to delete associate. Please try again.";
-      alert(errorMessage);
-    }
-  };
-
-  // Handle message individual associate
-  const messageAssociate = (associate: AssociateGroup) => {
-    setSelectedAssociate(associate);
-    setMessageText("");
-    setShowIndividualMessageModal(true);
-  };
-
-  // Handle message all associates
-  const messageAll = () => {
-    setMessageText("");
-    setShowMassMessageModal(true);
-  };
-
-  // Handle send message
+  // Wrapper for sendMessage that uses associates list
   const sendMessage = async () => {
-    if (!messageText.trim()) {
-      return;
-    }
-
-    setSendLoading(true);
-    setSendSuccess(false);
-    setSendError(null);
-    setShowToast(false);
-
-    try {
-      if (selectedAssociate) {
-        // Send to individual associate
-        await GroupsDataService.sendMessageToAssociate(
-          selectedAssociate.id,
-          messageText.trim()
-        );
-      } else {
-        // Send to all associates
-        const unsubscribedAssociates: Array<{
-          firstName: string;
-          lastName: string;
-        }> = [];
-
-        const promises = associates.map((associate) =>
-          GroupsDataService.sendMessageToAssociate(
-            associate.id,
-            messageText.trim()
-          ).catch((error) => {
-            console.error(
-              `Failed to send message to ${associate.firstName} ${associate.lastName}:`,
-              error
-            );
-
-            // Check if error is due to unsubscription
-            const errorMessage =
-              error instanceof Error ? error.message : String(error);
-            const errorCode = (error as any)?.code;
-            const isUnsubscribedFlag = (error as any)?.isUnsubscribed;
-
-            // Check multiple ways the error might indicate unsubscription
-            const isUnsubscribed =
-              isUnsubscribedFlag === true ||
-              errorCode === "21610" ||
-              errorCode === 21610 ||
-              errorMessage.toLowerCase().includes("unsubscribed") ||
-              errorMessage.toLowerCase().includes("opted out") ||
-              errorMessage
-                .toLowerCase()
-                .includes("cannot message this employee");
-
-            console.log(
-              `Checking unsubscription for ${associate.firstName} ${associate.lastName}:`,
-              {
-                isUnsubscribed,
-                errorMessage,
-                errorCode,
-                isUnsubscribedFlag,
-                errorObject: error,
-              }
-            );
-
-            if (isUnsubscribed) {
-              console.log(
-                `Adding ${associate.firstName} ${associate.lastName} to unsubscribed list`
-              );
-              unsubscribedAssociates.push({
-                firstName: associate.firstName,
-                lastName: associate.lastName,
-              });
-            }
-
-            return false;
-          })
-        );
-        await Promise.all(promises);
-
-        // Show toast if there are unsubscribed associates
-        console.log("Unsubscribed associates:", unsubscribedAssociates);
-        if (unsubscribedAssociates.length > 0) {
-          const names = unsubscribedAssociates.map(
-            (a) => `${a.firstName} ${a.lastName}`
-          );
-          let message = "The message was sent to everyone except ";
-
-          if (names.length === 1) {
-            message += `${names[0]}`;
-          } else if (names.length === 2) {
-            message += `${names[0]} and ${names[1]}`;
-          } else {
-            const namesCopy = [...names];
-            const last = namesCopy.pop();
-            message += `${namesCopy.join(", ")}, and ${last}`;
-          }
-
-          message += " all of which have unsubscribed";
-
-          console.log("Setting toast message:", message);
-          setToastMessage(message);
-          setToastType("info");
-          setShowToast(true);
-          console.log("Toast should be visible now");
-        }
-      }
-
-      setSendSuccess(true);
-      setTimeout(() => {
-        setShowIndividualMessageModal(false);
-        setShowMassMessageModal(false);
-        setSelectedAssociate(null);
-        setMessageText("");
-        setSendSuccess(false);
-        setSendError(null);
-        // Don't close toast here - let it auto-close after its duration
-      }, 1500);
-    } catch (error) {
-      console.error("Error sending message:", error);
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Failed to send message. Please try again.";
-      setSendError(errorMessage);
-    } finally {
-      setSendLoading(false);
-    }
-  };
-
-  // Handle cancel message
-  const cancelMessage = () => {
-    setShowIndividualMessageModal(false);
-    setShowMassMessageModal(false);
-    setSelectedAssociate(null);
-    setMessageText("");
-    setSendSuccess(false);
-    setSendError(null);
-  };
-
-  // Handle add new associate
-  const addNew = () => {
-    setNewAssociateForm({
-      firstName: "",
-      lastName: "",
-      phoneNumber: "",
-      emailAddress: "",
+    await messaging.sendMessage(associates.associates, () => {
+      // This callback is already handled in useAssociateMessaging
     });
-    setFormErrors({});
-    setPhoneError("");
-    setIsSubmitting(false);
-    setShowAddNewModal(true);
   };
 
-  // Handle form input change
-  const handleFormInputChange = (
-    field: keyof AssociateFormData,
-    value: string
-  ) => {
-    setNewAssociateForm((prev) => ({ ...prev, [field]: value }));
-
-    // Clear field error when user starts typing
-    if (formErrors[field]) {
-      setFormErrors((prev) => ({ ...prev, [field]: "" }));
-    }
-
-    // Validate phone number in real-time
-    if (field === "phoneNumber") {
-      if (value.trim() === "") {
-        setPhoneError("");
-      } else {
-        try {
-          if (isValidPhoneNumber(value)) {
-            setPhoneError("");
-          } else {
-            setPhoneError("Invalid phone format");
-          }
-        } catch {
-          setPhoneError("Invalid phone format");
-        }
-      }
-    }
-  };
-
-  // Validate form
-  const validateNewAssociateForm = (): boolean => {
-    const newErrors: Partial<AssociateFormData> = {};
-
-    if (!newAssociateForm.firstName.trim()) {
-      newErrors.firstName = "First name is required";
-    }
-
-    if (!newAssociateForm.lastName.trim()) {
-      newErrors.lastName = "Last name is required";
-    }
-
-    if (newAssociateForm.phoneNumber.trim()) {
-      if (!isValidPhoneNumber(newAssociateForm.phoneNumber)) {
-        setPhoneError("Please enter a valid phone number");
-        return false;
-      }
-    }
-
-    if (
-      newAssociateForm.emailAddress.trim() &&
-      !/\S+@\S+\.\S+/.test(newAssociateForm.emailAddress)
-    ) {
-      newErrors.emailAddress = "Please enter a valid email address";
-    }
-
-    setFormErrors(newErrors);
-    setPhoneError("");
-    return Object.keys(newErrors).length === 0;
-  };
-
-  // Handle submit new associate form
+  // Wrapper for submitNewAssociate that uses createAssociate
   const submitNewAssociate = async () => {
-    // Prevent double submission
-    if (isSubmitting) {
-      return;
-    }
-
-    if (!validateNewAssociateForm()) {
-      return;
-    }
-
-    setIsSubmitting(true);
-    const formData = newAssociateForm;
-    try {
-      const response = await fetch("/api/associates", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          first_name: formData.firstName.trim(),
-          last_name: formData.lastName.trim(),
-          phone_number: formData.phoneNumber.trim() || null,
-          email_address: formData.emailAddress.trim() || null,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to create associate");
-      }
-
-      const createdAssociates = await response.json();
-      const newAssociate = createdAssociates[0];
-
-      // Convert to AssociateGroup format and add to list
-      const associateGroup: AssociateGroup = {
-        id: newAssociate.id,
-        firstName: newAssociate.first_name || "",
-        lastName: newAssociate.last_name || "",
-        phoneNumber: newAssociate.phone_number || "",
-        emailAddress: newAssociate.email_address || "",
-        groupId: "",
-        createdAt: new Date(newAssociate.created_at || Date.now()),
-        updatedAt: new Date(newAssociate.updated_at || Date.now()),
-      };
-
-      setAssociates((prev) => [associateGroup, ...prev]);
-      setShowAddNewModal(false);
-      // Reset form
-      setNewAssociateForm({
-        firstName: "",
-        lastName: "",
-        phoneNumber: "",
-        emailAddress: "",
-      });
-    } catch (error) {
-      console.error("Error creating associate:", error);
-      alert("Failed to create associate. Please try again.");
-    } finally {
-      setIsSubmitting(false);
-    }
+    await form.submitNewAssociate(associates.createAssociate);
   };
 
-  // Handle cancel add new associate
-  const cancelAddNew = () => {
-    setIsSubmitting(false);
-    setShowAddNewModal(false);
+  // Wrapper for uploadCSVFile that uses loadAssociates and toast
+  const uploadCSVFile = async (file: File) => {
+    await csvUpload.uploadCSVFile(
+      file,
+      associates.loadAssociates,
+      () => {
+        // Error handling is done in the hook via toast
+      },
+      toast.showToastMessage
+    );
   };
 
   return {
-    // State
-    associates,
-    loading,
-    messageText,
-    selectedAssociate,
-    showMassMessageModal,
-    showIndividualMessageModal,
-    showAddNewModal,
-    newAssociateForm,
-    formErrors,
-    phoneError,
-    toastMessage,
-    toastType,
-    showToast,
-    sendLoading,
-    sendSuccess,
-    sendError,
-    isSubmitting,
-    // Actions
-    setMessageText,
-    setShowMassMessageModal,
-    setShowIndividualMessageModal,
-    setShowAddNewModal,
-    setSelectedAssociate,
-    setShowToast,
-    handleFormInputChange,
-    loadAssociates,
-    saveAssociate,
-    deleteAssociate,
+    // State from associates
+    associates: associates.associates,
+    loading: associates.loading,
+
+    // State from messaging
+    messageText: messaging.messageText,
+    selectedAssociate: messaging.selectedAssociate,
+    showMassMessageModal: messaging.showMassMessageModal,
+    showIndividualMessageModal: messaging.showIndividualMessageModal,
+    sendLoading: messaging.sendLoading,
+    sendSuccess: messaging.sendSuccess,
+    sendError: messaging.sendError,
+
+    // State from form
+    showAddNewModal: form.showAddNewModal,
+    newAssociateForm: form.newAssociateForm,
+    formErrors: form.formErrors,
+    phoneError: form.phoneError,
+    isSubmitting: form.isSubmitting,
+
+    // State from CSV upload
+    isUploading: csvUpload.isUploading,
+
+    // State from toast
+    toastMessage: toast.toastMessage,
+    toastType: toast.toastType,
+    showToast: toast.showToast,
+
+    // Actions from associates
+    loadAssociates: associates.loadAssociates,
+    saveAssociate: associates.saveAssociate,
+    deleteAssociate: associates.deleteAssociate,
+
+    // Actions from messaging
+    setMessageText: messaging.setMessageText,
+    setShowMassMessageModal: messaging.setShowMassMessageModal,
+    setShowIndividualMessageModal: messaging.setShowIndividualMessageModal,
+    setSelectedAssociate: messaging.setSelectedAssociate,
     sendMessage,
-    cancelMessage,
-    addNew,
-    cancelAddNew,
+    cancelMessage: messaging.cancelMessage,
+    messageAssociate: messaging.messageAssociate,
+    messageAll: messaging.messageAll,
+
+    // Actions from form
+    setShowAddNewModal: form.setShowAddNewModal,
+    handleFormInputChange: form.handleFormInputChange,
+    addNew: form.addNew,
+    cancelAddNew: form.cancelAddNew,
     submitNewAssociate,
-    messageAssociate,
-    messageAll,
+
+    // Actions from toast
+    setShowToast: toast.setShowToast,
+
+    // Actions from CSV upload
+    uploadCSVFile,
   };
 }

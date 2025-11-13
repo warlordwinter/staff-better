@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AssociatesDaoSupabase } from "@/lib/dao/implementations/supabase/AssociatesDaoSupabase";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { isValidPhoneNumber } from "@/utils/phoneUtils";
 
 const associatesDao = new AssociatesDaoSupabase();
 
@@ -24,61 +24,125 @@ export async function POST(request: NextRequest) {
     // Handle single associate or array of associates
     const associatesToInsert = Array.isArray(body) ? body : [body];
 
-    const insertedAssociates = await associatesDao.insertAssociates(
-      associatesToInsert
-    );
+    const sanitizedAssociates = associatesToInsert.map((associate, index) => {
+      const firstName =
+        typeof associate.first_name === "string"
+          ? associate.first_name.trim()
+          : "";
+      const lastName =
+        typeof associate.last_name === "string"
+          ? associate.last_name.trim()
+          : "";
+      // Handle phone_number: keep null if null, convert empty string to null, otherwise trim
+      const phoneNumber =
+        associate.phone_number === null || associate.phone_number === undefined
+          ? null
+          : typeof associate.phone_number === "string"
+          ? associate.phone_number.trim() || null
+          : null;
+      const emailAddress =
+        typeof associate.email_address === "string"
+          ? associate.email_address.trim() || null
+          : null;
 
-    // Create opt_info records for new associates (opt-out messages will be sent on first contact)
-    try {
-      const supabaseAdmin = createAdminClient();
+      return {
+        first_name: firstName,
+        last_name: lastName,
+        phone_number: phoneNumber,
+        email_address: emailAddress,
+        _originalIndex: index,
+      };
+    });
 
-      for (const associate of insertedAssociates) {
-        // Only create opt_info if associate has a phone number
-        if (associate.phone_number) {
-          try {
-            // Check if opt_info record already exists
-            const { data: existingOptInfo } = await supabaseAdmin
-              .from("opt_info")
-              .select("associate_id")
-              .eq("associate_id", associate.id)
-              .single();
+    const emailRegex = /\S+@\S+\.\S+/;
 
-            if (!existingOptInfo) {
-              // Insert new record with flags set to false (opt-out messages not sent yet)
-              const { error: insertError } = await supabaseAdmin
-                .from("opt_info")
-                .insert({
-                  associate_id: associate.id,
-                  first_sms_opt_out: false,
-                  first_reminder_opt_out: false,
-                });
+    for (const associate of sanitizedAssociates) {
+      const rowLabel = `Row ${associate._originalIndex + 1}`;
 
-              if (insertError) {
-                console.error(
-                  `Failed to create opt_info for associate ${associate.id}:`,
-                  insertError
-                );
-              }
-            }
-          } catch (optInfoError) {
-            // Log error but don't fail associate creation
-            console.error(
-              `Failed to create opt_info for associate ${associate.id}:`,
-              optInfoError
-            );
-          }
+      if (!associate.first_name || !associate.first_name.trim()) {
+        return NextResponse.json(
+          { error: `${rowLabel}: First name is required.` },
+          { status: 400 }
+        );
+      }
+      if (!associate.last_name || !associate.last_name.trim()) {
+        return NextResponse.json(
+          { error: `${rowLabel}: Last name is required.` },
+          { status: 400 }
+        );
+      }
+      // Phone number is optional - if provided, do basic validation
+      if (
+        associate.phone_number !== null &&
+        associate.phone_number !== undefined &&
+        typeof associate.phone_number === "string" &&
+        associate.phone_number.trim()
+      ) {
+        const digitsOnly = associate.phone_number.replace(/\D/g, "");
+        // Require at least 10 digits for valid phone numbers (7-digit local numbers are not valid)
+        if (digitsOnly.length < 10) {
+          return NextResponse.json(
+            {
+              error: `${rowLabel}: Phone number must have at least 10 digits. Found ${digitsOnly.length} digit(s).`,
+            },
+            { status: 400 }
+          );
+        }
+        // Validate format for 10+ digit numbers
+        if (!isValidPhoneNumber(associate.phone_number)) {
+          return NextResponse.json(
+            { error: `${rowLabel}: Invalid phone number format.` },
+            { status: 400 }
+          );
         }
       }
-    } catch (optInfoError) {
-      // Log error but don't fail associate creation
-      console.error("Failed to create opt_info records:", optInfoError);
+      // Email is optional, but if provided, validate it
+      if (
+        associate.email_address !== null &&
+        associate.email_address !== undefined &&
+        typeof associate.email_address === "string" &&
+        associate.email_address.trim() &&
+        !emailRegex.test(associate.email_address)
+      ) {
+        return NextResponse.json(
+          { error: `${rowLabel}: Invalid email address.` },
+          { status: 400 }
+        );
+      }
     }
 
+    const payload = sanitizedAssociates.map(({ ...rest }) => ({
+      ...rest,
+      phone_number: rest.phone_number || null,
+      email_address: rest.email_address || null,
+    }));
+
+    // Log what we're sending to the DAO
+    console.log(
+      "[API Route] Payload being sent to DAO:",
+      JSON.stringify(
+        payload.map((p) => ({
+          first_name: p.first_name,
+          last_name: p.last_name,
+          phone_number: p.phone_number,
+          email_address: p.email_address,
+        })),
+        null,
+        2
+      )
+    );
+
+    const insertedAssociates = await associatesDao.insertAssociates(payload);
     return NextResponse.json(insertedAssociates, { status: 201 });
   } catch (error) {
     console.error("Failed to create associate:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to create associate";
+    // Include more details in development
+    const errorDetails =
+      process.env.NODE_ENV === "development" ? { details: String(error) } : {};
     return NextResponse.json(
-      { error: "Failed to create associate" },
+      { error: errorMessage, ...errorDetails },
       { status: 500 }
     );
   }
