@@ -109,6 +109,27 @@ export class ISVCustomerDao {
     return data as ISVCustomer;
   }
 
+  async findByCompanyId(companyId: string): Promise<ISVCustomer | null> {
+    const { data, error } = await this.supabase
+      .from("isv_customers")
+      .select("*")
+      .eq("company_id", companyId)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (error) {
+      throw new Error(
+        `Failed to find ISV customer by company_id: ${error.message}`
+      );
+    }
+
+    if (!data || data.length === 0) {
+      return null;
+    }
+
+    return data[0] as ISVCustomer;
+  }
+
   async listAll(): Promise<ISVCustomer[]> {
     const { data, error } = await this.supabase
       .from("isv_customers")

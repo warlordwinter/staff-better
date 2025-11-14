@@ -44,7 +44,9 @@ export default function ISVOnboardingPage() {
   }
 
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -81,7 +83,7 @@ export default function ISVOnboardingPage() {
       }
 
       const customer = await response.json();
-      router.push(`/isv/customers/${customer.id}`);
+      router.push(`/settings`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -435,4 +437,3 @@ export default function ISVOnboardingPage() {
     </div>
   );
 }
-
