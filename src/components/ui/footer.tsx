@@ -19,6 +19,7 @@ export default function Footer() {
           <Link href="/legal/terms" className="hover:underline">Terms</Link>
           <Link href="/legal/privacy" className="hover:underline">Privacy</Link>
           <Link href="/legal/cookies" className="hover:underline">Cookies</Link>
+          <Link href="/legal/data-deletion" className="hover:underline">Delete Data</Link>
         </div>
 
         {/* Social Media */}
