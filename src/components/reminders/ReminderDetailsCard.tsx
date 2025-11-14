@@ -4,6 +4,7 @@ import { JobAssignmentResponse } from "@/utils/statusUtils";
 import { formatDate } from "@/utils/dateUtils";
 import { getStatusDisplay } from "@/utils/statusUtils";
 import { convertUTCTimeToLocal } from "@/utils/timezoneUtils";
+import { formatReminderSendTimesDetail } from "@/utils/reminderUtils";
 
 interface ReminderDetailsCardProps {
   job: Job;
@@ -48,7 +49,7 @@ export default function ReminderDetailsCard({
         <h2 className="text-xl font-semibold text-black">Reminder Details</h2>
         <div className="flex items-center gap-3">
           <span
-            className={`px-3 py-1 rounded ${statusDisplay.color} ${statusDisplay.textColor} text-sm font-medium`}
+            className={`px-3 py-1 rounded text-xs font-medium ${statusDisplay.color} ${statusDisplay.textColor}`}
           >
             {statusDisplay.label}
           </span>
@@ -113,9 +114,45 @@ export default function ReminderDetailsCard({
         </div>
       </div>
 
-      <p className="text-gray-700">
-        {job.customer_name || "No additional details provided."}
-      </p>
+      {/* Reminder Message */}
+      <div className="mb-4">
+        <textarea
+          readOnly
+          value={job.customer_name || "No additional details provided."}
+          className="w-full p-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-700 text-sm resize-none focus:outline-none"
+          rows={2}
+        />
+      </div>
+
+      {/* Reminder Send Times */}
+      {displayDate && displayTime && (
+        <div className="flex items-center gap-2 text-gray-700">
+          <svg
+            className="w-5 h-5 text-gray-500"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          <span className="text-sm">
+            {formatReminderSendTimesDetail(displayDate || null, displayTime || null)
+              .split("**")
+              .map((part, index) =>
+                index % 2 === 1 ? (
+                  <strong key={index} className="font-semibold">{part}</strong>
+                ) : (
+                  <span key={index}>{part}</span>
+                )
+              )}
+          </span>
+        </div>
+      )}
 
       {reminderStatus && (
         <div
