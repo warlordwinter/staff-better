@@ -127,13 +127,17 @@ export function isValidE164(phoneNumber: string): boolean {
 /**
  * Normalize phone number for database lookup
  * Handles both E.164 and various input formats
+ * Also strips WhatsApp prefix if present
  */
 export function normalizePhoneForLookup(phoneNumber: string): string {
+  // Strip whatsapp: prefix if present (for WhatsApp webhooks)
+  const cleaned = phoneNumber.replace(/^whatsapp:/i, "");
+
   try {
-    return formatPhoneToE164(phoneNumber);
+    return formatPhoneToE164(cleaned);
   } catch {
-    // If formatting fails, return original (for backwards compatibility)
-    return phoneNumber;
+    // If formatting fails, return cleaned version (for backwards compatibility)
+    return cleaned;
   }
 }
 

@@ -82,3 +82,13 @@ export interface TwilioConfig {
   phoneNumber: string;
   webhookUrl?: string;
 }
+
+// WhatsApp message structure
+export interface WhatsAppMessage {
+  to: string; // Phone number in E.164 format (e.g., +1234567890)
+  body: string; // Message content
+  from: string; // WhatsApp sender number in E.164 format (e.g., +14155238886 for sandbox)
+}
+
+// WhatsApp result (reuses SMSResult structure)
+export type WhatsAppResult = SMSResult;

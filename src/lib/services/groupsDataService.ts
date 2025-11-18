@@ -360,7 +360,8 @@ export class GroupsDataService {
    */
   static async sendMassMessageToGroup(
     groupId: string,
-    message: string
+    message: string,
+    channel: "sms" | "whatsapp" = "sms"
   ): Promise<{
     success: boolean;
     unsubscribed_members?: Array<{
@@ -374,7 +375,7 @@ export class GroupsDataService {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, channel }),
     });
 
     if (!response.ok) {

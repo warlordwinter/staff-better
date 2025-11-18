@@ -37,6 +37,7 @@ export default function GroupPage({ params }: GroupPageProps) {
   const [selectedAssociate, setSelectedAssociate] =
     useState<AssociateGroup | null>(null);
   const [messageText, setMessageText] = useState("");
+  const [messageType, setMessageType] = useState<"sms" | "whatsapp">("sms");
   const [availableAssociates, setAvailableAssociates] = useState<
     AssociateGroup[]
   >([]);
@@ -235,6 +236,7 @@ export default function GroupPage({ params }: GroupPageProps) {
 
   const handleMassMessage = () => {
     setMessageText("");
+    setMessageType("sms"); // Reset to SMS by default
     setShowMassMessageModal(true);
   };
 
@@ -257,7 +259,8 @@ export default function GroupPage({ params }: GroupPageProps) {
         // Send mass message
         const result = await GroupsDataService.sendMassMessageToGroup(
           groupId,
-          messageText
+          messageText,
+          messageType
         );
 
         // Show toast if there are unsubscribed members
@@ -312,6 +315,7 @@ export default function GroupPage({ params }: GroupPageProps) {
 
   const handleCancelMessage = () => {
     setMessageText("");
+    setMessageType("sms");
     setShowMassMessageModal(false);
     setShowIndividualMessageModal(false);
     setSelectedAssociate(null);
@@ -390,8 +394,12 @@ export default function GroupPage({ params }: GroupPageProps) {
       {/* Modals */}
       <MassMessageModal
         isOpen={showMassMessageModal}
+        groupName={group?.group_name}
+        associateCount={associates.length}
         messageText={messageText}
+        messageType={messageType}
         onMessageTextChange={setMessageText}
+        onMessageTypeChange={setMessageType}
         onSend={handleSendMessage}
         sendLoading={sendLoading}
         sendSuccess={sendSuccess}

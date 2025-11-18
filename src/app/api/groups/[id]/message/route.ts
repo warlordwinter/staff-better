@@ -1,14 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GroupsDaoSupabase } from "@/lib/dao/implementations/supabase/GroupsDaoSupabase";
-import { requireCompanyId } from "@/lib/auth/getCompanyId";
+import {
+  requireCompanyId,
+  requireCompanyPhoneNumber,
+  requireCompanyWhatsAppNumber,
+} from "@/lib/auth/getCompanyId";
 import { sendTwoWaySMS, formatPhoneNumber } from "@/lib/twilio/sms";
+import { sendWhatsAppBusiness } from "@/lib/twilio/whatsapp";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const groupsDao = new GroupsDaoSupabase();
 
 /**
  * POST /api/groups/[id]/message
- * Send a mass message to all members of a group
+ * Send a mass message to all members of a group via SMS or WhatsApp
+ * 
+ * Request body:
+ * - message: string (required) - The message text
+ * - channel: "sms" | "whatsapp" (optional, defaults to "sms")
  */
 export async function POST(
   request: NextRequest,
@@ -16,30 +25,6 @@ export async function POST(
 ) {
   try {
     const companyId = await requireCompanyId();
-
-    // Get company phone number directly from database (no fallback)
-    const supabaseAdmin = createAdminClient();
-    const { data: company, error: companyError } = await supabaseAdmin
-      .from("companies")
-      .select("phone_number")
-      .eq("id", companyId)
-      .single();
-
-    if (companyError || !company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 });
-    }
-
-    if (!company.phone_number) {
-      return NextResponse.json(
-        {
-          error:
-            "Company phone number is not configured. Please set a phone number in company settings.",
-        },
-        { status: 400 }
-      );
-    }
-
-    const twoWayPhoneNumber = company.phone_number;
     const { id: groupId } = await params;
     const body = await request.json();
 
@@ -53,6 +38,29 @@ export async function POST(
         { error: "Message is required" },
         { status: 400 }
       );
+    }
+
+    // Get channel (default to SMS for backwards compatibility)
+    const channel = body.channel === "whatsapp" ? "whatsapp" : "sms";
+
+    // Get appropriate phone number based on channel
+    let senderNumber: string;
+    let twoWayPhoneNumber: string | undefined;
+    if (channel === "whatsapp") {
+      try {
+        senderNumber = await requireCompanyWhatsAppNumber(companyId);
+      } catch (error) {
+        return NextResponse.json(
+          {
+            error:
+              "WhatsApp Business number is not configured. Please set TWILIO_WHATSAPP_NUMBER environment variable.",
+          },
+          { status: 400 }
+        );
+      }
+    } else {
+      senderNumber = await requireCompanyPhoneNumber(companyId);
+      twoWayPhoneNumber = senderNumber; // For SMS opt-out messages
     }
 
     // Verify the group belongs to the company
@@ -98,7 +106,7 @@ export async function POST(
       );
     }
 
-    // Send SMS to each eligible member
+    // Send messages to each eligible member
     const results = [];
     const errors = [];
     const twilioUnsubscribedMembers: Array<{
@@ -110,13 +118,27 @@ export async function POST(
     for (const member of eligibleMembers) {
       try {
         const formattedPhone = formatPhoneNumber(member.phone_number);
-        const result = await sendTwoWaySMS(
-          {
-            to: formattedPhone,
-            body: body.message.trim(),
-          },
-          twoWayPhoneNumber
-        );
+        let result;
+
+        if (channel === "whatsapp") {
+          // Send WhatsApp message
+          result = await sendWhatsAppBusiness(
+            {
+              to: formattedPhone,
+              body: body.message.trim(),
+            },
+            senderNumber
+          );
+        } else {
+          // Send SMS message
+          result = await sendTwoWaySMS(
+            {
+              to: formattedPhone,
+              body: body.message.trim(),
+            },
+            senderNumber
+          );
+        }
 
         results.push({
           member_id: member.id,
@@ -141,27 +163,30 @@ export async function POST(
             error: "error" in result ? result.error : "Unknown error",
           });
         } else {
-          // Send opt-out message if this is the first group message for this member (after sending the message)
-          try {
-            const { sendSMSOptOutIfNeeded } = await import(
-              "@/lib/utils/optOutUtils"
-            );
-            await sendSMSOptOutIfNeeded(
-              member.id,
-              member.phone_number,
-              companyId,
-              twoWayPhoneNumber
-            );
-          } catch (optOutError) {
-            // Log error but don't fail the message send
-            console.error(
-              `Failed to send opt-out message for group message to member ${member.id}:`,
-              optOutError
-            );
+          // Send opt-out message if this is the first group message for this member (only for SMS)
+          if (channel === "sms" && twoWayPhoneNumber) {
+            try {
+              const { sendSMSOptOutIfNeeded } = await import(
+                "@/lib/utils/optOutUtils"
+              );
+              await sendSMSOptOutIfNeeded(
+                member.id,
+                member.phone_number,
+                companyId,
+                twoWayPhoneNumber
+              );
+            } catch (optOutError) {
+              // Log error but don't fail the message send
+              console.error(
+                `Failed to send opt-out message for group message to member ${member.id}:`,
+                optOutError
+              );
+            }
           }
 
-          // Save message to database if SMS was sent successfully
+          // Save message to database if message was sent successfully
           try {
+            const supabaseAdmin = createAdminClient();
             // Find or create conversation
             const { data: existingConversations } = await supabaseAdmin
               .from("conversations")
