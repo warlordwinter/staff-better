@@ -6,7 +6,10 @@ import {
   requireCompanyWhatsAppNumber,
 } from "@/lib/auth/getCompanyId";
 import { sendTwoWaySMS, formatPhoneNumber } from "@/lib/twilio/sms";
-import { sendWhatsAppBusiness } from "@/lib/twilio/whatsapp";
+import {
+  sendWhatsAppBusiness,
+  sendWhatsAppBusinessTemplate,
+} from "@/lib/twilio/whatsapp";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const groupsDao = new GroupsDaoSupabase();
@@ -14,7 +17,7 @@ const groupsDao = new GroupsDaoSupabase();
 /**
  * POST /api/groups/[id]/message
  * Send a mass message to all members of a group via SMS or WhatsApp
- * 
+ *
  * Request body:
  * - message: string (required) - The message text
  * - channel: "sms" | "whatsapp" (optional, defaults to "sms")
@@ -28,20 +31,33 @@ export async function POST(
     const { id: groupId } = await params;
     const body = await request.json();
 
-    // Validate message
-    if (
-      !body.message ||
-      typeof body.message !== "string" ||
-      !body.message.trim()
-    ) {
-      return NextResponse.json(
-        { error: "Message is required" },
-        { status: 400 }
-      );
-    }
-
     // Get channel (default to SMS for backwards compatibility)
     const channel = body.channel === "whatsapp" ? "whatsapp" : "sms";
+
+    // Validate message or template
+    const isWhatsAppTemplate = channel === "whatsapp" && body.contentSid;
+
+    if (isWhatsAppTemplate) {
+      // Template-based WhatsApp message - contentSid is required
+      if (!body.contentSid || typeof body.contentSid !== "string") {
+        return NextResponse.json(
+          { error: "contentSid is required for WhatsApp template messages" },
+          { status: 400 }
+        );
+      }
+    } else {
+      // Regular message - message body is required
+      if (
+        !body.message ||
+        typeof body.message !== "string" ||
+        !body.message.trim()
+      ) {
+        return NextResponse.json(
+          { error: "Message is required" },
+          { status: 400 }
+        );
+      }
+    }
 
     // Get appropriate phone number based on channel
     let senderNumber: string;
@@ -122,13 +138,26 @@ export async function POST(
 
         if (channel === "whatsapp") {
           // Send WhatsApp message
-          result = await sendWhatsAppBusiness(
-            {
-              to: formattedPhone,
-              body: body.message.trim(),
-            },
-            senderNumber
-          );
+          if (isWhatsAppTemplate) {
+            // Use template-based sending
+            result = await sendWhatsAppBusinessTemplate(
+              {
+                to: formattedPhone,
+                contentSid: body.contentSid,
+                contentVariables: body.contentVariables,
+              },
+              senderNumber
+            );
+          } else {
+            // Use regular message sending
+            result = await sendWhatsAppBusiness(
+              {
+                to: formattedPhone,
+                body: body.message.trim(),
+              },
+              senderNumber
+            );
+          }
         } else {
           // Send SMS message
           result = await sendTwoWaySMS(
@@ -231,7 +260,9 @@ export async function POST(
                   {
                     conversation_id: conversationId,
                     sender_type: "company",
-                    body: body.message.trim(),
+                    body: isWhatsAppTemplate
+                      ? `[Template: ${body.contentSid}]`
+                      : body.message.trim(),
                     direction: "outbound",
                     status:
                       result.success &&

@@ -361,7 +361,8 @@ export class GroupsDataService {
   static async sendMassMessageToGroup(
     groupId: string,
     message: string,
-    channel: "sms" | "whatsapp" = "sms"
+    channel: "sms" | "whatsapp" = "sms",
+    templateData?: { contentSid: string; contentVariables?: Record<string, string> }
   ): Promise<{
     success: boolean;
     unsubscribed_members?: Array<{
@@ -370,12 +371,25 @@ export class GroupsDataService {
       last_name: string;
     }>;
   }> {
+    const body: any = { channel };
+    
+    if (channel === "whatsapp" && templateData) {
+      // Use template for WhatsApp
+      body.contentSid = templateData.contentSid;
+      if (templateData.contentVariables) {
+        body.contentVariables = templateData.contentVariables;
+      }
+    } else {
+      // Use regular message
+      body.message = message;
+    }
+
     const response = await fetch(`/api/groups/${groupId}/message`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ message, channel }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {

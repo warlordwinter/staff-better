@@ -1,5 +1,10 @@
 import { twilioClient } from "./client";
-import { WhatsAppMessage, WhatsAppResult, SMSError } from "./types";
+import {
+  WhatsAppMessage,
+  WhatsAppResult,
+  SMSError,
+  WhatsAppTemplateMessage,
+} from "./types";
 import { formatPhoneNumber } from "./sms";
 
 /**
@@ -157,6 +162,143 @@ export async function sendWhatsAppBusiness(
   whatsappBusinessNumber: string
 ): Promise<WhatsAppResult> {
   return sendWhatsApp({
+    ...message,
+    from: whatsappBusinessNumber,
+  });
+}
+
+/**
+ * Send a WhatsApp message using an approved template
+ * This is required for sending messages outside the 24-hour window
+ *
+ * @param message - WhatsApp template message with contentSid and optional variables
+ * @returns Promise resolving to WhatsAppResult
+ *
+ * @example
+ * ```typescript
+ * const result = await sendWhatsAppTemplate({
+ *   to: "+1234567890",
+ *   from: "+14155238886",
+ *   contentSid: "HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+ *   contentVariables: {
+ *     "1": "John",
+ *     "2": "12345"
+ *   }
+ * });
+ * ```
+ */
+export async function sendWhatsAppTemplate(
+  message: WhatsAppTemplateMessage
+): Promise<WhatsAppResult> {
+  try {
+    // Validate required fields
+    if (!message.from) {
+      throw new Error("WhatsApp 'from' field is required");
+    }
+
+    if (!message.to) {
+      throw new Error("WhatsApp 'to' field is required");
+    }
+
+    if (!message.contentSid) {
+      throw new Error("WhatsApp 'contentSid' (template SID) is required");
+    }
+
+    // Format phone numbers with whatsapp: prefix
+    const fromNumber = formatWhatsAppNumber(message.from);
+    const toNumber = formatWhatsAppNumber(message.to);
+
+    console.log("📱 [WHATSAPP DEBUG] Sending WhatsApp template message:");
+    console.log("📱 [WHATSAPP DEBUG]   FROM:", fromNumber);
+    console.log("📱 [WHATSAPP DEBUG]   TO:", toNumber);
+    console.log("📱 [WHATSAPP DEBUG]   CONTENT SID:", message.contentSid);
+    if (message.contentVariables) {
+      console.log(
+        "📱 [WHATSAPP DEBUG]   VARIABLES:",
+        JSON.stringify(message.contentVariables)
+      );
+    }
+
+    // Build the content variables array for Twilio
+    // Twilio expects variables in the format: ["value1", "value2", ...]
+    // based on the order of variables in the template
+    let contentVariables: string | undefined;
+    if (message.contentVariables) {
+      // Sort variables by key (numeric) and create array
+      const sortedKeys = Object.keys(message.contentVariables).sort(
+        (a, b) => parseInt(a) - parseInt(b)
+      );
+      const variableArray = sortedKeys.map(
+        (key) => message.contentVariables![key]
+      );
+      contentVariables = JSON.stringify(variableArray);
+    }
+
+    // Send message via Twilio using template
+    const twilioMessage = await twilioClient.messages.create({
+      to: toNumber,
+      from: fromNumber,
+      contentSid: message.contentSid,
+      ...(contentVariables && { contentVariables }),
+    });
+
+    console.log("📱 [WHATSAPP DEBUG] WhatsApp template message sent successfully:");
+    console.log("📱 [WHATSAPP DEBUG]   Message SID:", twilioMessage.sid);
+    console.log("📱 [WHATSAPP DEBUG]   Status:", twilioMessage.status);
+    console.log("📱 [WHATSAPP DEBUG]   From (Twilio):", twilioMessage.from);
+    console.log("📱 [WHATSAPP DEBUG]   To (Twilio):", twilioMessage.to);
+    console.log(
+      "📱 [WHATSAPP DEBUG]   Date Created:",
+      twilioMessage.dateCreated
+    );
+
+    return {
+      success: true,
+      messageId: twilioMessage.sid,
+      status: twilioMessage.status,
+      to: twilioMessage.to,
+      from: twilioMessage.from,
+      sentAt: new Date(),
+    };
+  } catch (error: unknown) {
+    const twilioError = error as { message?: string; code?: string };
+
+    const whatsappError: SMSError = {
+      success: false,
+      error: twilioError.message || "Unknown error occurred",
+      code: twilioError.code || "UNKNOWN",
+      to: message.to,
+      sentAt: new Date(),
+    };
+
+    // Log the error for debugging
+    console.error("WhatsApp template sending failed:", whatsappError);
+
+    return whatsappError;
+  }
+}
+
+/**
+ * Send WhatsApp message using a template with a verified WhatsApp Business number
+ *
+ * @param message - WhatsApp template message (without 'from' field)
+ * @param whatsappBusinessNumber - Your verified WhatsApp Business number in E.164 format
+ * @returns Promise resolving to WhatsAppResult
+ *
+ * @example
+ * ```typescript
+ * const result = await sendWhatsAppBusinessTemplate({
+ *   to: "+1234567890",
+ *   contentSid: "HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+ *   contentVariables: { "1": "John" }
+ * }, "+15551234567");
+ * ```
+ */
+export async function sendWhatsAppBusinessTemplate(
+  message: Omit<WhatsAppTemplateMessage, "from">,
+  whatsappBusinessNumber: string
+): Promise<WhatsAppResult> {
+  return sendWhatsAppTemplate({
     ...message,
     from: whatsappBusinessNumber,
   });

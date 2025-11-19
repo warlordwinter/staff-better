@@ -10,8 +10,15 @@ import {
 import {
   sendWhatsApp,
   sendWhatsAppBusiness,
+  sendWhatsAppBusinessTemplate,
 } from "../../twilio/whatsapp";
-import { SMSMessage, SMSResult, WhatsAppMessage, WhatsAppResult } from "../../twilio/types";
+import {
+  SMSMessage,
+  SMSResult,
+  WhatsAppMessage,
+  WhatsAppResult,
+  WhatsAppTemplateMessage,
+} from "../../twilio/types";
 
 export class TwilioMessageService implements IMessageService {
   async sendSMS(message: SMSMessage): Promise<SMSResult> {
@@ -43,5 +50,12 @@ export class TwilioMessageService implements IMessageService {
     whatsappBusinessNumber: string
   ): Promise<WhatsAppResult> {
     return await sendWhatsAppBusiness(message, whatsappBusinessNumber);
+  }
+
+  async sendWhatsAppBusinessTemplate(
+    message: Omit<WhatsAppTemplateMessage, "from">,
+    whatsappBusinessNumber: string
+  ): Promise<WhatsAppResult> {
+    return await sendWhatsAppBusinessTemplate(message, whatsappBusinessNumber);
   }
 }

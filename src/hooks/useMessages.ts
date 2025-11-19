@@ -80,12 +80,25 @@ export function useMessages(
       }
 
       const isSelected = selectedConversation?.id === conversation.id;
+      
+      // Update conversation channel based on new messages
+      const updatedMessages = [...conversation.messages, message];
+      const channelCounts = updatedMessages.reduce((acc, msg) => {
+        const ch = msg.channel || "sms";
+        acc[ch] = (acc[ch] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      
+      const updatedChannel: "sms" | "whatsapp" = 
+        (channelCounts.whatsapp || 0) > (channelCounts.sms || 0) ? "whatsapp" : "sms";
+      
       return {
         ...conversation,
-        messages: [...conversation.messages, message],
+        messages: updatedMessages,
         lastMessage: message.text,
         timestamp: message.timestamp,
         unread: direction === "inbound" ? !isSelected : conversation.unread,
+        channel: updatedChannel,
       };
     },
     [selectedConversation]
@@ -185,12 +198,25 @@ export function useMessages(
             }
           );
 
+          const body = newMessage.body || "";
+          // Determine channel for individual message
+          const messageChannel: "sms" | "whatsapp" = 
+            body.includes("[Template:") || 
+            body.toLowerCase().includes("whatsapp") ||
+            (newMessage.sender_type && newMessage.sender_type.toLowerCase().includes("whatsapp"))
+              ? "whatsapp"
+              : "sms";
+
+          // Clean up template indicators from display text
+          const displayText = body.replace(/\[Template: [^\]]+\]\s*/g, "").trim() || body;
+
           const uiMessage: Message = {
             id: newMessage.id,
-            text: newMessage.body || "",
+            text: displayText,
             sender:
               newMessage.direction === "inbound" ? "incoming" : "outgoing",
             timestamp: formattedTimestamp,
+            channel: messageChannel,
           };
 
           // Add message to conversation

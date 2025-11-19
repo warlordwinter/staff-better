@@ -15,6 +15,7 @@ export interface Conversation {
   timestamp: string;
   unread: boolean;
   messages: Message[];
+  channel?: "sms" | "whatsapp"; // Channel type for this conversation
 }
 
 export interface Message {
@@ -22,6 +23,7 @@ export interface Message {
   text: string;
   sender: "incoming" | "outgoing";
   timestamp: string;
+  channel?: "sms" | "whatsapp"; // Channel type for this message
 }
 
 interface SendMessageResponse {
@@ -67,6 +69,14 @@ export class MessagesDataService {
       const firstName = nameParts[0] || null;
       const lastName = nameParts.slice(1).join(" ") || null;
 
+      // Determine channel for conversation based on messages
+      // Check if any message indicates WhatsApp (template-based or from WhatsApp number)
+      const hasWhatsAppMessage = (conv.messages || []).some((msg: any) => {
+        const body = msg.body || "";
+        // Check if message body contains template indicator or WhatsApp pattern
+        return body.includes("[Template:") || body.toLowerCase().includes("whatsapp");
+      });
+
       // Transform messages from database format to UI format
       const messages: Message[] = (conv.messages || []).map((msg: any) => {
         const timestamp = msg.sent_at
@@ -76,13 +86,37 @@ export class MessagesDataService {
             })
           : "";
 
+        const body = msg.body || "";
+        // Determine channel for individual message
+        // Check for template indicator or WhatsApp patterns
+        const messageChannel: "sms" | "whatsapp" = 
+          body.includes("[Template:") || 
+          body.toLowerCase().includes("whatsapp") ||
+          (msg.sender_type && msg.sender_type.toLowerCase().includes("whatsapp"))
+            ? "whatsapp"
+            : "sms";
+
+        // Clean up template indicators from display text
+        const displayText = body.replace(/\[Template: [^\]]+\]\s*/g, "").trim() || body;
+
         return {
           id: msg.id,
-          text: msg.body || "",
+          text: displayText,
           sender: msg.direction === "inbound" ? "incoming" : "outgoing",
           timestamp,
+          channel: messageChannel,
         };
       });
+
+      // Determine conversation channel (use most common channel from messages, or default to SMS)
+      const channelCounts = messages.reduce((acc, msg) => {
+        const ch = msg.channel || "sms";
+        acc[ch] = (acc[ch] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      
+      const conversationChannel: "sms" | "whatsapp" = 
+        (channelCounts.whatsapp || 0) > (channelCounts.sms || 0) ? "whatsapp" : "sms";
 
       // Get last message info
       const lastMessage =
@@ -98,6 +132,7 @@ export class MessagesDataService {
         timestamp: lastMessage?.timestamp || "",
         unread: false, // TODO: implement unread tracking
         messages,
+        channel: conversationChannel,
       };
     });
   }

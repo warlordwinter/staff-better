@@ -240,8 +240,13 @@ export default function GroupPage({ params }: GroupPageProps) {
     setShowMassMessageModal(true);
   };
 
-  const handleSendMessage = async () => {
-    if (!messageText.trim()) return;
+  const handleSendMessage = async (templateData?: { contentSid: string; contentVariables?: Record<string, string> }) => {
+    // For WhatsApp with template, we don't need messageText
+    if (messageType === "whatsapp" && templateData) {
+      // Template-based WhatsApp message
+    } else if (!messageText.trim()) {
+      return;
+    }
 
     setSendLoading(true);
     setSendSuccess(false);
@@ -260,7 +265,8 @@ export default function GroupPage({ params }: GroupPageProps) {
         const result = await GroupsDataService.sendMassMessageToGroup(
           groupId,
           messageText,
-          messageType
+          messageType,
+          templateData
         );
 
         // Show toast if there are unsubscribed members
