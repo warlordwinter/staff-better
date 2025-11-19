@@ -1,12 +1,17 @@
 name: Reminder Processor
 
 on:
-  # Run every hour minutes
+  # Run every hour on the branch 68-reminders-set-up-correctly
   schedule:
     - cron: "0 * * * *"
 
   # Allow manual triggering
   workflow_dispatch:
+
+  # Only trigger workflow for pushes to 68-reminders-set-up-correctly
+  push:
+    branches:
+      - 68-reminders-set-up-correctly
 
 jobs:
   process-reminders:
