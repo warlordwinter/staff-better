@@ -18,17 +18,17 @@ export default function AssociatesList({ assignments, onDeleteAssociate }: Assoc
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {assignments.map((assignment) => {
         const associate = assignment.associates;
         const fullName = `${associate.first_name} ${associate.last_name}`;
         return (
           <div
             key={associate.id}
-            className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            className="flex items-center justify-between p-4 border border-gray-200 rounded-lg bg-white hover:bg-gray-50 transition-colors"
           >
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-3 mb-2">
+              <div className="flex items-center gap-3 mb-1">
                 <h3 className="text-base font-semibold text-black">{fullName}</h3>
                 <span
                   className={`px-3 py-1 rounded-full text-xs font-medium ${getConfirmationStatusColor(
@@ -42,7 +42,7 @@ export default function AssociatesList({ assignments, onDeleteAssociate }: Assoc
             </div>
             <button
               onClick={() => onDeleteAssociate(associate.id)}
-              className="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
+              className="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0 ml-4 p-1"
               title="Remove associate"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

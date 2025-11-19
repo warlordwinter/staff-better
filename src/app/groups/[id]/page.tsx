@@ -345,12 +345,8 @@ export default function GroupPage({ params }: GroupPageProps) {
   // Show loading while fetching data
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col bg-white">
-        <Navbar />
-        <div className="flex-1 flex items-center justify-center">
-          <LoadingSpinner />
-        </div>
-        <Footer />
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <LoadingSpinner />
       </div>
     );
   }
