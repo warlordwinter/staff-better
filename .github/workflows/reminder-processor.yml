@@ -1,22 +1,12 @@
 name: Reminder Processor
 
 on:
-  # Run every 15 minutes
+  # Run every hour minutes
   schedule:
-    - cron: "*/15 * * * *"
-  # Run on push to current branch
-  push:
-    branches:
-      - reminder-repair
+    - cron: "0 * * * *"
 
   # Allow manual triggering
   workflow_dispatch:
-    inputs:
-      test_mode:
-        description: "Run in test mode (no actual SMS sent)"
-        required: false
-        default: false
-        type: boolean
 
 jobs:
   process-reminders:

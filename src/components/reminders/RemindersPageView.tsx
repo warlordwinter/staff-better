@@ -487,7 +487,7 @@ export default function RemindersPageView({
                           d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                         />
                       </svg>
-                      <span className="text-sm">{dateTime}</span>
+                      <span className="text-sm">starts {dateTime}</span>
                     </div>
 
                     {/* Reminder Send Times */}
