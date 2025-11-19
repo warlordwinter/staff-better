@@ -24,6 +24,36 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
     if (hour === null) return false;
     return hour >= 8 && hour <= 23;
   }
+
+  /**
+   * Extract time portion (HH:MM:SS) from a timestamp string
+   * Handles both full ISO timestamps and time-only strings
+   */
+  private extractTimeFromTimestamp(timestamp: string): string {
+    if (!timestamp) return "";
+    
+    // If it's already in HH:MM:SS format, return as is
+    if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(timestamp)) {
+      return timestamp.length === 5 ? `${timestamp}:00` : timestamp;
+    }
+    
+    // Try to parse as Date and extract time
+    const date = new Date(timestamp);
+    if (!isNaN(date.getTime())) {
+      const hours = date.getUTCHours().toString().padStart(2, "0");
+      const minutes = date.getUTCMinutes().toString().padStart(2, "0");
+      const seconds = date.getUTCSeconds().toString().padStart(2, "0");
+      return `${hours}:${minutes}:${seconds}`;
+    }
+    
+    // If parsing fails, try to extract time from string
+    const timeMatch = timestamp.match(/(\d{1,2}):(\d{2})(:(\d{2}))?/);
+    if (timeMatch) {
+      return timeMatch[0];
+    }
+    
+    return timestamp;
+  }
   async insertJobsAssignments(
     jobsAssignments: {
       job_id: string;
@@ -314,6 +344,33 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
       throw new Error(JSON.stringify(error));
     }
 
+    // Create EventBridge schedules if work_date and start_time are provided
+    if (formattedWorkDate && formattedStartTime) {
+      try {
+        // Extract time portion from start_time (might be full timestamp)
+        const timePortion = this.extractTimeFromTimestamp(formattedStartTime);
+        const eventBridgeService = new (
+          await import("@/lib/services/eventbridgeScheduleService")
+        ).EventBridgeScheduleService();
+        
+        await eventBridgeService.createReminderSchedules(
+          jobId,
+          formattedWorkDate,
+          timePortion,
+          insertData.num_reminders || 2
+        );
+        console.log(
+          `Created EventBridge schedules for job ${jobId}, date ${formattedWorkDate}, time ${timePortion}`
+        );
+      } catch (scheduleError) {
+        // Log error but don't fail the assignment creation
+        console.error(
+          "Error creating EventBridge schedules (assignment still created):",
+          scheduleError
+        );
+      }
+    }
+
     // Format work_date to return only the date portion (YYYY-MM-DD)
     return data.map((assignment) => ({
       ...assignment,
@@ -339,6 +396,21 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
     console.log("Job Assignment jobid:", jobId);
     console.log("Job Assignment AssociateId:", associateId);
     console.log("Job Assignment updates:", updates);
+
+    // Get current assignment to check if work_date or start_time are changing
+    const { data: currentAssignment } = await supabase
+      .from("job_assignments")
+      .select("work_date, start_time, num_reminders")
+      .eq("job_id", jobId)
+      .eq("associate_id", associateId)
+      .single();
+
+    const oldWorkDate = currentAssignment?.work_date
+      ? currentAssignment.work_date.split("T")[0]
+      : null;
+    const oldStartTime = currentAssignment?.start_time
+      ? this.extractTimeFromTimestamp(currentAssignment.start_time)
+      : null;
 
     const cleanedUpdates = Object.fromEntries(
       Object.entries(updates).filter(([, value]) => value !== "")
@@ -450,6 +522,47 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
       throw new Error(JSON.stringify(error));
     }
 
+    // Update EventBridge schedules if work_date or start_time changed
+    const newWorkDate = cleanedUpdates.work_date
+      ? (cleanedUpdates.work_date as string).split("T")[0]
+      : oldWorkDate;
+    const newStartTime = cleanedUpdates.start_time
+      ? this.extractTimeFromTimestamp(cleanedUpdates.start_time as string)
+      : oldStartTime;
+
+    if (
+      (cleanedUpdates.work_date || cleanedUpdates.start_time) &&
+      oldWorkDate &&
+      oldStartTime &&
+      newWorkDate &&
+      newStartTime &&
+      (oldWorkDate !== newWorkDate || oldStartTime !== newStartTime)
+    ) {
+      try {
+        const eventBridgeService = new (
+          await import("@/lib/services/eventbridgeScheduleService")
+        ).EventBridgeScheduleService();
+
+        await eventBridgeService.updateReminderSchedules(
+          jobId,
+          oldWorkDate,
+          oldStartTime,
+          newWorkDate,
+          newStartTime,
+          currentAssignment?.num_reminders || 2
+        );
+        console.log(
+          `Updated EventBridge schedules for job ${jobId} from ${oldWorkDate}/${oldStartTime} to ${newWorkDate}/${newStartTime}`
+        );
+      } catch (scheduleError) {
+        // Log error but don't fail the assignment update
+        console.error(
+          "Error updating EventBridge schedules (assignment still updated):",
+          scheduleError
+        );
+      }
+    }
+
     // Format work_date to return only the date portion (YYYY-MM-DD)
     return data.map((assignment) => ({
       ...assignment,
@@ -462,6 +575,14 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
   async deleteJobAssignment(jobId: string, associateId: string) {
     const supabase = await createClient();
 
+    // Get assignment details before deleting (for schedule cleanup)
+    const { data: assignment } = await supabase
+      .from("job_assignments")
+      .select("work_date, start_time")
+      .eq("job_id", jobId)
+      .eq("associate_id", associateId)
+      .single();
+
     const { error } = await supabase
       .from("job_assignments")
       .delete()
@@ -471,6 +592,32 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
     if (error) {
       console.error("Error deleting job assignment:", error);
       throw new Error(JSON.stringify(error));
+    }
+
+    // Delete EventBridge schedules if work_date and start_time were set
+    if (assignment?.work_date && assignment?.start_time) {
+      try {
+        const workDate = assignment.work_date.split("T")[0];
+        const startTime = this.extractTimeFromTimestamp(assignment.start_time);
+        const eventBridgeService = new (
+          await import("@/lib/services/eventbridgeScheduleService")
+        ).EventBridgeScheduleService();
+
+        await eventBridgeService.deleteReminderSchedules(
+          jobId,
+          workDate,
+          startTime
+        );
+        console.log(
+          `Deleted EventBridge schedules for job ${jobId}, date ${workDate}, time ${startTime}`
+        );
+      } catch (scheduleError) {
+        // Log error but don't fail the deletion
+        console.error(
+          "Error deleting EventBridge schedules (assignment still deleted):",
+          scheduleError
+        );
+      }
     }
 
     return { success: true };

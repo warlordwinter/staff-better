@@ -1,0 +1,133 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation stack for EventBridge Scheduler + Lambda reminder system'
+
+Parameters:
+  TwilioAccountSid:
+    Type: String
+    Description: 'Twilio Account SID'
+    NoEcho: true
+  
+  TwilioAuthToken:
+    Type: String
+    Description: 'Twilio Auth Token'
+    NoEcho: true
+  
+  TwilioDefaultFrom:
+    Type: String
+    Description: 'Default Twilio phone number for reminders'
+  
+  SupabaseUrl:
+    Type: String
+    Description: 'Supabase project URL'
+  
+  SupabaseServiceRoleKey:
+    Type: String
+    Description: 'Supabase service role key'
+    NoEcho: true
+
+Resources:
+  # Lambda Execution Role
+  ReminderLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: ReminderLambdaExecutionRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: CloudWatchLogsPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: 'arn:aws:logs:*:*:*'
+
+  # Lambda Function
+  ReminderLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: ReminderProcessor
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role: !GetAtt ReminderLambdaRole.Arn
+      Timeout: 300
+      MemorySize: 256
+      Environment:
+        Variables:
+          TWILIO_SID: !Ref TwilioAccountSid
+          TWILIO_AUTH: !Ref TwilioAuthToken
+          TWILIO_DEFAULT_FROM: !Ref TwilioDefaultFrom
+          SUPABASE_URL: !Ref SupabaseUrl
+          SUPABASE_SERVICE_ROLE_KEY: !Ref SupabaseServiceRoleKey
+      Code:
+        ZipFile: |
+          // Placeholder - actual code should be deployed via zip file
+          exports.handler = async (event) => {
+            return { statusCode: 200, body: JSON.stringify({ message: 'Lambda deployed' }) };
+          };
+      Description: 'Processes reminders and sends SMS via Twilio'
+
+  # CloudWatch Log Group for Lambda
+  ReminderLambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ReminderLambda}'
+      RetentionInDays: 14
+
+  # EventBridge Scheduler IAM Role (to invoke Lambda)
+  EventBridgeInvokeLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: EventBridgeInvokeReminderLambdaRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: InvokeLambdaPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !GetAtt ReminderLambda.Arn
+
+Outputs:
+  LambdaFunctionArn:
+    Description: 'ARN of the Reminder Lambda function'
+    Value: !GetAtt ReminderLambda.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaArn'
+
+  LambdaExecutionRoleArn:
+    Description: 'ARN of the Lambda execution role'
+    Value: !GetAtt ReminderLambdaRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaRoleArn'
+
+  EventBridgeInvokeRoleArn:
+    Description: 'ARN of the EventBridge Scheduler role for invoking Lambda'
+    Value: !GetAtt EventBridgeInvokeLambdaRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-EventBridgeRoleArn'
+
+  LambdaFunctionName:
+    Description: 'Name of the Lambda function'
+    Value: !Ref ReminderLambda
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaName'
+

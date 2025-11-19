@@ -1,0 +1,105 @@
+name: Deploy Lambda Function
+
+on:
+  push:
+    paths:
+      - 'infrastructure/lambda/reminder-processor/**'
+      - '.github/workflows/deploy-lambda.yml'
+  workflow_dispatch: # Allows manual triggering
+
+env:
+  AWS_REGION: us-east-1
+  LAMBDA_FUNCTION_NAME: ReminderProcessor
+  LAMBDA_DIR: infrastructure/lambda/reminder-processor
+
+jobs:
+  deploy:
+    name: Deploy Lambda Function
+    runs-on: ubuntu-latest
+    
+    permissions:
+      id-token: write # Required for OIDC
+      contents: read
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: ${{ env.LAMBDA_DIR }}/package.json
+
+      - name: Install Lambda dependencies
+        working-directory: ${{ env.LAMBDA_DIR }}
+        run: |
+          npm ci --production
+          echo "Dependencies installed successfully"
+
+      - name: Create deployment package
+        working-directory: ${{ env.LAMBDA_DIR }}
+        run: |
+          zip -r function.zip index.js node_modules/ -q
+          echo "Package size: $(du -h function.zip | cut -f1)"
+          
+          # Check package size (Lambda limit is 50MB uncompressed)
+          PACKAGE_SIZE=$(du -m function.zip | cut -f1)
+          if [ $PACKAGE_SIZE -gt 45 ]; then
+            echo "⚠️ Warning: Package size is ${PACKAGE_SIZE}MB, close to 50MB limit"
+          fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to Lambda
+        working-directory: ${{ env.LAMBDA_DIR }}
+        run: |
+          echo "Deploying Lambda function: ${{ env.LAMBDA_FUNCTION_NAME }}"
+          aws lambda update-function-code \
+            --function-name ${{ env.LAMBDA_FUNCTION_NAME }} \
+            --zip-file fileb://function.zip \
+            --region ${{ env.AWS_REGION }}
+          
+          echo "✅ Lambda function code updated successfully"
+
+      - name: Wait for deployment to complete
+        run: |
+          echo "Waiting for Lambda deployment to complete..."
+          aws lambda wait function-updated \
+            --function-name ${{ env.LAMBDA_FUNCTION_NAME }} \
+            --region ${{ env.AWS_REGION }}
+          echo "✅ Deployment completed"
+
+      - name: Verify deployment
+        run: |
+          echo "Verifying deployment..."
+          LAST_MODIFIED=$(aws lambda get-function \
+            --function-name ${{ env.LAMBDA_FUNCTION_NAME }} \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Configuration.LastModified' \
+            --output text)
+          
+          echo "✅ Lambda function last modified: $LAST_MODIFIED"
+          
+          # Get function version
+          VERSION=$(aws lambda get-function \
+            --function-name ${{ env.LAMBDA_FUNCTION_NAME }} \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Configuration.Version' \
+            --output text)
+          
+          echo "📦 Function version: $VERSION"
+
+      - name: Cleanup
+        if: always()
+        working-directory: ${{ env.LAMBDA_DIR }}
+        run: |
+          rm -f function.zip
+          echo "Cleaned up deployment package"
+
