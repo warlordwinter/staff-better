@@ -647,8 +647,7 @@ export class ReminderDaoSupabase implements IReminder {
         `
       )
       .eq("work_date", todayString)
-      .gt("num_reminders", 0)
-      .order("start_time", { ascending: true });
+      .gt("num_reminders", 0);
 
     if (error) {
       console.error("Error grabbing morning-of reminders:", error);
@@ -692,8 +691,16 @@ export class ReminderDaoSupabase implements IReminder {
       return startTimeMs >= currentTime && startTimeMs <= futureTime;
     });
 
+    // Sort by start_time after filtering (in JavaScript)
+    filteredData.sort((a, b) => {
+      if (!a.start_time || !b.start_time) return 0;
+      const timeA = new Date(a.start_time).getTime() || 0;
+      const timeB = new Date(b.start_time).getTime() || 0;
+      return timeA - timeB;
+    });
+
     console.log(
-      `🔍 [DEBUG] getMorningOfReminders: Found ${data.length} assignments for today, ${filteredData.length} within next ${hoursAhead} hours`
+      `�� [DEBUG] getMorningOfReminders: Found ${data.length} assignments for today, ${filteredData.length} within next ${hoursAhead} hours`
     );
 
     if (filteredData.length === 0) {

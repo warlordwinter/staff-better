@@ -7,6 +7,12 @@ on:
 
   # Allow manual triggering
   workflow_dispatch:
+    inputs:
+      api_url:
+        description: "API URL to test against (leave empty to use default from secrets)"
+        required: false
+        type: string
+        default: ""
 
   # Only trigger workflow for pushes to 68-reminders-set-up-correctly
   push:
@@ -20,15 +26,21 @@ jobs:
     steps:
       - name: Process Reminders
         env:
-          VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
+          API_URL: ${{ inputs.api_url || secrets.VERCEL_APP_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           echo "🚀 Starting reminder processing..."
           echo "⏰ Current time: $(date)"
-          echo "🌐 Target URL: $VERCEL_APP_URL"
+          echo "🌐 Target URL: $API_URL"
 
-          # Make API call to your production Vercel app
-          RESPONSE=$(curl -sL -w "\n%{http_code}" -X POST "$VERCEL_APP_URL/api/reminders/process" \
+          # Validate that API_URL is set
+          if [ -z "$API_URL" ]; then
+            echo "❌ Error: API_URL is not set. Please provide api_url input or set VERCEL_APP_URL secret."
+            exit 1
+          fi
+
+          # Make API call to your app
+          RESPONSE=$(curl -sL -w "\n%{http_code}" -X POST "$API_URL/api/reminders/process" \
             -H "Authorization: Bearer $CRON_SECRET" \
             -H "Content-Type: application/json")
 
@@ -68,4 +80,4 @@ jobs:
           echo "- **Time**: $(date)" >> $GITHUB_STEP_SUMMARY
           echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Workflow**: ${{ github.workflow }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Target URL**: ${{ secrets.VERCEL_APP_URL }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Target URL**: ${{ inputs.api_url || secrets.VERCEL_APP_URL }}" >> $GITHUB_STEP_SUMMARY
