@@ -46,7 +46,6 @@ export default function ReminderDetailPage() {
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
-        <Navbar />
         <LoadingSpinner />
       </div>
     );
@@ -73,36 +72,13 @@ export default function ReminderDetailPage() {
       <Navbar />
       <main className="max-w-6xl mx-auto px-6 py-8">
         {/* Header Section */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <Link
-              href="/reminders"
-              className="text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 19l-7-7 7-7"
-                />
-              </svg>
-            </Link>
-            <h1 className="text-4xl font-bold text-black">
-              {job?.job_title || "Loading..."}
-            </h1>
-          </div>
-          <button
-            onClick={handleAddAssociate}
-            className="px-4 py-2 bg-gradient-to-r from-[#FFBB87] to-[#FE6F00] text-white rounded-lg font-medium inline-flex items-center gap-2 hover:opacity-90 transition-opacity"
+        <div className="flex items-center gap-4 mb-6">
+          <Link
+            href="/reminders"
+            className="text-gray-600 hover:text-gray-900 transition-colors"
           >
             <svg
-              className="w-5 h-5"
+              className="w-6 h-6"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -111,11 +87,13 @@ export default function ReminderDetailPage() {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M12 4v16m8-8H4"
+                d="M15 19l-7-7 7-7"
               />
             </svg>
-            Add Associate
-          </button>
+          </Link>
+          <h1 className="text-4xl font-bold text-black">
+            {job?.job_title || "Loading..."}
+          </h1>
         </div>
 
         {job && (
@@ -133,6 +111,25 @@ export default function ReminderDetailPage() {
                 <h2 className="text-xl font-semibold text-black">
                   Assigned Associates ({assignments.length})
                 </h2>
+                <button
+                  onClick={handleAddAssociate}
+                  className="px-4 py-2 bg-gradient-to-r from-[#FFBB87] to-[#FE6F00] text-white rounded-lg font-medium inline-flex items-center gap-2 hover:opacity-90 transition-opacity"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                  Add Associate
+                </button>
               </div>
               <AssociatesList
                 assignments={assignments}

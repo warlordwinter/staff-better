@@ -23,7 +23,7 @@ We do not collect any additional personal data without your consent.
 ## 2. How We Use Information
 We use this information to:
 
-- Send reminders to associates via SMS  
+- Send reminders to associates via SMS and WhatsApp  
 - Provide and improve our Services  
 - Process payments  
 - Communicate with you about your account  
@@ -39,6 +39,7 @@ We process information based on your instructions and for purposes directly rela
 We share data only with service providers necessary to operate our Services, including:
 
 - **Twilio** (SMS messaging)  
+- **Meta/Facebook** (WhatsApp messaging via Twilio)  
 - **Stripe** (payment processing)  
 - **Mailinator** (email handling/testing)  
 - **Supabase** (data storage and backend)  
@@ -53,14 +54,34 @@ We retain data indefinitely unless you request deletion or we remove it as part 
 ---
 
 ## 6. Security
-We use the security measures provided by our infrastructure providers (Supabase, Twilio, and Next.js) to protect your data.
+We use the security measures provided by our infrastructure providers (Supabase, Twilio, Meta/Facebook, and Next.js) to protect your data.
 
 ---
 
 ## 7. Opt-In & Opt-Out
-All recipients must opt in before receiving messages. Recipients can opt out at any time by replying “STOP” or following instructions provided in the message.
+All recipients must opt in before receiving messages. Recipients can opt out at any time by replying "STOP" or following instructions provided in the message. This applies to both SMS and WhatsApp messages.
 
 ---
 
-## 8. Children’s Privacy
-Our Services are not intended for individuals unde
+## 8. WhatsApp Integration
+When you use our Services to send messages via WhatsApp, your data is processed through Meta's WhatsApp Business Platform (via Twilio). By using WhatsApp messaging features, you acknowledge that:
+
+- Messages sent through WhatsApp are subject to Meta's Privacy Policy and Terms of Service
+- Meta may process your data in accordance with their policies
+- We use WhatsApp solely to deliver messages you request to be sent
+- You can opt out of WhatsApp messages at any time by replying "STOP"
+
+---
+
+## 9. Data Deletion Requests
+You have the right to request deletion of your personal data. Please see our [Data Deletion Policy](/legal/data-deletion) for instructions on how to request data deletion.
+
+---
+
+## 10. Children's Privacy
+Our Services are not intended for individuals under the age of 18. We do not knowingly collect personal information from children.
+
+---
+
+## 11. Contact Us
+If you have questions about this Privacy Policy or our data practices, please contact us at john@staff-better.com.
