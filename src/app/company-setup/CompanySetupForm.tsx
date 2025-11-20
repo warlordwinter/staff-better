@@ -73,7 +73,7 @@ export default function CompanySetupForm({ userEmail }: CompanySetupFormProps) {
       // Mark user as having completed company setup
       await markSetupComplete();
 
-      router.push("/jobs");
+      router.push("/home");
     } catch (error) {
       console.error("Error saving company information:", error);
       setFormError(error instanceof Error ? error.message : "Failed to complete setup. Please try again.");
