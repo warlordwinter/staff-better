@@ -20,7 +20,7 @@ export default function LoginPage() {
         user.user_metadata?.company_setup_completed === true;
 
       if (hasCompletedSetup) {
-        router.push("/jobs");
+        router.push("/home");
       } else {
         router.push("/company-setup");
       }

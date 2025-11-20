@@ -6,7 +6,6 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
   const error = searchParams.get("error");
   const errorDescription = searchParams.get("error_description");
-  const next = searchParams.get("next") ?? "/jobs";
 
   // If there's an error, redirect to error page
   if (error) {
@@ -55,9 +54,9 @@ export async function GET(request: NextRequest) {
         console.log("User needs company setup, redirecting to setup page");
         return NextResponse.redirect(`${origin}/company-setup`);
       } else {
-        // Returning user - redirect to jobs page
-        console.log("Returning user, redirecting to jobs page");
-        return NextResponse.redirect(`${origin}${next}`);
+        // Returning user - redirect to home page (always, ignore next parameter)
+        console.log("Returning user, redirecting to home page");
+        return NextResponse.redirect(`${origin}/home`);
       }
     } else {
       console.error("No session data returned");

@@ -48,12 +48,12 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="w-full px-5 py-3 bg-gradient-to-r from-[#ffb877] to-[#ff8a42]">
-      <div className="flex justify-between items-center">
+    <nav className="w-full px-5 py-3 bg-gradient-to-r from-[#ffb877] to-[#ff8a42] min-h-[72px] flex-shrink-0 overflow-hidden">
+      <div className="flex justify-between items-center w-full">
         {/* Logo + Brand */}
-        <Link href="/home" className="flex items-center gap-5 cursor-pointer">
+        <Link href="/home" className="flex items-center gap-5 cursor-pointer flex-shrink-0">
           <Image height={50} width={50} alt="Logo" src="/icons/logo.svg" />
-          <span className="text-white text-2xl sm:text-3xl font-bold font-inter">
+          <span className="text-white text-2xl sm:text-3xl font-bold font-inter whitespace-nowrap">
             Staff Better
           </span>
         </Link>
@@ -88,7 +88,7 @@ const Navbar = () => {
         </button>
 
         {/* Desktop Nav */}
-        <div className="hidden sm:flex items-center gap-6">
+        <div className="hidden sm:flex items-center gap-6 flex-shrink-0 min-w-0">
           {isLoggedIn ? (
             <>
               <Link

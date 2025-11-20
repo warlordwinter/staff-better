@@ -11,7 +11,10 @@ import { JobWithCount } from "@/hooks/useRemindersPage";
 import { formatDateTime } from "@/utils/dateUtils";
 import { getStatus } from "@/utils/statusUtils";
 import { formatReminderSendTimes } from "@/utils/reminderUtils";
-import { convertLocalTimeToUTC, convertUTCTimeToLocal } from "@/utils/timezoneUtils";
+import {
+  convertLocalTimeToUTC,
+  convertUTCTimeToLocal,
+} from "@/utils/timezoneUtils";
 
 interface RemindersPageViewProps {
   // Auth state
@@ -100,10 +103,13 @@ export default function RemindersPageView({
     setEditJobTitle(job.job_title || "");
     setEditCustomerName(job.customer_name || "");
     setEditStartDate(job.start_date || "");
-    
+
     // Convert UTC time to local for editing
     if (job.start_time) {
-      const localTime = convertUTCTimeToLocal(job.start_time, job.start_date || "");
+      const localTime = convertUTCTimeToLocal(
+        job.start_time,
+        job.start_date || ""
+      );
       setEditStartTime(localTime);
     } else {
       setEditStartTime("");
@@ -123,7 +129,7 @@ export default function RemindersPageView({
   const handleSaveEdit = async (job: JobWithCount, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (!editJobTitle.trim()) return;
 
     try {
@@ -188,7 +194,7 @@ export default function RemindersPageView({
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
+    <div className="min-h-screen flex flex-col bg-white overflow-hidden">
       <Navbar />
       <main className="flex-1 w-full max-w-7xl mx-auto px-6 py-8 mt-24">
         {/* Header Section */}
@@ -393,7 +399,10 @@ export default function RemindersPageView({
                 className="relative bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col"
                 onClick={(e) => {
                   // Only navigate if not editing and not clicking on buttons
-                  if (!isEditing && !(e.target as HTMLElement).closest('button')) {
+                  if (
+                    !isEditing &&
+                    !(e.target as HTMLElement).closest("button")
+                  ) {
                     window.location.href = `/reminders/${job.id}/associates`;
                   }
                 }}
@@ -507,7 +516,10 @@ export default function RemindersPageView({
                           />
                         </svg>
                         <span className="text-sm text-gray-600">
-                          {formatReminderSendTimes(job.start_date || null, job.start_time || null)}
+                          {formatReminderSendTimes(
+                            job.start_date || null,
+                            job.start_time || null
+                          )}
                         </span>
                       </div>
                     )}

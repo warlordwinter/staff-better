@@ -9,8 +9,8 @@ export default function Jobs() {
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
-      // Redirect to reminders page
-      window.location.href = "/reminders";
+      // Redirect to home page
+      window.location.href = "/home";
     }
   }, [authLoading, isAuthenticated]);
 
