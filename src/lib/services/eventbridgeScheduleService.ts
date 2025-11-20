@@ -6,6 +6,7 @@ import {
 } from "@aws-sdk/client-scheduler";
 import { IEventBridgeScheduleService } from "./interfaces/IEventBridgeScheduleService";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createHash } from "crypto";
 
 /**
  * EventBridge Schedule Service
@@ -22,7 +23,6 @@ export class EventBridgeScheduleService implements IEventBridgeScheduleService {
     const region = process.env.AWS_REGION || "us-east-1";
     this.schedulerClient = new SchedulerClient({ region });
 
-    // These should be set via environment variables or CloudFormation outputs
     this.lambdaArn = process.env.EVENTBRIDGE_LAMBDA_ARN || "";
     this.eventBridgeRoleArn = process.env.EVENTBRIDGE_ROLE_ARN || "";
     this.scheduleGroupName =
@@ -36,8 +36,29 @@ export class EventBridgeScheduleService implements IEventBridgeScheduleService {
   }
 
   /**
+   * Normalize startTime for DB queries (HH:MM:SS)
+   */
+  private normalizeStartTime(startTime: string) {
+    // Accepts HH:MM:SS or ISO string, returns HH:MM:SS
+    if (startTime.includes("T")) {
+      return startTime.split("T")[1].replace("Z", "");
+    }
+    return startTime;
+  }
+
+  /**
+   * Normalize workDate for DB queries (YYYY-MM-DD)
+   */
+  private normalizeWorkDate(workDate: string): string {
+    // Accepts YYYY-MM-DD or ISO string, returns YYYY-MM-DD
+    if (workDate.includes("T")) {
+      return workDate.split("T")[0];
+    }
+    return workDate;
+  }
+
+  /**
    * Create reminder schedules for a job assignment
-   * Only creates schedules that don't already exist (deduplication)
    */
   async createReminderSchedules(
     jobId: string,
@@ -46,92 +67,118 @@ export class EventBridgeScheduleService implements IEventBridgeScheduleService {
     maxNumReminders: number
   ): Promise<string[]> {
     const createdArns: string[] = [];
+    const normalizedWorkDate = this.normalizeWorkDate(workDate);
+    const normalizedStartTime = this.normalizeStartTime(startTime);
 
-    // Always create DAY_BEFORE schedule (7 PM the day before)
     const dayBeforeArn = await this.createScheduleIfNotExists(
       jobId,
-      workDate,
-      startTime,
+      normalizedWorkDate,
+      normalizedStartTime,
       "DAY_BEFORE"
     );
-    if (dayBeforeArn) {
-      createdArns.push(dayBeforeArn);
-    }
+    if (dayBeforeArn) createdArns.push(dayBeforeArn);
 
-    // Always create TWO_HOURS_BEFORE schedule (start_time - 2 hours)
     const twoHoursBeforeArn = await this.createScheduleIfNotExists(
       jobId,
-      workDate,
-      startTime,
+      normalizedWorkDate,
+      normalizedStartTime,
       "TWO_HOURS_BEFORE"
     );
-    if (twoHoursBeforeArn) {
-      createdArns.push(twoHoursBeforeArn);
-    }
+    if (twoHoursBeforeArn) createdArns.push(twoHoursBeforeArn);
 
     return createdArns;
   }
 
-  /**
-   * Create a schedule if it doesn't already exist
-   * Returns the ARN if created, null if it already exists
-   */
   private async createScheduleIfNotExists(
     jobId: string,
     workDate: string,
     startTime: string,
     reminderType: "DAY_BEFORE" | "TWO_HOURS_BEFORE"
   ): Promise<string | null> {
-    // Check if schedule already exists in database
     const supabase = createAdminClient();
+    const normalizedWorkDate = this.normalizeWorkDate(workDate);
+    const normalizedStartTime = this.normalizeStartTime(startTime);
+
+    // Check if schedule exists in DB
     const { data: existing } = await supabase
       .from("reminder_schedules")
       .select("schedule_arn")
       .eq("job_id", jobId)
-      .eq("work_date", workDate)
-      .eq("start_time", startTime)
+      .eq("work_date", normalizedWorkDate)
+      .eq("start_time", normalizedStartTime)
       .eq("reminder_type", reminderType)
       .single();
 
-    if (existing?.schedule_arn) {
-      console.log(
-        `Schedule already exists for ${jobId}/${workDate}/${startTime}/${reminderType}: ${existing.schedule_arn}`
-      );
-      return existing.schedule_arn;
+    if (existing?.schedule_arn) return existing.schedule_arn;
+
+    let scheduledTime = this.calculateScheduledTime(
+      normalizedWorkDate,
+      normalizedStartTime,
+      reminderType
+    );
+
+    // Round seconds to 00 for EventBridge compatibility
+    scheduledTime.setUTCSeconds(0, 0);
+
+    // Add 2-minute buffer to ensure EventBridge doesn't see it as "past"
+    const now = new Date();
+    const bufferMs = 2 * 60 * 1000; // 2 minutes
+    const minScheduledTime = new Date(now.getTime() + bufferMs);
+
+    // If the calculated time is too soon, adjust it to be at least 2 minutes in the future
+    if (scheduledTime.getTime() <= minScheduledTime.getTime()) {
+      scheduledTime = new Date(minScheduledTime);
+      scheduledTime.setUTCSeconds(0, 0);
     }
 
-    // Calculate scheduled time
-    const scheduledTime = this.calculateScheduledTime(
-      workDate,
-      startTime,
-      reminderType
-    );
+    // Final check - if still in the past after adjustment, skip
+    if (scheduledTime.getTime() <= now.getTime() + bufferMs) {
+      console.warn(
+        `Skipping schedule creation for ${reminderType} reminder: scheduled time ${scheduledTime.toISOString()} is in the past or too soon (current time: ${now.toISOString()})`
+      );
+      return null;
+    }
 
-    // Generate schedule name (sanitized)
     const scheduleName = this.generateScheduleName(
       jobId,
-      workDate,
-      startTime,
+      normalizedWorkDate,
+      normalizedStartTime,
       reminderType
     );
-
-    // Create payload for Lambda
     const payload = {
       job_id: jobId,
-      work_date: workDate,
-      start_time: startTime,
+      work_date: normalizedWorkDate,
+      start_time: normalizedStartTime,
       reminder_type: reminderType,
     };
 
+    // Format for EventBridge: at() expression requires format: at(yyyy-mm-ddThh:mm:ss)
+    // EventBridge assumes UTC by default, so we don't include the Z suffix
+    // Remove milliseconds and Z timezone indicator
+    const isoString = scheduledTime.toISOString().replace(/\.\d{3}Z$/, "");
+    const scheduleExpression = `at(${isoString})`;
+
+    // Log the exact expression being sent for debugging
+    console.log("Creating schedule with payload:", {
+      Name: scheduleName,
+      GroupName: this.scheduleGroupName,
+      ScheduleExpression: scheduleExpression,
+      LambdaArn: this.lambdaArn,
+      RoleArn: this.eventBridgeRoleArn,
+      Description: `Reminder schedule for job ${jobId}, ${reminderType}`,
+      Payload: payload,
+      ScheduledTimeISO: isoString,
+      ScheduledTimeUTC: scheduledTime.toISOString(),
+      CurrentTimeUTC: now.toISOString(),
+      TimeDifferenceMs: scheduledTime.getTime() - now.getTime(),
+    });
+
     try {
-      // Create schedule in EventBridge
       const command = new CreateScheduleCommand({
         Name: scheduleName,
         GroupName: this.scheduleGroupName,
-        ScheduleExpression: `at(${scheduledTime.toISOString()})`,
-        FlexibleTimeWindow: {
-          Mode: "OFF", // Exact time execution
-        },
+        ScheduleExpression: scheduleExpression,
+        FlexibleTimeWindow: { Mode: "OFF" },
         Target: {
           Arn: this.lambdaArn,
           RoleArn: this.eventBridgeRoleArn,
@@ -142,26 +189,22 @@ export class EventBridgeScheduleService implements IEventBridgeScheduleService {
 
       const response = await this.schedulerClient.send(command);
       const scheduleArn = response.ScheduleArn;
-
-      if (!scheduleArn) {
+      if (!scheduleArn)
         throw new Error("Failed to get schedule ARN from EventBridge response");
-      }
 
-      // Store schedule ARN in database
       const { error: insertError } = await supabase
         .from("reminder_schedules")
         .insert({
           job_id: jobId,
-          work_date: workDate,
-          start_time: startTime,
+          work_date: normalizedWorkDate,
+          start_time: normalizedStartTime,
           reminder_type: reminderType,
           schedule_arn: scheduleArn,
           scheduled_time: scheduledTime.toISOString(),
         });
 
       if (insertError) {
-        console.error("Error storing schedule ARN in database:", insertError);
-        // Try to delete the schedule from EventBridge
+        console.error("Error storing schedule ARN in DB:", insertError);
         try {
           await this.schedulerClient.send(
             new DeleteScheduleCommand({
@@ -178,28 +221,36 @@ export class EventBridgeScheduleService implements IEventBridgeScheduleService {
       console.log(`Created schedule ${scheduleName} with ARN ${scheduleArn}`);
       return scheduleArn;
     } catch (error: any) {
-      // If schedule already exists in EventBridge (but not in our DB), try to get it
+      if (
+        error.name === "ValidationException" ||
+        (error.message &&
+          typeof error.message === "string" &&
+          (error.message.includes("Invalid Schedule Expression") ||
+            error.message.includes("past")))
+      ) {
+        console.warn(
+          `Skipping schedule creation for ${reminderType}: ${error.message}`
+        );
+        return null;
+      }
+
       if (
         error.name === "ConflictException" ||
         error.name === "ResourceAlreadyExistsException"
       ) {
-        console.log(
-          `Schedule ${scheduleName} already exists in EventBridge, fetching ARN`
-        );
         try {
-          const getCommand = new GetScheduleCommand({
-            Name: scheduleName,
-            GroupName: this.scheduleGroupName,
-          });
-          const getResponse = await this.schedulerClient.send(getCommand);
+          const getResponse = await this.schedulerClient.send(
+            new GetScheduleCommand({
+              Name: scheduleName,
+              GroupName: this.scheduleGroupName,
+            })
+          );
           const existingArn = getResponse.Arn;
-
           if (existingArn) {
-            // Store in database
             await supabase.from("reminder_schedules").insert({
               job_id: jobId,
-              work_date: workDate,
-              start_time: startTime,
+              work_date: normalizedWorkDate,
+              start_time: normalizedStartTime,
               reminder_type: reminderType,
               schedule_arn: existingArn,
               scheduled_time: scheduledTime.toISOString(),
@@ -216,111 +267,98 @@ export class EventBridgeScheduleService implements IEventBridgeScheduleService {
     }
   }
 
-  /**
-   * Calculate the scheduled time for a reminder
-   */
   private calculateScheduledTime(
     workDate: string,
     startTime: string,
     reminderType: "DAY_BEFORE" | "TWO_HOURS_BEFORE"
   ): Date {
-    const workDateObj = new Date(workDate + "T00:00:00Z");
+    // Ensure workDate is in YYYY-MM-DD format (extract date portion if it's a full timestamp)
+    const dateOnly = workDate.split("T")[0];
+    const workDateObj = new Date(dateOnly + "T00:00:00Z");
 
     if (reminderType === "DAY_BEFORE") {
-      // 7 PM (19:00) the day before work_date
+      // 7 PM (19:00) UTC the day before work_date
       const dayBefore = new Date(workDateObj);
       dayBefore.setUTCDate(dayBefore.getUTCDate() - 1);
-      dayBefore.setUTCHours(19, 0, 0, 0);
+      dayBefore.setUTCHours(19, 0, 0, 0); // Set hours, minutes, seconds, milliseconds
       return dayBefore;
-    } else {
-      // TWO_HOURS_BEFORE: start_time - 2 hours on work_date
-      const [hours, minutes, seconds] = startTime.split(":").map(Number);
-      const jobStartTime = new Date(workDateObj);
-      jobStartTime.setUTCHours(hours, minutes || 0, seconds || 0, 0);
-
-      const twoHoursBefore = new Date(jobStartTime);
-      twoHoursBefore.setUTCHours(twoHoursBefore.getUTCHours() - 2);
-
-      return twoHoursBefore;
     }
+
+    // TWO_HOURS_BEFORE: start_time - 2 hours on work_date
+    const [hours, minutes, seconds] = startTime.split(":").map(Number);
+    const jobStartTime = new Date(workDateObj);
+    jobStartTime.setUTCHours(hours, minutes || 0, seconds || 0, 0);
+    const twoHoursBefore = new Date(jobStartTime);
+    twoHoursBefore.setUTCHours(twoHoursBefore.getUTCHours() - 2);
+    return twoHoursBefore;
   }
 
-  /**
-   * Generate a sanitized schedule name
-   */
   private generateScheduleName(
     jobId: string,
     workDate: string,
     startTime: string,
     reminderType: string
   ): string {
-    // EventBridge schedule names must be alphanumeric, hyphens, and underscores
-    // Max 64 characters
-    const sanitized = `${jobId}-${workDate}-${startTime}-${reminderType}`
-      .replace(/[^a-zA-Z0-9-_]/g, "-")
-      .substring(0, 64);
-    return `reminder-${sanitized}`;
+    const prefix = "reminder-";
+    const maxHashLength = 64 - prefix.length;
+    const uniqueString = `${jobId}-${workDate}-${startTime}-${reminderType}`;
+    const hash = createHash("sha256")
+      .update(uniqueString)
+      .digest("hex")
+      .substring(0, maxHashLength);
+    return `${prefix}${hash}`;
   }
 
-  /**
-   * Delete reminder schedules for a job/date/time combination
-   * Only deletes if no other assignments exist for the same combination
-   */
   async deleteReminderSchedules(
     jobId: string,
     workDate: string,
     startTime: string
   ): Promise<void> {
-    // Check if other assignments exist for the same job/date/time
     const supabase = createAdminClient();
+    const normalizedWorkDate = this.normalizeWorkDate(workDate);
+    const normalizedStartTime = this.normalizeStartTime(startTime);
+
+    // For job_assignments, start_time is TIMESTAMPTZ, so we need to construct a full timestamp
+    // Use normalized values to ensure consistency
+    const timestampForJobAssignments = new Date(
+      `${normalizedWorkDate}T${normalizedStartTime}Z`
+    ).toISOString();
+
+    // Query job_assignments using the normalized work_date (YYYY-MM-DD) and constructed timestamp
+    // Note: work_date in job_assignments might be stored as DATE or TIMESTAMPTZ, so we use a range query
+    const startOfDay = `${normalizedWorkDate}T00:00:00.000Z`;
+    const endOfDay = `${normalizedWorkDate}T23:59:59.999Z`;
+
     const { data: otherAssignments, error: checkError } = await supabase
       .from("job_assignments")
-      .select("id")
+      .select("job_id")
       .eq("job_id", jobId)
-      .eq("work_date", workDate)
-      .eq("start_time", startTime)
+      .gte("work_date", startOfDay)
+      .lte("work_date", endOfDay)
+      .eq("start_time", timestampForJobAssignments)
       .limit(1);
 
-    if (checkError) {
-      console.error("Error checking for other assignments:", checkError);
-      throw checkError;
-    }
+    if (checkError) throw checkError;
+    if (otherAssignments && otherAssignments.length > 0) return;
 
-    // If other assignments exist, don't delete schedules
-    if (otherAssignments && otherAssignments.length > 0) {
-      console.log(
-        `Other assignments exist for ${jobId}/${workDate}/${startTime}, not deleting schedules`
-      );
-      return;
-    }
-
-    // Get all schedules for this job/date/time
+    // Query reminder_schedules using normalized values
     const { data: schedules, error: fetchError } = await supabase
       .from("reminder_schedules")
       .select("schedule_arn, reminder_type")
       .eq("job_id", jobId)
-      .eq("work_date", workDate)
-      .eq("start_time", startTime);
+      .eq("work_date", normalizedWorkDate)
+      .eq("start_time", normalizedStartTime);
 
-    if (fetchError) {
-      console.error("Error fetching schedules:", fetchError);
-      throw fetchError;
-    }
+    if (fetchError) throw fetchError;
+    if (!schedules || schedules.length === 0) return;
 
-    if (!schedules || schedules.length === 0) {
-      console.log(`No schedules found for ${jobId}/${workDate}/${startTime}`);
-      return;
-    }
-
-    // Delete each schedule from EventBridge
     for (const schedule of schedules) {
       const scheduleName = this.generateScheduleName(
         jobId,
-        workDate,
-        startTime,
+        normalizedWorkDate,
+        normalizedStartTime,
         schedule.reminder_type
       );
-
       try {
         await this.schedulerClient.send(
           new DeleteScheduleCommand({
@@ -330,34 +368,24 @@ export class EventBridgeScheduleService implements IEventBridgeScheduleService {
         );
         console.log(`Deleted schedule ${scheduleName}`);
       } catch (error: any) {
-        // If schedule doesn't exist, that's okay
-        if (error.name !== "ResourceNotFoundException") {
+        if (error.name !== "ResourceNotFoundException")
           console.error(`Error deleting schedule ${scheduleName}:`, error);
-        }
       }
     }
 
-    // Delete from database
     const { error: deleteError } = await supabase
       .from("reminder_schedules")
       .delete()
       .eq("job_id", jobId)
-      .eq("work_date", workDate)
-      .eq("start_time", startTime);
+      .eq("work_date", normalizedWorkDate)
+      .eq("start_time", normalizedStartTime);
 
-    if (deleteError) {
-      console.error("Error deleting schedules from database:", deleteError);
-      throw deleteError;
-    }
-
+    if (deleteError) throw deleteError;
     console.log(
-      `Deleted ${schedules.length} schedules for ${jobId}/${workDate}/${startTime}`
+      `Deleted ${schedules.length} schedules for ${jobId}/${normalizedWorkDate}/${normalizedStartTime}`
     );
   }
 
-  /**
-   * Update reminder schedules when work_date or start_time changes
-   */
   async updateReminderSchedules(
     jobId: string,
     oldWorkDate: string,
@@ -366,15 +394,24 @@ export class EventBridgeScheduleService implements IEventBridgeScheduleService {
     newStartTime: string,
     maxNumReminders: number
   ): Promise<string[]> {
-    // Delete old schedules
-    await this.deleteReminderSchedules(jobId, oldWorkDate, oldStartTime);
+    // Normalize all values to ensure consistency
+    const normalizedOldWorkDate = this.normalizeWorkDate(oldWorkDate);
+    const normalizedOldStartTime = this.normalizeStartTime(oldStartTime);
+    const normalizedNewWorkDate = this.normalizeWorkDate(newWorkDate);
+    const normalizedNewStartTime = this.normalizeStartTime(newStartTime);
 
-    // Create new schedules
-    return await this.createReminderSchedules(
+    // Create new schedules first, then delete old ones
+    const newSchedules = await this.createReminderSchedules(
       jobId,
-      newWorkDate,
-      newStartTime,
+      normalizedNewWorkDate,
+      normalizedNewStartTime,
       maxNumReminders
     );
+    await this.deleteReminderSchedules(
+      jobId,
+      normalizedOldWorkDate,
+      normalizedOldStartTime
+    );
+    return newSchedules;
   }
 }

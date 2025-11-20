@@ -36,11 +36,11 @@ exports.handler = async (event) => {
   let payload;
   try {
     // EventBridge passes the payload in event.body as a string
-    payload =
-      typeof event.body === "string" ? JSON.parse(event.body) : event.body;
-
-    // If body is not present, check if event itself is the payload
-    if (!payload.job_id && event.job_id) {
+    if (event.body) {
+      payload =
+        typeof event.body === "string" ? JSON.parse(event.body) : event.body;
+    } else {
+      // If body is not present, event itself is the payload (AWS Console test)
       payload = event;
     }
   } catch (error) {
@@ -73,6 +73,23 @@ exports.handler = async (event) => {
     };
   }
 
+  // Normalize start_time to full timestamp format
+  // Database expects timestamp with time zone, so combine work_date and start_time
+  let normalizedStartTime = start_time;
+  if (start_time && !start_time.includes("T")) {
+    // If it's just a time string (e.g., "09:00:00"), combine with work_date
+    const datePart = work_date.split("T")[0]; // Extract date portion if it's a full timestamp
+    // Ensure time has seconds if missing (HH:MM -> HH:MM:00)
+    let timePart = start_time;
+    if (timePart.split(":").length === 2) {
+      timePart = `${timePart}:00`;
+    }
+    normalizedStartTime = `${datePart}T${timePart}Z`;
+    console.log(
+      `Normalized start_time: "${start_time}" -> "${normalizedStartTime}"`
+    );
+  }
+
   // Initialize clients
   const twilioClient = twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH);
   const supabase = createClient(
@@ -90,7 +107,7 @@ exports.handler = async (event) => {
   try {
     // Query database for all assignments matching job_id, work_date, start_time
     console.log(
-      `Querying assignments for job_id=${job_id}, work_date=${work_date}, start_time=${start_time}`
+      `Querying assignments for job_id=${job_id}, work_date=${work_date}, start_time=${normalizedStartTime}`
     );
 
     const { data: assignments, error: queryError } = await supabase
@@ -117,7 +134,7 @@ exports.handler = async (event) => {
       )
       .eq("job_id", job_id)
       .eq("work_date", work_date)
-      .eq("start_time", start_time);
+      .eq("start_time", normalizedStartTime);
 
     if (queryError) {
       throw new Error(`Database query error: ${queryError.message}`);

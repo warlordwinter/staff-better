@@ -31,12 +31,12 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
    */
   private extractTimeFromTimestamp(timestamp: string): string {
     if (!timestamp) return "";
-    
+
     // If it's already in HH:MM:SS format, return as is
     if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(timestamp)) {
       return timestamp.length === 5 ? `${timestamp}:00` : timestamp;
     }
-    
+
     // Try to parse as Date and extract time
     const date = new Date(timestamp);
     if (!isNaN(date.getTime())) {
@@ -45,13 +45,13 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
       const seconds = date.getUTCSeconds().toString().padStart(2, "0");
       return `${hours}:${minutes}:${seconds}`;
     }
-    
+
     // If parsing fails, try to extract time from string
     const timeMatch = timestamp.match(/(\d{1,2}):(\d{2})(:(\d{2}))?/);
     if (timeMatch) {
       return timeMatch[0];
     }
-    
+
     return timestamp;
   }
   async insertJobsAssignments(
@@ -86,13 +86,6 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
           );
           return false; // Skip this assignment
         }
-        // Validate allowed time window 08:00-23:00 if present
-        if (!this.isWithinAllowedHours(assignment.start_time)) {
-          console.warn(
-            `start_time must be between 08:00 and 23:00 - skipping assignment (start_time=${assignment.start_time})`
-          );
-          return false;
-        }
         return true;
       })
       .map((assignment) => {
@@ -121,13 +114,6 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
             } else {
               formattedStartTime = date.toISOString();
             }
-          }
-          // Final allowed-hours check after formatting
-          if (!this.isWithinAllowedHours(formattedStartTime)) {
-            console.warn(
-              `start_time must be between 08:00 and 23:00 - setting to null (start_time=${formattedStartTime})`
-            );
-            formattedStartTime = null;
           }
         }
 
@@ -263,12 +249,13 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
       // Check if it's a time value (like "14:00") and format it properly
       if (/^\d{1,2}:\d{2}$/.test(formattedStartTime.trim())) {
         // If it's just a time, we need to combine it with a date
-        // For now, we'll use today's date as the base
-        const today = new Date();
-        const dateStr = today.toISOString().split("T")[0];
-        formattedStartTime = `${dateStr} ${formattedStartTime}:00`;
+        // Use work_date if available, otherwise use today's date
+        const dateToUse = assignmentData.work_date
+          ? assignmentData.work_date.split("T")[0] // Extract date portion if it's a full timestamp
+          : new Date().toISOString().split("T")[0];
+        formattedStartTime = `${dateToUse} ${formattedStartTime}:00`;
         console.log(
-          `Formatted start_time: "${assignmentData.start_time}" -> "${formattedStartTime}"`
+          `Formatted start_time: "${assignmentData.start_time}" -> "${formattedStartTime}" (using date: ${dateToUse})`
         );
       } else {
         // Try to parse as a full timestamp
@@ -282,13 +269,6 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
           formattedStartTime = date.toISOString();
         }
       }
-    }
-
-    // Enforce allowed hours (only if start_time is provided)
-    if (formattedStartTime && !this.isWithinAllowedHours(formattedStartTime)) {
-      throw new Error(
-        `start_time must be between 08:00 and 23:00 (got ${formattedStartTime})`
-      );
     }
 
     // Validate and format the work_date field
@@ -352,16 +332,22 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
         const eventBridgeService = new (
           await import("@/lib/services/eventbridgeScheduleService")
         ).EventBridgeScheduleService();
-        
-        await eventBridgeService.createReminderSchedules(
+
+        const createdArns = await eventBridgeService.createReminderSchedules(
           jobId,
           formattedWorkDate,
           timePortion,
           insertData.num_reminders || 2
         );
-        console.log(
-          `Created EventBridge schedules for job ${jobId}, date ${formattedWorkDate}, time ${timePortion}`
-        );
+        if (createdArns.length > 0) {
+          console.log(
+            `Created ${createdArns.length} EventBridge schedule(s) for job ${jobId}, date ${formattedWorkDate}, time ${timePortion}`
+          );
+        } else {
+          console.log(
+            `No EventBridge schedules created for job ${jobId}, date ${formattedWorkDate}, time ${timePortion} (all reminders were in the past or already exist)`
+          );
+        }
       } catch (scheduleError) {
         // Log error but don't fail the assignment creation
         console.error(
@@ -437,9 +423,12 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
         // Check if it's a time value (like "14:00") and format it properly
         if (/^\d{1,2}:\d{2}$/.test(formattedStartTime.trim())) {
           // If it's just a time, we need to combine it with a date
-          // Use the work_date if available, otherwise use today's date
+          // Use the work_date if available (extract date portion if it's a full timestamp), otherwise use today's date
           const workDate =
-            cleanedUpdates.work_date || new Date().toISOString().split("T")[0];
+            cleanedUpdates.work_date &&
+            typeof cleanedUpdates.work_date === "string"
+              ? cleanedUpdates.work_date.split("T")[0] // Extract date portion if it's a full timestamp
+              : oldWorkDate || new Date().toISOString().split("T")[0];
           formattedStartTime = `${workDate} ${formattedStartTime}:00`;
           console.log(
             `Formatted start_time: "${cleanedUpdates.start_time}" -> "${formattedStartTime}" (using work_date: ${workDate})`
@@ -459,12 +448,6 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
             // Assign the formatted time back to cleanedUpdates
             cleanedUpdates.start_time = formattedStartTime;
           }
-        }
-        // Enforce allowed hours on update
-        if (!this.isWithinAllowedHours(cleanedUpdates.start_time as string)) {
-          throw new Error(
-            `start_time must be between 08:00 and 23:00 (got ${cleanedUpdates.start_time})`
-          );
         }
       }
     }
@@ -530,14 +513,45 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
       ? this.extractTimeFromTimestamp(cleanedUpdates.start_time as string)
       : oldStartTime;
 
-    if (
-      (cleanedUpdates.work_date || cleanedUpdates.start_time) &&
-      oldWorkDate &&
-      oldStartTime &&
-      newWorkDate &&
-      newStartTime &&
-      (oldWorkDate !== newWorkDate || oldStartTime !== newStartTime)
-    ) {
+    // Determine if we need to create, update, or delete schedules
+    const hasOldValues = oldWorkDate && oldStartTime;
+    const hasNewValues = newWorkDate && newStartTime;
+    const valuesChanged =
+      hasOldValues &&
+      hasNewValues &&
+      (oldWorkDate !== newWorkDate || oldStartTime !== newStartTime);
+
+    if (hasNewValues && !hasOldValues) {
+      // Case 1: Creating schedules for the first time (assignment didn't have work_date/start_time before)
+      try {
+        const eventBridgeService = new (
+          await import("@/lib/services/eventbridgeScheduleService")
+        ).EventBridgeScheduleService();
+
+        const createdArns = await eventBridgeService.createReminderSchedules(
+          jobId,
+          newWorkDate,
+          newStartTime,
+          currentAssignment?.num_reminders || 2
+        );
+        if (createdArns.length > 0) {
+          console.log(
+            `Created ${createdArns.length} EventBridge schedule(s) for job ${jobId}, date ${newWorkDate}, time ${newStartTime}`
+          );
+        } else {
+          console.log(
+            `No EventBridge schedules created for job ${jobId}, date ${newWorkDate}, time ${newStartTime} (all reminders were in the past or already exist)`
+          );
+        }
+      } catch (scheduleError) {
+        // Log error but don't fail the assignment update
+        console.error(
+          "Error creating EventBridge schedules (assignment still updated):",
+          scheduleError
+        );
+      }
+    } else if (valuesChanged) {
+      // Case 2: Updating existing schedules (both old and new values exist and are different)
       try {
         const eventBridgeService = new (
           await import("@/lib/services/eventbridgeScheduleService")
@@ -545,8 +559,8 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
 
         await eventBridgeService.updateReminderSchedules(
           jobId,
-          oldWorkDate,
-          oldStartTime,
+          oldWorkDate!,
+          oldStartTime!,
           newWorkDate,
           newStartTime,
           currentAssignment?.num_reminders || 2
@@ -558,6 +572,28 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
         // Log error but don't fail the assignment update
         console.error(
           "Error updating EventBridge schedules (assignment still updated):",
+          scheduleError
+        );
+      }
+    } else if (hasOldValues && !hasNewValues) {
+      // Case 3: Deleting schedules (old values existed but new values don't)
+      try {
+        const eventBridgeService = new (
+          await import("@/lib/services/eventbridgeScheduleService")
+        ).EventBridgeScheduleService();
+
+        await eventBridgeService.deleteReminderSchedules(
+          jobId,
+          oldWorkDate!,
+          oldStartTime!
+        );
+        console.log(
+          `Deleted EventBridge schedules for job ${jobId}, date ${oldWorkDate}, time ${oldStartTime}`
+        );
+      } catch (scheduleError) {
+        // Log error but don't fail the assignment update
+        console.error(
+          "Error deleting EventBridge schedules (assignment still updated):",
           scheduleError
         );
       }
