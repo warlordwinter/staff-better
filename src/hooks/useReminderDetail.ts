@@ -20,6 +20,8 @@ export function useReminderDetail(reminderId: string) {
   const [editCustomerName, setEditCustomerName] = useState("");
   const [editStartDate, setEditStartDate] = useState("");
   const [editStartTime, setEditStartTime] = useState("");
+  const [editNightBeforeTime, setEditNightBeforeTime] = useState("19:00");
+  const [editDayOfTime, setEditDayOfTime] = useState("06:00");
   const [processingReminders, setProcessingReminders] = useState(false);
   const [reminderStatus, setReminderStatus] = useState<ReminderStatus | null>(
     null
@@ -161,6 +163,21 @@ export function useReminderDetail(reminderId: string) {
         localTime = convertUTCTimeToLocal(assignments[0].start_time, workDate);
       }
       setEditStartTime(localTime);
+
+      // Set reminder times from job, with defaults
+      if (job.night_before_time) {
+        // Convert from stored format (HH:MM) to local time if needed
+        setEditNightBeforeTime(job.night_before_time);
+      } else {
+        setEditNightBeforeTime("19:00"); // Default 7:00 PM
+      }
+
+      if (job.day_of_time) {
+        setEditDayOfTime(job.day_of_time);
+      } else {
+        setEditDayOfTime("06:00"); // Default 6:00 AM
+      }
+
       setShowEditModal(true);
     }
   };
@@ -184,6 +201,8 @@ export function useReminderDetail(reminderId: string) {
       customer_name: editCustomerName.trim() || "Generic Company Name",
       start_date: workDate,
       start_time: formattedStartTime,
+      night_before_time: editNightBeforeTime || "19:00",
+      day_of_time: editDayOfTime || "06:00",
     };
 
     try {
@@ -273,6 +292,8 @@ export function useReminderDetail(reminderId: string) {
     editCustomerName,
     editStartDate,
     editStartTime,
+    editNightBeforeTime,
+    editDayOfTime,
     processingReminders,
     reminderStatus,
     showAddModal,
@@ -281,6 +302,8 @@ export function useReminderDetail(reminderId: string) {
     setEditCustomerName,
     setEditStartDate,
     setEditStartTime,
+    setEditNightBeforeTime,
+    setEditDayOfTime,
     setShowEditModal,
     setShowAddModal,
     setReminderStatus,

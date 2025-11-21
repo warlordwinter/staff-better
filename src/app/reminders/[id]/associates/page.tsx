@@ -26,11 +26,15 @@ export default function ReminderDetailPage() {
     editCustomerName,
     editStartDate,
     editStartTime,
+    editNightBeforeTime,
+    editDayOfTime,
     reminderStatus,
     setEditJobTitle,
     setEditCustomerName,
     setEditStartDate,
     setEditStartTime,
+    setEditNightBeforeTime,
+    setEditDayOfTime,
     setShowEditModal,
     setReminderStatus,
     handleDeleteAssociate,
@@ -147,10 +151,14 @@ export default function ReminderDetailPage() {
         customerName={editCustomerName}
         startDate={editStartDate}
         startTime={editStartTime}
+        nightBeforeTime={editNightBeforeTime}
+        dayOfTime={editDayOfTime}
         onJobTitleChange={setEditJobTitle}
         onCustomerNameChange={setEditCustomerName}
         onStartDateChange={setEditStartDate}
         onStartTimeChange={setEditStartTime}
+        onNightBeforeTimeChange={setEditNightBeforeTime}
+        onDayOfTimeChange={setEditDayOfTime}
         onSave={handleUpdateReminder}
         onCancel={() => {
           setShowEditModal(false);
@@ -158,6 +166,8 @@ export default function ReminderDetailPage() {
           setEditCustomerName("");
           setEditStartDate("");
           setEditStartTime("");
+          setEditNightBeforeTime("19:00");
+          setEditDayOfTime("06:00");
         }}
       />
 

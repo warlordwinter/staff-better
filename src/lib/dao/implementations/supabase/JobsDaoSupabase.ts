@@ -103,11 +103,13 @@ export class JobsDaoSupabase implements IJobs {
       start_time?: string | null;
       job_status: string;
       customer_name: string;
+      night_before_time?: string | null;
+      day_of_time?: string | null;
     }>
   ) {
     const supabase = await createClient();
 
-    // Prepare updates - conditionally include start_time
+    // Prepare updates - conditionally include optional fields
     const updatesToApply: any = { ...updates };
 
     // Only include start_time if it has a value
@@ -124,6 +126,33 @@ export class JobsDaoSupabase implements IJobs {
       }
     }
 
+    // Handle night_before_time (store as TIME format, e.g., "19:00")
+    if (updates.night_before_time !== undefined) {
+      if (
+        updates.night_before_time !== null &&
+        updates.night_before_time.trim() !== ""
+      ) {
+        updatesToApply.night_before_time = updates.night_before_time;
+        console.log(
+          `Including night_before_time in job update: ${updates.night_before_time}`
+        );
+      } else {
+        delete updatesToApply.night_before_time;
+      }
+    }
+
+    // Handle day_of_time (store as TIME format, e.g., "06:00")
+    if (updates.day_of_time !== undefined) {
+      if (updates.day_of_time !== null && updates.day_of_time.trim() !== "") {
+        updatesToApply.day_of_time = updates.day_of_time;
+        console.log(
+          `Including day_of_time in job update: ${updates.day_of_time}`
+        );
+      } else {
+        delete updatesToApply.day_of_time;
+      }
+    }
+
     console.log(
       "Job updates to apply:",
       JSON.stringify(updatesToApply, null, 2)
@@ -136,32 +165,66 @@ export class JobsDaoSupabase implements IJobs {
       .select();
 
     if (error) {
-      const hasStartTime = updatesToApply.start_time !== undefined;
       const errorMessage = error.message || JSON.stringify(error);
       const errorCode = error.code || "";
 
       console.error("Update error:", {
         errorMessage,
         errorCode,
-        hasStartTime,
         errorDetails: error,
       });
 
-      // If we're trying to update start_time and get a column error, it's likely the column doesn't exist
+      // Check for missing column errors
+      const missingColumns: string[] = [];
+
       if (
-        hasStartTime &&
-        (errorMessage.includes("column") ||
+        updatesToApply.start_time !== undefined &&
+        (errorMessage.includes("start_time") ||
+          errorMessage.includes("column") ||
           errorCode === "42703" ||
-          errorMessage.includes("start_time") ||
-          errorMessage.toLowerCase().includes("does not exist"))
+          errorCode === "PGRST204")
       ) {
+        missingColumns.push("start_time");
+      }
+
+      if (
+        updatesToApply.night_before_time !== undefined &&
+        (errorMessage.includes("night_before_time") || errorCode === "PGRST204")
+      ) {
+        missingColumns.push("night_before_time");
+      }
+
+      if (
+        updatesToApply.day_of_time !== undefined &&
+        (errorMessage.includes("day_of_time") || errorCode === "PGRST204")
+      ) {
+        missingColumns.push("day_of_time");
+      }
+
+      if (missingColumns.length > 0) {
+        const sqlStatements = missingColumns
+          .map((col) => {
+            if (col === "start_time") {
+              return "ALTER TABLE jobs ADD COLUMN start_time TIMESTAMPTZ NULL;";
+            } else if (col === "night_before_time") {
+              return "ALTER TABLE jobs ADD COLUMN night_before_time TIME NULL;";
+            } else if (col === "day_of_time") {
+              return "ALTER TABLE jobs ADD COLUMN day_of_time TIME NULL;";
+            }
+            return "";
+          })
+          .filter(Boolean);
+
         console.error(
-          "ERROR: start_time column does not exist in the jobs table. " +
-            "Please add the column with: ALTER TABLE jobs ADD COLUMN start_time TIMESTAMPTZ NULL;"
+          `ERROR: The following columns do not exist in the jobs table: ${missingColumns.join(
+            ", "
+          )}. ` + `Please add them with:\n${sqlStatements.join("\n")}`
         );
         throw new Error(
-          "start_time column not found in database. Please add the column to the jobs table. " +
-            "SQL: ALTER TABLE jobs ADD COLUMN start_time TIMESTAMPTZ NULL;"
+          `Missing columns in database: ${missingColumns.join(", ")}. ` +
+            `Please add the columns to the jobs table. SQL:\n${sqlStatements.join(
+              "\n"
+            )}`
         );
       }
 
