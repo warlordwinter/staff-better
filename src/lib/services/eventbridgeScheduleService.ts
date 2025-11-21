@@ -7,6 +7,7 @@ import {
 import { IEventBridgeScheduleService } from "./interfaces/IEventBridgeScheduleService";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createHash } from "crypto";
+import { addDaysISO, localDateTimeToUTCDate } from "@/utils/timeServer";
 
 /**
  * EventBridge Schedule Service
@@ -179,6 +180,7 @@ export class EventBridgeScheduleService implements IEventBridgeScheduleService {
         GroupName: this.scheduleGroupName,
         ScheduleExpression: scheduleExpression,
         FlexibleTimeWindow: { Mode: "OFF" },
+        ActionAfterCompletion: "DELETE",
         Target: {
           Arn: this.lambdaArn,
           RoleArn: this.eventBridgeRoleArn,
@@ -277,11 +279,8 @@ export class EventBridgeScheduleService implements IEventBridgeScheduleService {
     const workDateObj = new Date(dateOnly + "T00:00:00Z");
 
     if (reminderType === "DAY_BEFORE") {
-      // 7 PM (19:00) UTC the day before work_date
-      const dayBefore = new Date(workDateObj);
-      dayBefore.setUTCDate(dayBefore.getUTCDate() - 1);
-      dayBefore.setUTCHours(19, 0, 0, 0); // Set hours, minutes, seconds, milliseconds
-      return dayBefore;
+      const dayBeforeIso = addDaysISO(workDate, -1);
+      return localDateTimeToUTCDate(dayBeforeIso, "19:00:00");
     }
 
     // TWO_HOURS_BEFORE: start_time - 2 hours on work_date

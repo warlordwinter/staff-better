@@ -1,6 +1,7 @@
 import { createClient } from "../../../supabase/server";
 import { ConfirmationStatus } from "@/model/enums/ConfirmationStatus";
 import { IJobAssignments } from "../../interfaces/IJobAssignments";
+import { localDateTimeToUTCISO } from "@/utils/timeServer";
 
 export class JobsAssignmentsDaoSupabase implements IJobAssignments {
   private extractHour(value: string | null): number | null {
@@ -54,6 +55,76 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
 
     return timestamp;
   }
+
+  private normalizeWorkDateValue(workDate: string | null | undefined) {
+    if (!workDate || !workDate.trim()) return null;
+    const trimmed = workDate.trim();
+    if (/^\d{1,2}:\d{2}$/.test(trimmed)) {
+      console.warn(
+        `work_date contains time-only value "${workDate}", setting to null`
+      );
+      return null;
+    }
+    const parsedDate = new Date(trimmed);
+    if (isNaN(parsedDate.getTime())) {
+      console.warn(`Invalid work_date value "${workDate}", setting to null`);
+      return null;
+    }
+    return parsedDate.toISOString().split("T")[0];
+  }
+
+  private normalizeStartTimeValue(
+    startTime: string | null | undefined,
+    normalizedWorkDate: string | null
+  ): string | null {
+    if (!startTime || (typeof startTime === "string" && !startTime.trim())) {
+      return null;
+    }
+    const trimmed = startTime.trim();
+    const addSeconds = (value: string) =>
+      value.split(":").length === 2 ? `${value}:00` : value;
+
+    const timeOnlyRegex = /^\d{1,2}:\d{2}(?::\d{2})?$/;
+    if (timeOnlyRegex.test(trimmed)) {
+      if (!normalizedWorkDate) {
+        console.warn(
+          `Cannot apply timezone conversion for start_time "${startTime}" without work_date`
+        );
+        return null;
+      }
+      try {
+        return localDateTimeToUTCISO(normalizedWorkDate, addSeconds(trimmed));
+      } catch (error) {
+        console.warn(
+          `Failed to normalize start_time "${startTime}" with work_date "${normalizedWorkDate}":`,
+          error
+        );
+        return null;
+      }
+    }
+
+    const localDateTimeRegex =
+      /^\d{4}-\d{2}-\d{2}[ T]\d{1,2}:\d{2}(?::\d{2})?$/;
+    if (localDateTimeRegex.test(trimmed)) {
+      const [datePartRaw, timePartRaw] = trimmed.replace("T", " ").split(" ");
+      try {
+        return localDateTimeToUTCISO(datePartRaw, addSeconds(timePartRaw));
+      } catch (error) {
+        console.warn(
+          `Failed to normalize start_time "${startTime}" interpreted as local datetime:`,
+          error
+        );
+        return null;
+      }
+    }
+
+    const parsed = new Date(trimmed);
+    if (isNaN(parsed.getTime())) {
+      console.warn(`Invalid start_time value "${startTime}", setting to null`);
+      return null;
+    }
+    return parsed.toISOString();
+  }
   async insertJobsAssignments(
     jobsAssignments: {
       job_id: string;
@@ -89,57 +160,21 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
         return true;
       })
       .map((assignment) => {
-        // Validate and format the start_time field
-        let formattedStartTime = assignment.start_time;
-
-        if (formattedStartTime && formattedStartTime.trim()) {
-          // Check if it's a time value (like "14:00") and format it properly
-          if (/^\d{1,2}:\d{2}$/.test(formattedStartTime.trim())) {
-            // If it's just a time, we need to combine it with a date
-            // For now, we'll use today's date as the base
-            const today = new Date();
-            const dateStr = today.toISOString().split("T")[0];
-            formattedStartTime = `${dateStr} ${formattedStartTime}:00`;
-            console.log(
-              `Formatted start_time: "${assignment.start_time}" -> "${formattedStartTime}"`
-            );
-          } else {
-            // Try to parse as a full timestamp
-            const date = new Date(formattedStartTime);
-            if (isNaN(date.getTime())) {
-              console.warn(
-                `Invalid start_time value "${formattedStartTime}", setting to null`
-              );
-              formattedStartTime = null;
-            } else {
-              formattedStartTime = date.toISOString();
-            }
-          }
+        const formattedWorkDate = this.normalizeWorkDateValue(
+          assignment.work_date
+        );
+        if (!formattedWorkDate) {
+          const jobLabel = assignment.job_id
+            ? ` for job ${assignment.job_id}`
+            : "";
+          throw new Error(
+            `Work date is required${jobLabel} before assigning associates. Please set a shift date and try again.`
+          );
         }
-
-        // Validate and format the work_date field
-        let formattedWorkDate = assignment.work_date;
-        if (formattedWorkDate && formattedWorkDate.trim()) {
-          // Check if it's a time value (like "14:00") and convert to null
-          if (/^\d{1,2}:\d{2}$/.test(formattedWorkDate.trim())) {
-            console.warn(
-              `work_date contains time value "${formattedWorkDate}", setting to null`
-            );
-            formattedWorkDate = null;
-          } else {
-            // Try to parse as a date
-            const date = new Date(formattedWorkDate);
-            if (isNaN(date.getTime())) {
-              console.warn(
-                `Invalid work_date value "${formattedWorkDate}", setting to null`
-              );
-              formattedWorkDate = null;
-            } else {
-              // Format as ISO date string
-              formattedWorkDate = date.toISOString().split("T")[0];
-            }
-          }
-        }
+        const formattedStartTime = this.normalizeStartTimeValue(
+          assignment.start_time,
+          formattedWorkDate
+        );
 
         return {
           ...assignment,
@@ -241,59 +276,18 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
   ) {
     const supabase = await createClient();
 
-    // Validate and format the start_time field
-    let formattedStartTime = assignmentData.start_time;
-
-    // start_time is optional - only validate if provided
-    if (formattedStartTime && formattedStartTime.trim()) {
-      // Check if it's a time value (like "14:00") and format it properly
-      if (/^\d{1,2}:\d{2}$/.test(formattedStartTime.trim())) {
-        // If it's just a time, we need to combine it with a date
-        // Use work_date if available, otherwise use today's date
-        const dateToUse = assignmentData.work_date
-          ? assignmentData.work_date.split("T")[0] // Extract date portion if it's a full timestamp
-          : new Date().toISOString().split("T")[0];
-        formattedStartTime = `${dateToUse} ${formattedStartTime}:00`;
-        console.log(
-          `Formatted start_time: "${assignmentData.start_time}" -> "${formattedStartTime}" (using date: ${dateToUse})`
-        );
-      } else {
-        // Try to parse as a full timestamp
-        const date = new Date(formattedStartTime);
-        if (isNaN(date.getTime())) {
-          console.warn(
-            `Invalid start_time value "${formattedStartTime}", setting to null`
-          );
-          formattedStartTime = null;
-        } else {
-          formattedStartTime = date.toISOString();
-        }
-      }
+    const formattedWorkDate = this.normalizeWorkDateValue(
+      assignmentData.work_date
+    );
+    if (!formattedWorkDate) {
+      throw new Error(
+        "Work date is required to assign associates. Please update the reminder’s shift date."
+      );
     }
-
-    // Validate and format the work_date field
-    let formattedWorkDate = assignmentData.work_date;
-    if (formattedWorkDate && formattedWorkDate.trim()) {
-      // Check if it's a time value (like "14:00") and convert to null
-      if (/^\d{1,2}:\d{2}$/.test(formattedWorkDate.trim())) {
-        console.warn(
-          `work_date contains time value "${formattedWorkDate}", setting to null`
-        );
-        formattedWorkDate = null;
-      } else {
-        // Try to parse as a date
-        const date = new Date(formattedWorkDate);
-        if (isNaN(date.getTime())) {
-          console.warn(
-            `Invalid work_date value "${formattedWorkDate}", setting to null`
-          );
-          formattedWorkDate = null;
-        } else {
-          // Format as ISO date string
-          formattedWorkDate = date.toISOString().split("T")[0];
-        }
-      }
-    }
+    const formattedStartTime = this.normalizeStartTimeValue(
+      assignmentData.start_time,
+      formattedWorkDate
+    );
 
     const insertData = {
       job_id: jobId,
@@ -402,85 +396,26 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
       Object.entries(updates).filter(([, value]) => value !== "")
     );
 
-    // Process start_time if it's being updated
-    if (cleanedUpdates.start_time) {
-      let formattedStartTime = cleanedUpdates.start_time;
-
-      // Validate that start_time is not empty or null
-      if (
-        !formattedStartTime ||
-        (typeof formattedStartTime === "string" && !formattedStartTime.trim())
-      ) {
-        console.warn(
-          "start_time cannot be empty or null - removing from update"
-        );
-        delete cleanedUpdates.start_time;
-      } else if (
-        formattedStartTime &&
-        typeof formattedStartTime === "string" &&
-        formattedStartTime.trim()
-      ) {
-        // Check if it's a time value (like "14:00") and format it properly
-        if (/^\d{1,2}:\d{2}$/.test(formattedStartTime.trim())) {
-          // If it's just a time, we need to combine it with a date
-          // Use the work_date if available (extract date portion if it's a full timestamp), otherwise use today's date
-          const workDate =
-            cleanedUpdates.work_date &&
-            typeof cleanedUpdates.work_date === "string"
-              ? cleanedUpdates.work_date.split("T")[0] // Extract date portion if it's a full timestamp
-              : oldWorkDate || new Date().toISOString().split("T")[0];
-          formattedStartTime = `${workDate} ${formattedStartTime}:00`;
-          console.log(
-            `Formatted start_time: "${cleanedUpdates.start_time}" -> "${formattedStartTime}" (using work_date: ${workDate})`
-          );
-          // Assign the formatted time back to cleanedUpdates
-          cleanedUpdates.start_time = formattedStartTime;
-        } else {
-          // Try to parse as a full timestamp
-          const date = new Date(formattedStartTime);
-          if (isNaN(date.getTime())) {
-            console.warn(
-              `Invalid start_time value "${formattedStartTime}", keeping original value`
-            );
-            // Don't delete or modify - keep the original value
-          } else {
-            formattedStartTime = date.toISOString();
-            // Assign the formatted time back to cleanedUpdates
-            cleanedUpdates.start_time = formattedStartTime;
-          }
-        }
+    if (cleanedUpdates.work_date) {
+      const normalizedWorkDate = this.normalizeWorkDateValue(
+        cleanedUpdates.work_date as string
+      );
+      if (normalizedWorkDate) {
+        cleanedUpdates.work_date = normalizedWorkDate;
+      } else {
+        delete cleanedUpdates.work_date;
       }
     }
 
-    // Process work_date if it's being updated
-    if (cleanedUpdates.work_date) {
-      let formattedWorkDate = cleanedUpdates.work_date;
-      if (
-        formattedWorkDate &&
-        typeof formattedWorkDate === "string" &&
-        formattedWorkDate.trim()
-      ) {
-        // Check if it's a time value (like "14:00") and convert to null
-        if (/^\d{1,2}:\d{2}$/.test(formattedWorkDate.trim())) {
-          console.warn(
-            `work_date contains time value "${formattedWorkDate}", setting to null`
-          );
-          delete cleanedUpdates.work_date;
-        } else {
-          // Try to parse as a date
-          const date = new Date(formattedWorkDate);
-          if (isNaN(date.getTime())) {
-            console.warn(
-              `Invalid work_date value "${formattedWorkDate}", setting to null`
-            );
-            delete cleanedUpdates.work_date;
-          } else {
-            // Format as ISO date string
-            formattedWorkDate = date.toISOString().split("T")[0];
-          }
-        }
+    if (cleanedUpdates.start_time) {
+      const normalizedStart = this.normalizeStartTimeValue(
+        cleanedUpdates.start_time as string,
+        (cleanedUpdates.work_date as string) || oldWorkDate
+      );
+      if (normalizedStart) {
+        cleanedUpdates.start_time = normalizedStart;
       } else {
-        cleanedUpdates.work_date = formattedWorkDate;
+        delete cleanedUpdates.start_time;
       }
     }
 

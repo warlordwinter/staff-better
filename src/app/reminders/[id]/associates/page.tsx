@@ -71,6 +71,12 @@ export default function ReminderDetailPage() {
     );
   }
 
+  const primaryWorkDate =
+    (assignments[0]?.work_date && assignments[0].work_date.trim()) ||
+    (job.start_date && job.start_date.trim()) ||
+    "";
+  const scheduleIncomplete = !primaryWorkDate;
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
@@ -102,6 +108,25 @@ export default function ReminderDetailPage() {
 
         {job && (
           <>
+            {scheduleIncomplete && (
+              <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold">
+                    Add a shift date to schedule reminders.
+                  </p>
+                  <p className="text-xs mt-1">
+                    Click “Edit reminder” and set the shift date before
+                    assigning associates.
+                  </p>
+                </div>
+                <button
+                  onClick={handleEditClick}
+                  className="px-3 py-1 text-xs font-semibold bg-amber-600 text-white rounded-md hover:bg-amber-700 transition-colors"
+                >
+                  Edit reminder
+                </button>
+              </div>
+            )}
             <ReminderDetailsCard
               job={job}
               assignments={assignments}
@@ -117,7 +142,13 @@ export default function ReminderDetailPage() {
                 </h2>
                 <button
                   onClick={handleAddAssociate}
-                  className="px-4 py-2 bg-gradient-to-r from-[#FFBB87] to-[#FE6F00] text-white rounded-lg font-medium inline-flex items-center gap-2 hover:opacity-90 transition-opacity"
+                  disabled={scheduleIncomplete}
+                  title={
+                    scheduleIncomplete
+                      ? "Set a shift date before adding associates."
+                      : undefined
+                  }
+                  className="px-4 py-2 bg-gradient-to-r from-[#FFBB87] to-[#FE6F00] text-white rounded-lg font-medium inline-flex items-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <svg
                     className="w-5 h-5"

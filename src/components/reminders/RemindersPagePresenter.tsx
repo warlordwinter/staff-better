@@ -87,7 +87,9 @@ export default function RemindersPagePresenter() {
         model.newJobTitle,
         model.newCustomerName,
         model.newStartDate,
-        model.newStartTime
+        model.newStartTime,
+        model.newNightBeforeTime,
+        model.newDayOfTime
       );
     } catch {
       alert("Failed to create reminder. Please try again.");
@@ -119,6 +121,8 @@ export default function RemindersPagePresenter() {
       newCustomerName={model.newCustomerName}
       newStartDate={model.newStartDate}
       newStartTime={model.newStartTime}
+      newNightBeforeTime={model.newNightBeforeTime}
+      newDayOfTime={model.newDayOfTime}
       scheduledCount={model.scheduledCount}
       sentCount={model.sentCount}
       confirmedCount={model.confirmedCount}
@@ -138,6 +142,8 @@ export default function RemindersPagePresenter() {
       onCustomerNameChange={model.setNewCustomerName}
       onStartDateChange={model.setNewStartDate}
       onStartTimeChange={model.setNewStartTime}
+      onNightBeforeTimeChange={model.setNewNightBeforeTime}
+      onDayOfTimeChange={model.setNewDayOfTime}
       onCreateReminder={handleCreateReminder}
       onCancelAdd={() => model.resetForm()}
       onDeleteReminder={handleDeleteReminder}

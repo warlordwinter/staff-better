@@ -29,6 +29,8 @@ interface RemindersPageViewProps {
   newCustomerName: string;
   newStartDate: string;
   newStartTime: string;
+  newNightBeforeTime: string;
+  newDayOfTime: string;
   scheduledCount: number;
   sentCount: number;
   confirmedCount: number;
@@ -51,6 +53,8 @@ interface RemindersPageViewProps {
   onCustomerNameChange: (name: string) => void;
   onStartDateChange: (date: string) => void;
   onStartTimeChange: (time: string) => void;
+  onNightBeforeTimeChange: (time: string) => void;
+  onDayOfTimeChange: (time: string) => void;
   onCreateReminder: () => void;
   onCancelAdd: () => void;
   onDeleteReminder: (job: JobWithCount) => void;
@@ -68,6 +72,8 @@ export default function RemindersPageView({
   newCustomerName,
   newStartDate,
   newStartTime,
+  newNightBeforeTime,
+  newDayOfTime,
   scheduledCount,
   sentCount,
   confirmedCount,
@@ -85,6 +91,8 @@ export default function RemindersPageView({
   onCustomerNameChange,
   onStartDateChange,
   onStartTimeChange,
+  onNightBeforeTimeChange,
+  onDayOfTimeChange,
   onCreateReminder,
   onCancelAdd,
   onDeleteReminder,
@@ -496,7 +504,7 @@ export default function RemindersPageView({
                           d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                         />
                       </svg>
-                      <span className="text-sm">starts {dateTime}</span>
+                      <span className="text-sm">Starts {dateTime}</span>
                     </div>
 
                     {/* Reminder Send Times */}
@@ -518,7 +526,9 @@ export default function RemindersPageView({
                         <span className="text-sm text-gray-600">
                           {formatReminderSendTimes(
                             job.start_date || null,
-                            job.start_time || null
+                            job.start_time || null,
+                            job.night_before_time,
+                            job.day_of_time
                           )}
                         </span>
                       </div>
@@ -665,10 +675,14 @@ export default function RemindersPageView({
           customerName={newCustomerName}
           startDate={newStartDate}
           startTime={newStartTime}
+          nightBeforeTime={newNightBeforeTime}
+          dayOfTime={newDayOfTime}
           onJobTitleChange={onJobTitleChange}
           onCustomerNameChange={onCustomerNameChange}
           onStartDateChange={onStartDateChange}
           onStartTimeChange={onStartTimeChange}
+          onNightBeforeTimeChange={onNightBeforeTimeChange}
+          onDayOfTimeChange={onDayOfTimeChange}
           onSave={onCreateReminder}
           onCancel={onCancelAdd}
         />

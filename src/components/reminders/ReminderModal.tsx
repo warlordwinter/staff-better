@@ -154,7 +154,7 @@ export default function ReminderModal({
   startDate,
   startTime,
   nightBeforeTime = "19:00",
-  dayOfTime = "06:00",
+  dayOfTime = "07:00",
   onJobTitleChange,
   onCustomerNameChange,
   onStartDateChange,
@@ -294,14 +294,14 @@ export default function ReminderModal({
                   htmlFor={nightBeforeTimeId}
                   className="block text-xs text-gray-600 mb-1"
                 >
-                  Night Before
+                  Day Before
                 </label>
                 <TimeDropdown
                   id={nightBeforeTimeId}
                   value={nightBeforeTime}
                   onChange={(value) => onNightBeforeTimeChange?.(value)}
                   options={timeOptions}
-                  label="Night Before"
+                  label="Day Before"
                 />
               </div>
               <div>
@@ -342,9 +342,9 @@ export default function ReminderModal({
               </svg>
               <span>
                 Sends at{" "}
-                <strong>{formatTimeForDisplay(nightBeforeTime)}</strong> night
+                <strong>{formatTimeForDisplay(nightBeforeTime)}</strong> day
                 before and <strong>{formatTimeForDisplay(dayOfTime)}</strong>{" "}
-                day of shift
+                day of
               </span>
             </div>
           </div>
