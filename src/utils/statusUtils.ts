@@ -24,8 +24,41 @@ export interface JobAssignmentResponse {
 export const getStatus = (
   job: Job & { associateCount?: number; numReminders?: number }
 ): StatusDisplay => {
-  if (job.numReminders && job.numReminders > 0) {
-    return { label: "Sent", color: "bg-gray-400", textColor: "text-gray-900" };
+  // Check if there are any associates assigned
+  if (!job.associateCount || job.associateCount === 0) {
+    return {
+      label: "Waiting for Assigned Associates",
+      color: "bg-gray-400",
+      textColor: "text-white",
+    };
+  }
+
+  // Determine status based on numReminders (starts at 3, decreases as reminders are sent)
+  // numReminders represents remaining reminders, so:
+  // 3 = no reminders sent (Scheduled)
+  // 2 = first reminder sent
+  // 1 = second reminder sent
+  // 0 = all reminders sent (Completed)
+  if (job.numReminders !== undefined && job.numReminders !== null) {
+    if (job.numReminders === 0) {
+      return {
+        label: "Completed",
+        color: "bg-green-500",
+        textColor: "text-white",
+      };
+    } else if (job.numReminders === 1) {
+      return {
+        label: "Second Reminder Sent",
+        color: "bg-blue-500",
+        textColor: "text-white",
+      };
+    } else if (job.numReminders === 2) {
+      return {
+        label: "First Reminder Sent",
+        color: "bg-blue-400",
+        textColor: "text-white",
+      };
+    }
   }
 
   if (job.job_status?.includes("CONFIRMED")) {
@@ -43,7 +76,7 @@ export const getStatus = (
     return { label: "Failed", color: "bg-red-500", textColor: "text-white" };
   }
 
-  // Default to Scheduled
+  // Default to Scheduled (has associates but no reminders sent yet)
   return { label: "Scheduled", color: "bg-blue-500", textColor: "text-white" };
 };
 
@@ -52,12 +85,16 @@ export const getStatusDisplay = (
   job: Job,
   assignments: JobAssignmentResponse[]
 ): StatusDisplay => {
-  // If any reminders have been sent
-  if (assignments.some((a) => a.num_reminders > 0)) {
-    return { label: "Sent", color: "bg-gray-400", textColor: "text-gray-900" };
+  // If no assignments, show waiting status
+  if (!assignments || assignments.length === 0) {
+    return {
+      label: "Waiting for Assigned Associates",
+      color: "bg-gray-400",
+      textColor: "text-white",
+    };
   }
 
-  // Check if any assignments are confirmed
+  // Check if any assignments are confirmed (highest priority)
   if (assignments.some((a) => a.confirmation_status === "CONFIRMED")) {
     return {
       label: "Confirmed",
@@ -73,6 +110,33 @@ export const getStatusDisplay = (
     return { label: "Failed", color: "bg-red-500", textColor: "text-white" };
   }
 
+  // Determine status based on num_reminders (starts at 3, decreases as reminders are sent)
+  // Find the minimum num_reminders across all assignments to show the most advanced status
+  const minReminders = Math.min(
+    ...assignments.map((a) => a.num_reminders ?? 3)
+  );
+
+  if (minReminders === 0) {
+    return {
+      label: "Completed",
+      color: "bg-green-500",
+      textColor: "text-white",
+    };
+  } else if (minReminders === 1) {
+    return {
+      label: "Second Reminder Sent",
+      color: "bg-blue-500",
+      textColor: "text-white",
+    };
+  } else if (minReminders === 2) {
+    return {
+      label: "First Reminder Sent",
+      color: "bg-blue-400",
+      textColor: "text-white",
+    };
+  }
+
+  // Default to Scheduled (has associates but no reminders sent yet, num_reminders = 3)
   return { label: "Scheduled", color: "bg-blue-500", textColor: "text-white" };
 };
 

@@ -146,6 +146,32 @@ function TimeDropdown({
   );
 }
 
+// Helper function to check if date/time is in the past
+const isDateTimeInPast = (date: string, time: string): boolean => {
+  if (!date || !time) return false;
+
+  const now = new Date();
+  const selectedDate = new Date(`${date}T${time}`);
+
+  // Add 2 minutes buffer to account for reminder calculation time
+  const bufferMs = 2 * 60 * 1000;
+  return selectedDate.getTime() <= now.getTime() + bufferMs;
+};
+
+// Get today's date in YYYY-MM-DD format
+const getTodayDate = (): string => {
+  const today = new Date();
+  return today.toISOString().split("T")[0];
+};
+
+// Get current time in HH:MM format
+const getCurrentTime = (): string => {
+  const now = new Date();
+  const hours = now.getHours().toString().padStart(2, "0");
+  const minutes = now.getMinutes().toString().padStart(2, "0");
+  return `${hours}:${minutes}`;
+};
+
 export default function ReminderModal({
   show,
   mode,
@@ -182,6 +208,16 @@ export default function ReminderModal({
   const dayOfTimeId = isEditMode ? "editDayOfTime" : "dayOfTime";
 
   const timeOptions = generateTimeOptions();
+
+  // Validation: Check if date/time is in the past
+  const todayDate = getTodayDate();
+  const isPastDateTime =
+    startDate && startTime ? isDateTimeInPast(startDate, startTime) : false;
+  const isToday = startDate === todayDate;
+  const minTime = isToday ? getCurrentTime() : "00:00";
+
+  // Determine if save should be disabled
+  const isSaveDisabled = !jobTitle.trim() || isPastDateTime;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -261,8 +297,17 @@ export default function ReminderModal({
               id={startDateId}
               value={startDate}
               onChange={(e) => onStartDateChange(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+              min={todayDate}
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                isPastDateTime ? "border-red-500" : "border-gray-300"
+              }`}
             />
+            {isPastDateTime && (
+              <p className="text-red-500 text-xs mt-1">
+                Cannot schedule reminders in the past. Please select a future
+                date and time.
+              </p>
+            )}
           </div>
 
           <div>
@@ -277,10 +322,18 @@ export default function ReminderModal({
               id={startTimeId}
               value={startTime}
               onChange={(e) => onStartTimeChange(e.target.value)}
-              min="08:00"
+              min={isToday ? minTime : "08:00"}
               max="23:00"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                isPastDateTime ? "border-red-500" : "border-gray-300"
+              }`}
             />
+            {isToday && startTime && startTime < minTime && (
+              <p className="text-red-500 text-xs mt-1">
+                Time must be in the future. Current time is{" "}
+                {formatTimeForDisplay(minTime)}.
+              </p>
+            )}
           </div>
 
           {/* Reminder Times Section */}
@@ -359,7 +412,7 @@ export default function ReminderModal({
           </button>
           <button
             onClick={onSave}
-            disabled={!jobTitle.trim()}
+            disabled={isSaveDisabled}
             className="px-4 py-2 bg-gradient-to-r from-[#FFBB87] to-[#FE6F00] text-white rounded-md hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
           >
             {buttonText}

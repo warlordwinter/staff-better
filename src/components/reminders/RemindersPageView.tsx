@@ -140,6 +140,20 @@ export default function RemindersPageView({
 
     if (!editJobTitle.trim()) return;
 
+    // Validate that date/time is not in the past
+    if (editStartDate && editStartTime) {
+      const now = new Date();
+      const selectedDate = new Date(`${editStartDate}T${editStartTime}`);
+      const bufferMs = 2 * 60 * 1000; // 2 minutes buffer
+
+      if (selectedDate.getTime() <= now.getTime() + bufferMs) {
+        alert(
+          "Cannot schedule reminders in the past. Please select a future date and time."
+        );
+        return;
+      }
+    }
+
     try {
       // Convert local time to UTC for API
       let formattedStartTime: string | null = null;
@@ -462,6 +476,7 @@ export default function RemindersPageView({
                         value={editStartDate}
                         onChange={(e) => setEditStartDate(e.target.value)}
                         onClick={(e) => e.stopPropagation()}
+                        min={new Date().toISOString().split("T")[0]}
                         className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-orange-500"
                       />
                     </div>
@@ -484,6 +499,12 @@ export default function RemindersPageView({
                         value={editStartTime}
                         onChange={(e) => setEditStartTime(e.target.value)}
                         onClick={(e) => e.stopPropagation()}
+                        min={
+                          editStartDate ===
+                          new Date().toISOString().split("T")[0]
+                            ? new Date().toTimeString().slice(0, 5)
+                            : "00:00"
+                        }
                         className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-orange-500"
                       />
                     </div>

@@ -70,7 +70,7 @@ export function useRemindersPage(
       if (!jobsRes.ok) throw new Error("Failed to fetch jobs");
       const jobsData: Job[] = await jobsRes.json();
 
-      // Fetch associate counts for each job
+      // Fetch associate counts and reminder status for each job
       const jobsWithCounts = await Promise.all(
         jobsData.map(async (job) => {
           try {
@@ -79,16 +79,26 @@ export function useRemindersPage(
             );
             if (assignmentsRes.ok) {
               const assignments = await assignmentsRes.json();
+              const assignmentArray = Array.isArray(assignments)
+                ? assignments
+                : [];
+              // Calculate minimum num_reminders to determine status
+              // (starts at 3, decreases as reminders are sent)
+              const numReminders =
+                assignmentArray.length > 0
+                  ? Math.min(
+                      ...assignmentArray.map((a: any) => a.num_reminders ?? 3)
+                    )
+                  : undefined;
               return {
                 ...job,
-                associateCount: Array.isArray(assignments)
-                  ? assignments.length
-                  : 0,
+                associateCount: assignmentArray.length,
+                numReminders,
               };
             }
-            return { ...job, associateCount: 0 };
+            return { ...job, associateCount: 0, numReminders: undefined };
           } catch {
-            return { ...job, associateCount: 0 };
+            return { ...job, associateCount: 0, numReminders: undefined };
           }
         })
       );
@@ -136,6 +146,19 @@ export function useRemindersPage(
     dayOfTime?: string | null
   ) => {
     if (!jobTitle.trim()) return;
+
+    // Validate that date/time is not in the past
+    if (startDate && startTime) {
+      const now = new Date();
+      const selectedDate = new Date(`${startDate}T${startTime}`);
+      const bufferMs = 2 * 60 * 1000; // 2 minutes buffer
+
+      if (selectedDate.getTime() <= now.getTime() + bufferMs) {
+        throw new Error(
+          "Cannot schedule reminders in the past. Please select a future date and time."
+        );
+      }
+    }
 
     // Format start_time if provided (convert local time to UTC timestamp)
     let formattedStartTime: string | null = null;

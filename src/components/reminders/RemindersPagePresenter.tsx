@@ -91,8 +91,12 @@ export default function RemindersPagePresenter() {
         model.newNightBeforeTime,
         model.newDayOfTime
       );
-    } catch {
-      alert("Failed to create reminder. Please try again.");
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to create reminder. Please try again.";
+      alert(errorMessage);
     }
   };
 

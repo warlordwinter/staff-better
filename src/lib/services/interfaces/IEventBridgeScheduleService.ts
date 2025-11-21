@@ -16,7 +16,9 @@ export interface IEventBridgeScheduleService {
     jobId: string,
     workDate: string,
     startTime: string,
-    maxNumReminders: number
+    maxNumReminders: number,
+    nightBeforeTime?: string | null,
+    dayOfTime?: string | null
   ): Promise<string[]>;
 
   /**
@@ -48,7 +50,8 @@ export interface IEventBridgeScheduleService {
     oldStartTime: string,
     newWorkDate: string,
     newStartTime: string,
-    maxNumReminders: number
+    maxNumReminders: number,
+    nightBeforeTime?: string | null,
+    dayOfTime?: string | null
   ): Promise<string[]>;
 }
-

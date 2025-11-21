@@ -65,7 +65,9 @@ export class EventBridgeScheduleService implements IEventBridgeScheduleService {
     jobId: string,
     workDate: string,
     startTime: string,
-    maxNumReminders: number
+    maxNumReminders: number,
+    nightBeforeTime?: string | null,
+    dayOfTime?: string | null
   ): Promise<string[]> {
     const createdArns: string[] = [];
     const normalizedWorkDate = this.normalizeWorkDate(workDate);
@@ -75,7 +77,8 @@ export class EventBridgeScheduleService implements IEventBridgeScheduleService {
       jobId,
       normalizedWorkDate,
       normalizedStartTime,
-      "DAY_BEFORE"
+      "DAY_BEFORE",
+      nightBeforeTime
     );
     if (dayBeforeArn) createdArns.push(dayBeforeArn);
 
@@ -83,7 +86,8 @@ export class EventBridgeScheduleService implements IEventBridgeScheduleService {
       jobId,
       normalizedWorkDate,
       normalizedStartTime,
-      "TWO_HOURS_BEFORE"
+      "TWO_HOURS_BEFORE",
+      dayOfTime
     );
     if (twoHoursBeforeArn) createdArns.push(twoHoursBeforeArn);
 
@@ -94,7 +98,8 @@ export class EventBridgeScheduleService implements IEventBridgeScheduleService {
     jobId: string,
     workDate: string,
     startTime: string,
-    reminderType: "DAY_BEFORE" | "TWO_HOURS_BEFORE"
+    reminderType: "DAY_BEFORE" | "TWO_HOURS_BEFORE",
+    reminderTime?: string | null
   ): Promise<string | null> {
     const supabase = createAdminClient();
     const normalizedWorkDate = this.normalizeWorkDate(workDate);
@@ -115,7 +120,8 @@ export class EventBridgeScheduleService implements IEventBridgeScheduleService {
     let scheduledTime = this.calculateScheduledTime(
       normalizedWorkDate,
       normalizedStartTime,
-      reminderType
+      reminderType,
+      reminderTime
     );
 
     // Round seconds to 00 for EventBridge compatibility
@@ -272,7 +278,8 @@ export class EventBridgeScheduleService implements IEventBridgeScheduleService {
   private calculateScheduledTime(
     workDate: string,
     startTime: string,
-    reminderType: "DAY_BEFORE" | "TWO_HOURS_BEFORE"
+    reminderType: "DAY_BEFORE" | "TWO_HOURS_BEFORE",
+    reminderTime?: string | null
   ): Date {
     // Ensure workDate is in YYYY-MM-DD format (extract date portion if it's a full timestamp)
     const dateOnly = workDate.split("T")[0];
@@ -280,10 +287,25 @@ export class EventBridgeScheduleService implements IEventBridgeScheduleService {
 
     if (reminderType === "DAY_BEFORE") {
       const dayBeforeIso = addDaysISO(workDate, -1);
-      return localDateTimeToUTCDate(dayBeforeIso, "19:00:00");
+      // Use custom reminder time if provided, otherwise default to 19:00:00
+      const timeToUse = reminderTime || "19:00:00";
+      // Ensure time has seconds if missing (HH:MM -> HH:MM:00)
+      const timeWithSeconds =
+        timeToUse.split(":").length === 2 ? `${timeToUse}:00` : timeToUse;
+      return localDateTimeToUTCDate(dayBeforeIso, timeWithSeconds);
     }
 
-    // TWO_HOURS_BEFORE: start_time - 2 hours on work_date
+    // TWO_HOURS_BEFORE: Use custom reminder time if provided, otherwise calculate as start_time - 2 hours
+    if (reminderTime) {
+      // Use the custom day_of_time
+      const timeWithSeconds =
+        reminderTime.split(":").length === 2
+          ? `${reminderTime}:00`
+          : reminderTime;
+      return localDateTimeToUTCDate(workDate, timeWithSeconds);
+    }
+
+    // Default: start_time - 2 hours on work_date
     const [hours, minutes, seconds] = startTime.split(":").map(Number);
     const jobStartTime = new Date(workDateObj);
     jobStartTime.setUTCHours(hours, minutes || 0, seconds || 0, 0);
@@ -391,7 +413,9 @@ export class EventBridgeScheduleService implements IEventBridgeScheduleService {
     oldStartTime: string,
     newWorkDate: string,
     newStartTime: string,
-    maxNumReminders: number
+    maxNumReminders: number,
+    nightBeforeTime?: string | null,
+    dayOfTime?: string | null
   ): Promise<string[]> {
     // Normalize all values to ensure consistency
     const normalizedOldWorkDate = this.normalizeWorkDate(oldWorkDate);
@@ -404,7 +428,9 @@ export class EventBridgeScheduleService implements IEventBridgeScheduleService {
       jobId,
       normalizedNewWorkDate,
       normalizedNewStartTime,
-      maxNumReminders
+      maxNumReminders,
+      nightBeforeTime,
+      dayOfTime
     );
     await this.deleteReminderSchedules(
       jobId,

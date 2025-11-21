@@ -603,6 +603,7 @@ export type Database = {
           sender_type: string
           sent_at: string | null
           status: string | null
+          twilio_sid: string | null
         }
         Insert: {
           body?: string | null
@@ -613,6 +614,7 @@ export type Database = {
           sender_type: string
           sent_at?: string | null
           status?: string | null
+          twilio_sid?: string | null
         }
         Update: {
           body?: string | null
@@ -623,6 +625,7 @@ export type Database = {
           sender_type?: string
           sent_at?: string | null
           status?: string | null
+          twilio_sid?: string | null
         }
         Relationships: [
           {

@@ -327,11 +327,20 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
           await import("@/lib/services/eventbridgeScheduleService")
         ).EventBridgeScheduleService();
 
+        // Fetch job reminder times
+        const { data: jobData } = await supabase
+          .from("jobs")
+          .select("night_before_time, day_of_time")
+          .eq("id", jobId)
+          .single();
+
         const createdArns = await eventBridgeService.createReminderSchedules(
           jobId,
           formattedWorkDate,
           timePortion,
-          insertData.num_reminders || 2
+          insertData.num_reminders || 2,
+          jobData?.night_before_time || null,
+          jobData?.day_of_time || null
         );
         if (createdArns.length > 0) {
           console.log(
@@ -463,11 +472,20 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
           await import("@/lib/services/eventbridgeScheduleService")
         ).EventBridgeScheduleService();
 
+        // Fetch job reminder times
+        const { data: jobData } = await supabase
+          .from("jobs")
+          .select("night_before_time, day_of_time")
+          .eq("id", jobId)
+          .single();
+
         const createdArns = await eventBridgeService.createReminderSchedules(
           jobId,
           newWorkDate,
           newStartTime,
-          currentAssignment?.num_reminders || 2
+          currentAssignment?.num_reminders || 2,
+          jobData?.night_before_time || null,
+          jobData?.day_of_time || null
         );
         if (createdArns.length > 0) {
           console.log(
@@ -492,13 +510,22 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
           await import("@/lib/services/eventbridgeScheduleService")
         ).EventBridgeScheduleService();
 
+        // Fetch job reminder times
+        const { data: jobData } = await supabase
+          .from("jobs")
+          .select("night_before_time, day_of_time")
+          .eq("id", jobId)
+          .single();
+
         await eventBridgeService.updateReminderSchedules(
           jobId,
           oldWorkDate!,
           oldStartTime!,
           newWorkDate,
           newStartTime,
-          currentAssignment?.num_reminders || 2
+          currentAssignment?.num_reminders || 2,
+          jobData?.night_before_time || null,
+          jobData?.day_of_time || null
         );
         console.log(
           `Updated EventBridge schedules for job ${jobId} from ${oldWorkDate}/${oldStartTime} to ${newWorkDate}/${newStartTime}`
