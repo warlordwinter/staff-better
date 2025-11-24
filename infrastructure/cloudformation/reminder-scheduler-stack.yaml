@@ -28,6 +28,9 @@ Parameters:
   SesFromEmail:
     Type: String
     Description: "Verified SES email address to send from"
+    MinLength: 1
+    AllowedPattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+    ConstraintDescription: "Must be a valid email address"
 
   ApiBaseUrl:
     Type: String
@@ -37,6 +40,9 @@ Parameters:
     Type: String
     Description: "Secret token for authenticating API calls from Lambda"
     NoEcho: true
+
+Conditions:
+  HasSesEmail: !Not [!Equals [!Ref SesFromEmail, ""]]
 
 Resources:
   # Lambda Execution Role
@@ -189,6 +195,7 @@ Resources:
   # The verification email will be sent to the email address specified
   SesEmailIdentity:
     Type: AWS::SES::EmailIdentity
+    Condition: HasSesEmail
     Properties:
       EmailIdentity: !Ref SesFromEmail
 
@@ -273,6 +280,7 @@ Outputs:
       Name: !Sub "${AWS::StackName}-DailySummaryScheduleName"
 
   SesEmailIdentityArn:
+    Condition: HasSesEmail
     Description: "ARN of the SES email identity"
     Value: !GetAtt SesEmailIdentity.Arn
     Export:
