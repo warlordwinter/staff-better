@@ -229,6 +229,8 @@ Resources:
       Description: "Triggers daily email summary at 5:00 PM MST (00:00 UTC)"
       ScheduleExpression: "cron(0 0 * * ? *)"
       ScheduleExpressionTimezone: "UTC"
+      FlexibleTimeWindow:
+        Mode: "OFF"
       State: ENABLED
       Target:
         Arn: !GetAtt DailySummaryLambda.Arn
