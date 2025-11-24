@@ -334,9 +334,10 @@ export class AssociatesDaoSupabase implements IAssociates {
   /**
    * Find associate by phone number with normalization
    * Returns UTC times from database
+   * Uses admin client to bypass RLS (needed for webhooks without user sessions)
    */
   async getAssociateByPhone(phoneNumber: string): Promise<Associate | null> {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     // Normalize the incoming phone number to E.164 format
     const normalizedPhone = normalizePhoneForLookup(phoneNumber);

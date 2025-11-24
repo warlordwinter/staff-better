@@ -40,9 +40,19 @@ export class EventBridgeScheduleService implements IEventBridgeScheduleService {
    * Normalize startTime for DB queries (HH:MM:SS)
    */
   private normalizeStartTime(startTime: string) {
+    if (!startTime) return "";
     // Accepts HH:MM:SS or ISO string, returns HH:MM:SS
     if (startTime.includes("T")) {
-      return startTime.split("T")[1].replace("Z", "");
+      const timePart = startTime.split("T")[1].replace("Z", "").split(".")[0];
+      // Ensure we have seconds (HH:MM -> HH:MM:00)
+      if (timePart.split(":").length === 2) {
+        return `${timePart}:00`;
+      }
+      return timePart;
+    }
+    // Ensure we have seconds if missing
+    if (startTime.split(":").length === 2) {
+      return `${startTime}:00`;
     }
     return startTime;
   }
@@ -339,11 +349,48 @@ export class EventBridgeScheduleService implements IEventBridgeScheduleService {
     const normalizedWorkDate = this.normalizeWorkDate(workDate);
     const normalizedStartTime = this.normalizeStartTime(startTime);
 
+    // Ensure normalizedStartTime has seconds (HH:MM -> HH:MM:00)
+    let timeWithSeconds = normalizedStartTime;
+    if (timeWithSeconds && timeWithSeconds.split(":").length === 2) {
+      timeWithSeconds = `${timeWithSeconds}:00`;
+    }
+
     // For job_assignments, start_time is TIMESTAMPTZ, so we need to construct a full timestamp
     // Use normalized values to ensure consistency
-    const timestampForJobAssignments = new Date(
-      `${normalizedWorkDate}T${normalizedStartTime}Z`
-    ).toISOString();
+    if (!normalizedWorkDate || !timeWithSeconds) {
+      console.warn(
+        `Cannot delete schedules: missing workDate (${normalizedWorkDate}) or startTime (${timeWithSeconds})`
+      );
+      return;
+    }
+
+    // Validate time format (should be HH:MM:SS)
+    const timePattern = /^\d{2}:\d{2}:\d{2}$/;
+    if (!timePattern.test(timeWithSeconds)) {
+      console.warn(
+        `Cannot delete schedules: invalid time format (${timeWithSeconds}). Expected HH:MM:SS`
+      );
+      return;
+    }
+
+    let timestampForJobAssignments: string;
+    try {
+      const dateObj = new Date(`${normalizedWorkDate}T${timeWithSeconds}Z`);
+      if (isNaN(dateObj.getTime())) {
+        console.warn(
+          `Cannot delete schedules: invalid date/time combination (${normalizedWorkDate}T${timeWithSeconds}Z)`
+        );
+        return;
+      }
+      timestampForJobAssignments = dateObj.toISOString();
+    } catch (error) {
+      console.error(
+        `Error constructing timestamp for job assignments:`,
+        error,
+        `workDate: ${normalizedWorkDate}, startTime: ${timeWithSeconds}`
+      );
+      return;
+    }
 
     // Query job_assignments using the normalized work_date (YYYY-MM-DD) and constructed timestamp
     // Note: work_date in job_assignments might be stored as DATE or TIMESTAMPTZ, so we use a range query

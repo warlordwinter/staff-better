@@ -288,7 +288,7 @@ export class JobsDaoSupabase implements IJobs {
           // Get all job assignments for this job that need to be updated
           const { data: assignments, error: assignmentsError } = await supabase
             .from("job_assignments")
-            .select("id, num_reminders")
+            .select("num_reminders")
             .eq("job_id", id);
 
           // Store original num_reminders before resetting (for use in schedule creation)

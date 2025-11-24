@@ -4,6 +4,7 @@ import { twiml } from "twilio";
 import { TWILIO_PHONE_NUMBER_REMINDERS } from "@/lib/twilio/client";
 import { normalizePhoneForLookup } from "@/utils/phoneUtils";
 import { getCompanyPhoneNumberAdmin } from "@/lib/auth/getCompanyId";
+import { serviceContainer } from "@/lib/services/ServiceContainer";
 
 /**
  * POST /api/twilio/incoming
@@ -152,6 +153,25 @@ export async function POST(request: NextRequest) {
     console.log(
       `✅ Found associate: ${associate.id} (company: ${associate.company_id}, stored phone: ${associate.phone_number})`
     );
+
+    const companyId = associate.company_id;
+
+    // Process message for reminders/confirmations (this updates assignment statuses)
+    // This must happen BEFORE saving to database so confirmation status is updated
+    const messageService = serviceContainer.getIncomingMessageService();
+    try {
+      console.log("🔄 Processing message for confirmations/reminders...");
+      const result = await messageService.processIncomingMessage(
+        From,
+        Body,
+        To,
+        companyId
+      );
+      console.log("✅ Message processing result:", result);
+    } catch (error) {
+      // Log error but don't fail the webhook - still save message to DB
+      console.error("❌ Error processing message for confirmations:", error);
+    }
 
     // Determine which phone number to use for the conversation
     // If the message is to the reminder number, use the company's two-way number
