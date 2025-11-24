@@ -50,9 +50,13 @@ jobs:
           fi
 
       - name: Deploy CloudFormation Stack (Create)
+        id: create-stack
         if: steps.check-stack.outputs.exists == 'false'
         run: |
           echo "Creating CloudFormation stack..."
+          echo "Note: If creation fails, the stack will be automatically deleted (--on-failure DELETE)"
+
+          # Create stack with automatic deletion on failure
           aws cloudformation create-stack \
             --stack-name ${{ env.STACK_NAME }} \
             --template-body file://${{ env.CLOUDFORMATION_TEMPLATE }} \
@@ -66,12 +70,49 @@ jobs:
               ParameterKey=ApiBaseUrl,ParameterValue=${{ secrets.API_BASE_URL }} \
               ParameterKey=CronSecret,ParameterValue=${{ secrets.CRON_SECRET }} \
             --region ${{ env.AWS_REGION }} \
-            --capabilities CAPABILITY_NAMED_IAM
+            --capabilities CAPABILITY_NAMED_IAM \
+            --on-failure DELETE
 
           echo "Waiting for stack creation to complete..."
-          aws cloudformation wait stack-create-complete \
+          echo "If creation fails, CloudFormation will automatically delete the stack..."
+
+          # Wait for stack creation, but handle failure gracefully
+          if ! aws cloudformation wait stack-create-complete \
             --stack-name ${{ env.STACK_NAME }} \
-            --region ${{ env.AWS_REGION }}
+            --region ${{ env.AWS_REGION }} 2>&1; then
+            
+            echo "❌ Stack creation failed or timed out"
+            echo "Checking if stack is being deleted..."
+            
+            # Check stack status
+            STACK_STATUS=$(aws cloudformation describe-stacks \
+              --stack-name ${{ env.STACK_NAME }} \
+              --region ${{ env.AWS_REGION }} \
+              --query 'Stacks[0].StackStatus' \
+              --output text 2>/dev/null || echo "NOT_FOUND")
+            
+            echo "Current stack status: $STACK_STATUS"
+            
+            # If stack is being deleted or in failed state, wait for deletion
+            if [ "$STACK_STATUS" = "DELETE_IN_PROGRESS" ] || [ "$STACK_STATUS" = "DELETE_COMPLETE" ]; then
+              echo "Stack deletion in progress (triggered by --on-failure DELETE)..."
+              aws cloudformation wait stack-delete-complete \
+                --stack-name ${{ env.STACK_NAME }} \
+                --region ${{ env.AWS_REGION }} || true
+              echo "✅ Failed stack has been automatically deleted"
+            elif [ "$STACK_STATUS" = "ROLLBACK_COMPLETE" ] || [ "$STACK_STATUS" = "CREATE_FAILED" ]; then
+              echo "Stack is in $STACK_STATUS state. Manually deleting..."
+              aws cloudformation delete-stack \
+                --stack-name ${{ env.STACK_NAME }} \
+                --region ${{ env.AWS_REGION }}
+              aws cloudformation wait stack-delete-complete \
+                --stack-name ${{ env.STACK_NAME }} \
+                --region ${{ env.AWS_REGION }} || true
+              echo "✅ Failed stack has been deleted"
+            fi
+            
+            exit 1
+          fi
 
           echo "✅ Stack created successfully"
 
@@ -106,6 +147,7 @@ jobs:
           fi
 
       - name: Get stack outputs
+        if: success()
         run: |
           echo "📋 Stack Outputs:"
           aws cloudformation describe-stacks \
@@ -113,6 +155,31 @@ jobs:
             --region ${{ env.AWS_REGION }} \
             --query 'Stacks[0].Outputs' \
             --output table
+
+      - name: Cleanup failed stack
+        if: failure() && steps.check-stack.outputs.exists == 'false'
+        run: |
+          echo "🧹 Cleaning up failed stack..."
+          STACK_STATUS=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.STACK_NAME }} \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Stacks[0].StackStatus' \
+            --output text 2>/dev/null || echo "NOT_FOUND")
+
+          if [ "$STACK_STATUS" = "ROLLBACK_COMPLETE" ] || [ "$STACK_STATUS" = "CREATE_FAILED" ] || [ "$STACK_STATUS" = "ROLLBACK_IN_PROGRESS" ]; then
+            echo "Stack is in $STACK_STATUS state. Deleting failed stack..."
+            aws cloudformation delete-stack \
+              --stack-name ${{ env.STACK_NAME }} \
+              --region ${{ env.AWS_REGION }}
+            
+            echo "Waiting for stack deletion to complete..."
+            aws cloudformation wait stack-delete-complete \
+              --stack-name ${{ env.STACK_NAME }} \
+              --region ${{ env.AWS_REGION }} || true
+            echo "✅ Failed stack has been deleted"
+          else
+            echo "Stack status: $STACK_STATUS - No cleanup needed"
+          fi
 
   deploy-reminder-processor:
     name: Deploy Reminder Processor Lambda
