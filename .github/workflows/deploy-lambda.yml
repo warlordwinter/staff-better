@@ -40,10 +40,11 @@ jobs:
           MISSING_SECRETS=()
 
           # Check if secrets are set (they'll be empty string if not set)
+          # Using the actual secret names from the repository
           [ -z "${{ secrets.TWILIO_ACCOUNT_SID }}" ] && MISSING_SECRETS+=("TWILIO_ACCOUNT_SID")
           [ -z "${{ secrets.TWILIO_AUTH_TOKEN }}" ] && MISSING_SECRETS+=("TWILIO_AUTH_TOKEN")
-          [ -z "${{ secrets.TWILIO_DEFAULT_FROM }}" ] && MISSING_SECRETS+=("TWILIO_DEFAULT_FROM")
-          [ -z "${{ secrets.SUPABASE_URL }}" ] && MISSING_SECRETS+=("SUPABASE_URL")
+          [ -z "${{ secrets.TWILIO_PHONE_NUMBER_REMINDERS }}" ] && MISSING_SECRETS+=("TWILIO_PHONE_NUMBER_REMINDERS")
+          [ -z "${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" ] && MISSING_SECRETS+=("NEXT_PUBLIC_SUPABASE_URL")
           [ -z "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" ] && MISSING_SECRETS+=("SUPABASE_SERVICE_ROLE_KEY")
           [ -z "${{ secrets.SES_FROM_EMAIL }}" ] && MISSING_SECRETS+=("SES_FROM_EMAIL")
           [ -z "${{ secrets.API_BASE_URL }}" ] && MISSING_SECRETS+=("API_BASE_URL")
@@ -96,8 +97,8 @@ jobs:
             --parameters \
               ParameterKey=TwilioAccountSid,ParameterValue=${{ secrets.TWILIO_ACCOUNT_SID }} \
               ParameterKey=TwilioAuthToken,ParameterValue=${{ secrets.TWILIO_AUTH_TOKEN }} \
-              ParameterKey=TwilioDefaultFrom,ParameterValue=${{ secrets.TWILIO_DEFAULT_FROM }} \
-              ParameterKey=SupabaseUrl,ParameterValue=${{ secrets.SUPABASE_URL }} \
+              ParameterKey=TwilioDefaultFrom,ParameterValue=${{ secrets.TWILIO_PHONE_NUMBER_REMINDERS }} \
+              ParameterKey=SupabaseUrl,ParameterValue=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }} \
               ParameterKey=SupabaseServiceRoleKey,ParameterValue=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }} \
               ParameterKey=SesFromEmail,ParameterValue=${{ secrets.SES_FROM_EMAIL }} \
               ParameterKey=ApiBaseUrl,ParameterValue=${{ secrets.API_BASE_URL }} \
