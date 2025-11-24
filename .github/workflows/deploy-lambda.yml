@@ -34,6 +34,39 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Validate required secrets
+        run: |
+          echo "Validating required GitHub secrets..."
+          MISSING_SECRETS=()
+
+          # Check if secrets are set (they'll be empty string if not set)
+          [ -z "${{ secrets.TWILIO_ACCOUNT_SID }}" ] && MISSING_SECRETS+=("TWILIO_ACCOUNT_SID")
+          [ -z "${{ secrets.TWILIO_AUTH_TOKEN }}" ] && MISSING_SECRETS+=("TWILIO_AUTH_TOKEN")
+          [ -z "${{ secrets.TWILIO_DEFAULT_FROM }}" ] && MISSING_SECRETS+=("TWILIO_DEFAULT_FROM")
+          [ -z "${{ secrets.SUPABASE_URL }}" ] && MISSING_SECRETS+=("SUPABASE_URL")
+          [ -z "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" ] && MISSING_SECRETS+=("SUPABASE_SERVICE_ROLE_KEY")
+          [ -z "${{ secrets.SES_FROM_EMAIL }}" ] && MISSING_SECRETS+=("SES_FROM_EMAIL")
+          [ -z "${{ secrets.API_BASE_URL }}" ] && MISSING_SECRETS+=("API_BASE_URL")
+          [ -z "${{ secrets.CRON_SECRET }}" ] && MISSING_SECRETS+=("CRON_SECRET")
+
+          if [ ${#MISSING_SECRETS[@]} -gt 0 ]; then
+            echo "❌ Missing required GitHub secrets:"
+            printf '  - %s\n' "${MISSING_SECRETS[@]}"
+            echo ""
+            echo "Please add these secrets in: Repository Settings → Secrets and variables → Actions"
+            exit 1
+          fi
+
+          # Validate email format
+          SES_EMAIL="${{ secrets.SES_FROM_EMAIL }}"
+          if ! echo "$SES_EMAIL" | grep -qE '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'; then
+            echo "❌ Invalid email format for SES_FROM_EMAIL: $SES_EMAIL"
+            echo "Please provide a valid email address (e.g., noreply@yourdomain.com)"
+            exit 1
+          fi
+
+          echo "✅ All required secrets are set and valid"
+
       - name: Check if stack exists
         id: check-stack
         run: |
