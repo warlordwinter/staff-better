@@ -12,12 +12,8 @@ exports.handler = async (event) => {
   );
 
   // Validate environment variables
-  const requiredEnvVars = [
-    "API_BASE_URL",
-    "CRON_SECRET",
-    "SES_FROM_EMAIL",
-    "AWS_REGION",
-  ];
+  // Note: AWS_REGION is automatically provided by Lambda, no need to check for it
+  const requiredEnvVars = ["API_BASE_URL", "CRON_SECRET", "SES_FROM_EMAIL"];
 
   for (const envVar of requiredEnvVars) {
     if (!process.env[envVar]) {
@@ -85,9 +81,7 @@ exports.handler = async (event) => {
         const { company_name, email, assignments } = companyData;
 
         if (!email) {
-          console.warn(
-            `Skipping company ${company_name} - no email address`
-          );
+          console.warn(`Skipping company ${company_name} - no email address`);
           results.errors.push({
             company: company_name,
             error: "No email address",
@@ -96,9 +90,7 @@ exports.handler = async (event) => {
         }
 
         if (!assignments || assignments.length === 0) {
-          console.log(
-            `Skipping company ${company_name} - no assignments`
-          );
+          console.log(`Skipping company ${company_name} - no assignments`);
           continue;
         }
 
@@ -173,4 +165,3 @@ exports.handler = async (event) => {
     };
   }
 };
-

@@ -5,16 +5,120 @@ on:
     paths:
       - "infrastructure/lambda/reminder-processor/**"
       - "infrastructure/lambda/daily-summary-email/**"
+      - "infrastructure/cloudformation/**"
       - ".github/workflows/deploy-lambda.yml"
   workflow_dispatch: # Allows manual triggering
 
 env:
   AWS_REGION: us-east-1
+  STACK_NAME: reminder-scheduler-stack
+  CLOUDFORMATION_TEMPLATE: infrastructure/cloudformation/reminder-scheduler-stack.yaml
 
 jobs:
+  deploy-cloudformation:
+    name: Deploy CloudFormation Stack
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check if stack exists
+        id: check-stack
+        run: |
+          if aws cloudformation describe-stacks \
+            --stack-name ${{ env.STACK_NAME }} \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Stacks[0].StackStatus' \
+            --output text 2>/dev/null; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Stack exists, will update"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Stack does not exist, will create"
+          fi
+
+      - name: Deploy CloudFormation Stack (Create)
+        if: steps.check-stack.outputs.exists == 'false'
+        run: |
+          echo "Creating CloudFormation stack..."
+          aws cloudformation create-stack \
+            --stack-name ${{ env.STACK_NAME }} \
+            --template-body file://${{ env.CLOUDFORMATION_TEMPLATE }} \
+            --parameters \
+              ParameterKey=TwilioAccountSid,ParameterValue=${{ secrets.TWILIO_ACCOUNT_SID }} \
+              ParameterKey=TwilioAuthToken,ParameterValue=${{ secrets.TWILIO_AUTH_TOKEN }} \
+              ParameterKey=TwilioDefaultFrom,ParameterValue=${{ secrets.TWILIO_DEFAULT_FROM }} \
+              ParameterKey=SupabaseUrl,ParameterValue=${{ secrets.SUPABASE_URL }} \
+              ParameterKey=SupabaseServiceRoleKey,ParameterValue=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }} \
+              ParameterKey=SesFromEmail,ParameterValue=${{ secrets.SES_FROM_EMAIL }} \
+              ParameterKey=ApiBaseUrl,ParameterValue=${{ secrets.API_BASE_URL }} \
+              ParameterKey=CronSecret,ParameterValue=${{ secrets.CRON_SECRET }} \
+            --region ${{ env.AWS_REGION }} \
+            --capabilities CAPABILITY_NAMED_IAM
+
+          echo "Waiting for stack creation to complete..."
+          aws cloudformation wait stack-create-complete \
+            --stack-name ${{ env.STACK_NAME }} \
+            --region ${{ env.AWS_REGION }}
+
+          echo "✅ Stack created successfully"
+
+      - name: Deploy CloudFormation Stack (Update)
+        if: steps.check-stack.outputs.exists == 'true'
+        run: |
+          echo "Updating CloudFormation stack..."
+          aws cloudformation update-stack \
+            --stack-name ${{ env.STACK_NAME }} \
+            --template-body file://${{ env.CLOUDFORMATION_TEMPLATE }} \
+            --parameters \
+              ParameterKey=TwilioAccountSid,UsePreviousValue=true \
+              ParameterKey=TwilioAuthToken,UsePreviousValue=true \
+              ParameterKey=TwilioDefaultFrom,UsePreviousValue=true \
+              ParameterKey=SupabaseUrl,UsePreviousValue=true \
+              ParameterKey=SupabaseServiceRoleKey,UsePreviousValue=true \
+              ParameterKey=SesFromEmail,ParameterValue=${{ secrets.SES_FROM_EMAIL }} \
+              ParameterKey=ApiBaseUrl,ParameterValue=${{ secrets.API_BASE_URL }} \
+              ParameterKey=CronSecret,ParameterValue=${{ secrets.CRON_SECRET }} \
+            --region ${{ env.AWS_REGION }} \
+            --capabilities CAPABILITY_NAMED_IAM || EXIT_CODE=$?
+
+          # Exit code 255 means no updates are to be performed, which is OK
+          if [ "${EXIT_CODE:-0}" = "255" ]; then
+            echo "ℹ️ No stack updates detected"
+          else
+            echo "Waiting for stack update to complete..."
+            aws cloudformation wait stack-update-complete \
+              --stack-name ${{ env.STACK_NAME }} \
+              --region ${{ env.AWS_REGION }}
+            echo "✅ Stack updated successfully"
+          fi
+
+      - name: Get stack outputs
+        run: |
+          echo "📋 Stack Outputs:"
+          aws cloudformation describe-stacks \
+            --stack-name ${{ env.STACK_NAME }} \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Stacks[0].Outputs' \
+            --output table
+
   deploy-reminder-processor:
     name: Deploy Reminder Processor Lambda
     runs-on: ubuntu-latest
+    needs: deploy-cloudformation
+    if: always() && (needs.deploy-cloudformation.result == 'success' || needs.deploy-cloudformation.result == 'skipped')
     env:
       LAMBDA_FUNCTION_NAME: ReminderProcessor
       LAMBDA_DIR: infrastructure/lambda/reminder-processor
@@ -108,6 +212,8 @@ jobs:
   deploy-daily-summary:
     name: Deploy Daily Summary Email Lambda
     runs-on: ubuntu-latest
+    needs: deploy-cloudformation
+    if: always() && (needs.deploy-cloudformation.result == 'success' || needs.deploy-cloudformation.result == 'skipped')
     env:
       LAMBDA_FUNCTION_NAME: DailySummaryEmail
       LAMBDA_DIR: infrastructure/lambda/daily-summary-email
