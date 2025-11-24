@@ -167,14 +167,10 @@ export default function JobAssociateTableRow({
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "UNCONFIRMED":
-        return "bg-gray-100 text-gray-800";
-      case "SOFT_CONFIRMED":
-        return "bg-yellow-100 text-yellow-800";
-      case "LIKELY_CONFIRMED":
-        return "bg-blue-100 text-blue-800";
       case "CONFIRMED":
         return "bg-green-100 text-green-800";
+      case "UNCONFIRMED":
+        return "bg-yellow-100 text-yellow-800";
       case "DECLINED":
         return "bg-red-100 text-red-800";
       default:
@@ -351,10 +347,8 @@ export default function JobAssociateTableRow({
               }
               className="w-full px-1 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-blue-500"
             >
-              <option value="UNCONFIRMED">Unconfirmed</option>
-              <option value="SOFT_CONFIRMED">Soft Confirmed</option>
-              <option value="LIKELY_CONFIRMED">Likely Confirmed</option>
               <option value="CONFIRMED">Confirmed</option>
+              <option value="UNCONFIRMED">Unconfirmed</option>
               <option value="DECLINED">Declined</option>
             </select>
           ) : (

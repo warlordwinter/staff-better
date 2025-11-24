@@ -4,26 +4,20 @@ import { IReminder } from "../../interfaces/IReminder";
 
 // Add this helper near the top of the file (below imports is fine)
 type Confirmation =
-  | "UNCONFIRMED"
-  | "SOFT_CONFIRMED"
-  | "LIKELY_CONFIRMED"
   | "CONFIRMED"
+  | "UNCONFIRMED"
   | "DECLINED";
 
 function toConfirmationStatus(
   value: string | null | undefined
 ): Confirmation | undefined {
   if (!value) return undefined;
-  switch (value.trim().toLowerCase()) {
-    case "unconfirmed":
-      return "UNCONFIRMED";
-    case "soft confirmed":
-      return "SOFT_CONFIRMED";
-    case "likely confirmed":
-      return "LIKELY_CONFIRMED";
-    case "confirmed":
+  switch (value.trim().toUpperCase()) {
+    case "CONFIRMED":
       return "CONFIRMED";
-    case "declined":
+    case "UNCONFIRMED":
+      return "UNCONFIRMED";
+    case "DECLINED":
       return "DECLINED";
     default:
       // Unknown string -> treat as undefined (or throw if you prefer)

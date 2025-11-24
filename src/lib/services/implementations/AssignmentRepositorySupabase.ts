@@ -63,16 +63,12 @@ export class AssignmentRepositorySupabase implements IAssignmentRepository {
   }
 
   private mapConfirmationStatus(status: string): ConfirmationStatus {
-    switch (status?.toLowerCase()) {
-      case "unconfirmed":
-        return ConfirmationStatus.UNCONFIRMED;
-      case "soft confirmed":
-        return ConfirmationStatus.SOFT_CONFIRMED;
-      case "likely confirmed":
-        return ConfirmationStatus.LIKELY_CONFIRMED;
-      case "confirmed":
+    switch (status?.toUpperCase()) {
+      case "CONFIRMED":
         return ConfirmationStatus.CONFIRMED;
-      case "declined":
+      case "UNCONFIRMED":
+        return ConfirmationStatus.UNCONFIRMED;
+      case "DECLINED":
         return ConfirmationStatus.DECLINED;
       default:
         console.warn(

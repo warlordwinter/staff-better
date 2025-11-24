@@ -1,28 +1,41 @@
-AWSTemplateFormatVersion: '2010-09-09'
-Description: 'CloudFormation stack for EventBridge Scheduler + Lambda reminder system'
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CloudFormation stack for EventBridge Scheduler + Lambda reminder system"
 
 Parameters:
   TwilioAccountSid:
     Type: String
-    Description: 'Twilio Account SID'
+    Description: "Twilio Account SID"
     NoEcho: true
-  
+
   TwilioAuthToken:
     Type: String
-    Description: 'Twilio Auth Token'
+    Description: "Twilio Auth Token"
     NoEcho: true
-  
+
   TwilioDefaultFrom:
     Type: String
-    Description: 'Default Twilio phone number for reminders'
-  
+    Description: "Default Twilio phone number for reminders"
+
   SupabaseUrl:
     Type: String
-    Description: 'Supabase project URL'
-  
+    Description: "Supabase project URL"
+
   SupabaseServiceRoleKey:
     Type: String
-    Description: 'Supabase service role key'
+    Description: "Supabase service role key"
+    NoEcho: true
+
+  SesFromEmail:
+    Type: String
+    Description: "Verified SES email address to send from"
+
+  ApiBaseUrl:
+    Type: String
+    Description: "Base URL of the Next.js API (e.g., https://your-app.vercel.app)"
+
+  CronSecret:
+    Type: String
+    Description: "Secret token for authenticating API calls from Lambda"
     NoEcho: true
 
 Resources:
@@ -32,7 +45,7 @@ Resources:
     Properties:
       RoleName: ReminderLambdaExecutionRole
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
@@ -43,14 +56,14 @@ Resources:
       Policies:
         - PolicyName: CloudWatchLogsPolicy
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
-                Resource: 'arn:aws:logs:*:*:*'
+                Resource: "arn:aws:logs:*:*:*"
 
   # Lambda Function
   ReminderLambda:
@@ -75,13 +88,13 @@ Resources:
           exports.handler = async (event) => {
             return { statusCode: 200, body: JSON.stringify({ message: 'Lambda deployed' }) };
           };
-      Description: 'Processes reminders and sends SMS via Twilio'
+      Description: "Processes reminders and sends SMS via Twilio"
 
   # CloudWatch Log Group for Lambda
   ReminderLambdaLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub '/aws/lambda/${ReminderLambda}'
+      LogGroupName: !Sub "/aws/lambda/${ReminderLambda}"
       RetentionInDays: 14
 
   # EventBridge Scheduler IAM Role (to invoke Lambda)
@@ -90,7 +103,7 @@ Resources:
     Properties:
       RoleName: EventBridgeInvokeReminderLambdaRole
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
@@ -99,35 +112,155 @@ Resources:
       Policies:
         - PolicyName: InvokeLambdaPolicy
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
                   - lambda:InvokeFunction
                 Resource: !GetAtt ReminderLambda.Arn
 
+  # Daily Summary Email Lambda Execution Role
+  DailySummaryLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: DailySummaryLambdaExecutionRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: CloudWatchLogsPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "arn:aws:logs:*:*:*"
+        - PolicyName: SESSendEmailPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ses:SendEmail
+                  - ses:SendRawEmail
+                Resource: "*"
+
+  # Daily Summary Email Lambda Function
+  DailySummaryLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: DailySummaryEmail
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role: !GetAtt DailySummaryLambdaRole.Arn
+      Timeout: 300
+      MemorySize: 256
+      Environment:
+        Variables:
+          API_BASE_URL: !Ref ApiBaseUrl
+          CRON_SECRET: !Ref CronSecret
+          SES_FROM_EMAIL: !Ref SesFromEmail
+          AWS_REGION: !Ref AWS::Region
+      Code:
+        ZipFile: |
+          // Placeholder - actual code should be deployed via zip file
+          exports.handler = async (event) => {
+            return { statusCode: 200, body: JSON.stringify({ message: 'Lambda deployed' }) };
+          };
+      Description: "Sends daily email summaries of job assignments via SES"
+
+  # CloudWatch Log Group for Daily Summary Lambda
+  DailySummaryLambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${DailySummaryLambda}"
+      RetentionInDays: 14
+
+  # EventBridge Scheduler IAM Role (to invoke Daily Summary Lambda)
+  EventBridgeInvokeDailySummaryRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: EventBridgeInvokeDailySummaryRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: InvokeLambdaPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !GetAtt DailySummaryLambda.Arn
+
+  # EventBridge Schedule for Daily Summary (5:00 PM MST = 00:00 UTC next day)
+  DailySummarySchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: DailySummaryEmailSchedule
+      Description: "Triggers daily email summary at 5:00 PM MST (00:00 UTC)"
+      ScheduleExpression: "cron(0 0 * * ? *)"
+      ScheduleExpressionTimezone: "UTC"
+      State: ENABLED
+      Target:
+        Arn: !GetAtt DailySummaryLambda.Arn
+        RoleArn: !GetAtt EventBridgeInvokeDailySummaryRole.Arn
+        RetryPolicy:
+          MaximumRetryAttempts: 2
+
 Outputs:
   LambdaFunctionArn:
-    Description: 'ARN of the Reminder Lambda function'
+    Description: "ARN of the Reminder Lambda function"
     Value: !GetAtt ReminderLambda.Arn
     Export:
-      Name: !Sub '${AWS::StackName}-LambdaArn'
+      Name: !Sub "${AWS::StackName}-LambdaArn"
 
   LambdaExecutionRoleArn:
-    Description: 'ARN of the Lambda execution role'
+    Description: "ARN of the Lambda execution role"
     Value: !GetAtt ReminderLambdaRole.Arn
     Export:
-      Name: !Sub '${AWS::StackName}-LambdaRoleArn'
+      Name: !Sub "${AWS::StackName}-LambdaRoleArn"
 
   EventBridgeInvokeRoleArn:
-    Description: 'ARN of the EventBridge Scheduler role for invoking Lambda'
+    Description: "ARN of the EventBridge Scheduler role for invoking Lambda"
     Value: !GetAtt EventBridgeInvokeLambdaRole.Arn
     Export:
-      Name: !Sub '${AWS::StackName}-EventBridgeRoleArn'
+      Name: !Sub "${AWS::StackName}-EventBridgeRoleArn"
 
   LambdaFunctionName:
-    Description: 'Name of the Lambda function'
+    Description: "Name of the Lambda function"
     Value: !Ref ReminderLambda
     Export:
-      Name: !Sub '${AWS::StackName}-LambdaName'
+      Name: !Sub "${AWS::StackName}-LambdaName"
 
+  DailySummaryLambdaArn:
+    Description: "ARN of the Daily Summary Email Lambda function"
+    Value: !GetAtt DailySummaryLambda.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-DailySummaryLambdaArn"
+
+  DailySummaryLambdaName:
+    Description: "Name of the Daily Summary Email Lambda function"
+    Value: !Ref DailySummaryLambda
+    Export:
+      Name: !Sub "${AWS::StackName}-DailySummaryLambdaName"
+
+  DailySummaryScheduleName:
+    Description: "Name of the EventBridge schedule for daily summaries"
+    Value: !Ref DailySummarySchedule
+    Export:
+      Name: !Sub "${AWS::StackName}-DailySummaryScheduleName"

@@ -130,10 +130,8 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
       job_id: string;
       associate_id: string;
       confirmation_status:
-        | "UNCONFIRMED"
-        | "SOFT_CONFIRMED"
-        | "LIKELY_CONFIRMED"
         | "CONFIRMED"
+        | "UNCONFIRMED"
         | "DECLINED";
       work_date: string | null;
       start_time: string | null;
@@ -264,10 +262,8 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
     assignmentData: {
       associate_id: string;
       confirmation_status?:
-        | "UNCONFIRMED"
-        | "SOFT_CONFIRMED"
-        | "LIKELY_CONFIRMED"
         | "CONFIRMED"
+        | "UNCONFIRMED"
         | "DECLINED";
       work_date: string | null;
       start_time: string | null;

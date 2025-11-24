@@ -927,10 +927,8 @@ export type Database = {
     }
     Enums: {
       confirmation_status_enum:
-        | "UNCONFIRMED"
-        | "SOFT_CONFIRMED"
-        | "LIKELY_CONFIRMED"
         | "CONFIRMED"
+        | "UNCONFIRMED"
         | "DECLINED"
       job_status_enum: "ACTIVE" | "PAST" | "UPCOMING"
     }
@@ -1061,10 +1059,8 @@ export const Constants = {
   public: {
     Enums: {
       confirmation_status_enum: [
-        "UNCONFIRMED",
-        "SOFT_CONFIRMED",
-        "LIKELY_CONFIRMED",
         "CONFIRMED",
+        "UNCONFIRMED",
         "DECLINED",
       ],
       job_status_enum: ["ACTIVE", "PAST", "UPCOMING"],
