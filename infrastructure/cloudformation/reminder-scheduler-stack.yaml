@@ -27,10 +27,10 @@ Parameters:
 
   SesFromEmail:
     Type: String
-    Description: "Verified SES email address to send from"
+    Description: "Existing verified SES email address or domain to send from (must already be verified in SES)"
     MinLength: 1
     AllowedPattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
-    ConstraintDescription: "Must be a valid email address"
+    ConstraintDescription: "Must be a valid email address that is already verified in SES"
 
   ApiBaseUrl:
     Type: String
@@ -40,9 +40,6 @@ Parameters:
     Type: String
     Description: "Secret token for authenticating API calls from Lambda"
     NoEcho: true
-
-Conditions:
-  HasSesEmail: !Not [!Equals [!Ref SesFromEmail, ""]]
 
 Resources:
   # Lambda Execution Role
@@ -190,15 +187,6 @@ Resources:
       LogGroupName: !Sub "/aws/lambda/${DailySummaryLambda}"
       RetentionInDays: 14
 
-  # SES Email Identity (verifies the sender email address)
-  # Note: This creates the identity but you still need to verify it via email
-  # The verification email will be sent to the email address specified
-  SesEmailIdentity:
-    Type: AWS::SES::EmailIdentity
-    Condition: HasSesEmail
-    Properties:
-      EmailIdentity: !Ref SesFromEmail
-
   # EventBridge Scheduler IAM Role (to invoke Daily Summary Lambda)
   EventBridgeInvokeDailySummaryRole:
     Type: AWS::IAM::Role
@@ -280,10 +268,3 @@ Outputs:
     Value: !Ref DailySummarySchedule
     Export:
       Name: !Sub "${AWS::StackName}-DailySummaryScheduleName"
-
-  SesEmailIdentityArn:
-    Condition: HasSesEmail
-    Description: "ARN of the SES email identity"
-    Value: !GetAtt SesEmailIdentity.Arn
-    Export:
-      Name: !Sub "${AWS::StackName}-SesEmailIdentityArn"
