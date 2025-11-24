@@ -37,7 +37,7 @@ jobs:
       - name: Install Lambda dependencies
         working-directory: ${{ env.LAMBDA_DIR }}
         run: |
-          npm ci --production
+          npm ci --omit=dev
           echo "Dependencies installed successfully"
 
       - name: Create deployment package
@@ -130,7 +130,7 @@ jobs:
       - name: Install Lambda dependencies
         working-directory: ${{ env.LAMBDA_DIR }}
         run: |
-          npm ci --production
+          npm ci --omit=dev
           echo "Dependencies installed successfully"
 
       - name: Create deployment package
