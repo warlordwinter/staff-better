@@ -29,6 +29,8 @@ interface RemindersPageViewProps {
   newCustomerName: string;
   newStartDate: string;
   newStartTime: string;
+  newNightBeforeTime: string;
+  newDayOfTime: string;
   scheduledCount: number;
   sentCount: number;
   confirmedCount: number;
@@ -51,6 +53,8 @@ interface RemindersPageViewProps {
   onCustomerNameChange: (name: string) => void;
   onStartDateChange: (date: string) => void;
   onStartTimeChange: (time: string) => void;
+  onNightBeforeTimeChange: (time: string) => void;
+  onDayOfTimeChange: (time: string) => void;
   onCreateReminder: () => void;
   onCancelAdd: () => void;
   onDeleteReminder: (job: JobWithCount) => void;
@@ -68,6 +72,8 @@ export default function RemindersPageView({
   newCustomerName,
   newStartDate,
   newStartTime,
+  newNightBeforeTime,
+  newDayOfTime,
   scheduledCount,
   sentCount,
   confirmedCount,
@@ -85,6 +91,8 @@ export default function RemindersPageView({
   onCustomerNameChange,
   onStartDateChange,
   onStartTimeChange,
+  onNightBeforeTimeChange,
+  onDayOfTimeChange,
   onCreateReminder,
   onCancelAdd,
   onDeleteReminder,
@@ -131,6 +139,20 @@ export default function RemindersPageView({
     e.stopPropagation();
 
     if (!editJobTitle.trim()) return;
+
+    // Validate that date/time is not in the past
+    if (editStartDate && editStartTime) {
+      const now = new Date();
+      const selectedDate = new Date(`${editStartDate}T${editStartTime}`);
+      const bufferMs = 2 * 60 * 1000; // 2 minutes buffer
+
+      if (selectedDate.getTime() <= now.getTime() + bufferMs) {
+        alert(
+          "Cannot schedule reminders in the past. Please select a future date and time."
+        );
+        return;
+      }
+    }
 
     try {
       // Convert local time to UTC for API
@@ -454,6 +476,7 @@ export default function RemindersPageView({
                         value={editStartDate}
                         onChange={(e) => setEditStartDate(e.target.value)}
                         onClick={(e) => e.stopPropagation()}
+                        min={new Date().toISOString().split("T")[0]}
                         className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-orange-500"
                       />
                     </div>
@@ -476,6 +499,12 @@ export default function RemindersPageView({
                         value={editStartTime}
                         onChange={(e) => setEditStartTime(e.target.value)}
                         onClick={(e) => e.stopPropagation()}
+                        min={
+                          editStartDate ===
+                          new Date().toISOString().split("T")[0]
+                            ? new Date().toTimeString().slice(0, 5)
+                            : "00:00"
+                        }
                         className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-orange-500"
                       />
                     </div>
@@ -496,7 +525,7 @@ export default function RemindersPageView({
                           d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                         />
                       </svg>
-                      <span className="text-sm">{dateTime}</span>
+                      <span className="text-sm">Starts {dateTime}</span>
                     </div>
 
                     {/* Reminder Send Times */}
@@ -518,7 +547,9 @@ export default function RemindersPageView({
                         <span className="text-sm text-gray-600">
                           {formatReminderSendTimes(
                             job.start_date || null,
-                            job.start_time || null
+                            job.start_time || null,
+                            job.night_before_time,
+                            job.day_of_time
                           )}
                         </span>
                       </div>
@@ -665,10 +696,14 @@ export default function RemindersPageView({
           customerName={newCustomerName}
           startDate={newStartDate}
           startTime={newStartTime}
+          nightBeforeTime={newNightBeforeTime}
+          dayOfTime={newDayOfTime}
           onJobTitleChange={onJobTitleChange}
           onCustomerNameChange={onCustomerNameChange}
           onStartDateChange={onStartDateChange}
           onStartTimeChange={onStartTimeChange}
+          onNightBeforeTimeChange={onNightBeforeTimeChange}
+          onDayOfTimeChange={onDayOfTimeChange}
           onSave={onCreateReminder}
           onCancel={onCancelAdd}
         />

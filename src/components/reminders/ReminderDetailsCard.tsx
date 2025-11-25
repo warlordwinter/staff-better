@@ -141,7 +141,12 @@ export default function ReminderDetailsCard({
             />
           </svg>
           <span className="text-sm">
-            {formatReminderSendTimesDetail(displayDate || null, displayTime || null)
+            {formatReminderSendTimesDetail(
+              displayDate || null,
+              displayTime || null,
+              job.night_before_time,
+              job.day_of_time
+            )
               .split("**")
               .map((part, index) =>
                 index % 2 === 1 ? (

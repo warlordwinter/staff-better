@@ -138,10 +138,8 @@ export class ConfirmationHandler implements IMessageHandler {
 
     if (hoursDifference <= 6 && hoursDifference > 0) {
       return ConfirmationStatus.CONFIRMED;
-    } else if (hoursDifference <= 24) {
-      return ConfirmationStatus.LIKELY_CONFIRMED;
     } else {
-      return ConfirmationStatus.SOFT_CONFIRMED;
+      return ConfirmationStatus.UNCONFIRMED;
     }
   }
 

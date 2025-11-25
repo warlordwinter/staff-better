@@ -36,6 +36,7 @@ export default function AddAssociateModal({
   );
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const scheduleIncomplete = !workDate || !workDate.trim();
 
   useEffect(() => {
     if (show) {
@@ -114,6 +115,13 @@ export default function AddAssociateModal({
   };
 
   const handleAddAssociates = async () => {
+    if (scheduleIncomplete) {
+      setError(
+        "Set a shift date on the reminder before assigning associates."
+      );
+      return;
+    }
+
     if (selectedAssociateIds.size === 0) return;
 
     setAdding(true);
@@ -196,6 +204,18 @@ export default function AddAssociateModal({
           </button>
         </div>
 
+        {scheduleIncomplete && (
+          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-900">
+            <p className="text-sm font-semibold">
+              Set a shift date before adding associates.
+            </p>
+            <p className="text-xs mt-1">
+              Go back to the reminder details, add a date, then reopen this
+              dialog.
+            </p>
+          </div>
+        )}
+
         {availableAssociates.length > 0 && (
           <div className="mb-4 flex items-center justify-between">
             <label className="flex items-center gap-2 cursor-pointer">
@@ -206,6 +226,7 @@ export default function AddAssociateModal({
                   availableAssociates.length > 0
                 }
                 onChange={handleSelectAll}
+                disabled={scheduleIncomplete}
                 className="w-4 h-4 text-orange-500 border-gray-300 rounded focus:ring-orange-500"
               />
               <span className="text-sm font-medium text-gray-700">
@@ -227,7 +248,8 @@ export default function AddAssociateModal({
             placeholder="Search by name, phone, or email..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+            disabled={scheduleIncomplete}
+            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-gray-100 disabled:text-gray-500"
           />
         </div>
 
@@ -235,6 +257,10 @@ export default function AddAssociateModal({
           {loading ? (
             <div className="p-8 text-center text-gray-500">
               Loading associates...
+            </div>
+          ) : scheduleIncomplete ? (
+            <div className="p-8 text-center text-gray-500 text-sm">
+              Shift date required before showing available associates.
             </div>
           ) : availableAssociates.length === 0 ? (
             <div className="p-8 text-center text-gray-500">
@@ -262,6 +288,7 @@ export default function AddAssociateModal({
                       type="checkbox"
                       checked={isSelected}
                       onChange={() => handleToggleAssociate(associate.id)}
+                      disabled={scheduleIncomplete}
                       className="w-4 h-4 text-orange-500 border-gray-300 rounded focus:ring-orange-500 flex-shrink-0"
                     />
                     <div className="flex-1 min-w-0">
@@ -292,7 +319,14 @@ export default function AddAssociateModal({
           </button>
           <button
             onClick={handleAddAssociates}
-            disabled={selectedAssociateIds.size === 0 || adding}
+            disabled={
+              selectedAssociateIds.size === 0 || adding || scheduleIncomplete
+            }
+            title={
+              scheduleIncomplete
+                ? "Set a shift date on the reminder before adding associates."
+                : undefined
+            }
             className="px-4 py-2 bg-gradient-to-r from-[#FFBB87] to-[#FE6F00] text-white rounded-md hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
           >
             {adding

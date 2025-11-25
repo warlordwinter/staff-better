@@ -4,26 +4,20 @@ import { IReminder } from "../../interfaces/IReminder";
 
 // Add this helper near the top of the file (below imports is fine)
 type Confirmation =
-  | "UNCONFIRMED"
-  | "SOFT_CONFIRMED"
-  | "LIKELY_CONFIRMED"
   | "CONFIRMED"
+  | "UNCONFIRMED"
   | "DECLINED";
 
 function toConfirmationStatus(
   value: string | null | undefined
 ): Confirmation | undefined {
   if (!value) return undefined;
-  switch (value.trim().toLowerCase()) {
-    case "unconfirmed":
-      return "UNCONFIRMED";
-    case "soft confirmed":
-      return "SOFT_CONFIRMED";
-    case "likely confirmed":
-      return "LIKELY_CONFIRMED";
-    case "confirmed":
+  switch (value.trim().toUpperCase()) {
+    case "CONFIRMED":
       return "CONFIRMED";
-    case "declined":
+    case "UNCONFIRMED":
+      return "UNCONFIRMED";
+    case "DECLINED":
       return "DECLINED";
     default:
       // Unknown string -> treat as undefined (or throw if you prefer)
@@ -614,22 +608,15 @@ export class ReminderDaoSupabase implements IReminder {
     const todayString = now.toISOString().split("T")[0];
 
     // Calculate time range (current time + hoursAhead)
-    const currentTime = now.toTimeString().split(" ")[0]; // HH:MM:SS format
-    const futureTime = new Date(now.getTime() + hoursAhead * 60 * 60 * 1000)
-      .toTimeString()
-      .split(" ")[0];
-
-    // Extract just the time portion (HH:MM:SS) for comparison
-    // start_time is stored as a time string, not a full datetime
-    const currentTimeOnly = currentTime; // Already in HH:MM:SS format
-    const futureTimeOnly = futureTime; // Already in HH:MM:SS format
+    const currentTime = now.getTime();
+    const futureTime = currentTime + hoursAhead * 60 * 60 * 1000;
 
     console.log(
-      `🔍 [DEBUG] getMorningOfReminders: Looking for jobs today (${todayString}) with start_time between ${currentTimeOnly} and ${futureTimeOnly}`
+      `🔍 [DEBUG] getMorningOfReminders: Looking for jobs today (${todayString}) with start_time within next ${hoursAhead} hours`
     );
 
-    // Query: work_date = today AND start_time >= currentTime AND start_time <= futureTime
-    // Since start_time is a time field, we compare it as a time string
+    // Fetch all jobs for today, then filter by time in JavaScript
+    // This avoids PostgreSQL type issues with start_time (which may be stored as TIMESTAMPTZ)
     const { data, error } = await supabase
       .from("job_assignments")
       .select(
@@ -654,24 +641,66 @@ export class ReminderDaoSupabase implements IReminder {
         `
       )
       .eq("work_date", todayString)
-      .gte("start_time", currentTimeOnly) // Compare time strings (HH:MM:SS)
-      .lte("start_time", futureTimeOnly) // Compare time strings (HH:MM:SS)
-      .gt("num_reminders", 0)
-      .order("start_time", { ascending: true });
+      .gt("num_reminders", 0);
 
     if (error) {
       console.error("Error grabbing morning-of reminders:", error);
       throw new Error(JSON.stringify(error));
     }
 
-    console.log(
-      `🔍 [DEBUG] getMorningOfReminders: Found ${data?.length || 0} assignments`
-    );
-
     if (!data || data.length === 0) {
+      console.log(
+        `🔍 [DEBUG] getMorningOfReminders: Found 0 assignments for today`
+      );
       return [];
     }
 
-    return transformReminderData(data);
+    // Filter assignments where start_time is within the next hoursAhead hours
+    const filteredData = data.filter((item) => {
+      if (!item.start_time) return false;
+
+      // Parse start_time (could be ISO timestamp or time string)
+      let startTimeMs: number;
+      try {
+        // Try parsing as ISO timestamp first
+        const startDate = new Date(item.start_time);
+        if (!isNaN(startDate.getTime())) {
+          startTimeMs = startDate.getTime();
+        } else {
+          // If that fails, try parsing as time string and combine with today's date
+          const [hours, minutes, seconds] = item.start_time.split(":");
+          const today = new Date(todayString);
+          today.setUTCHours(
+            parseInt(hours) || 0,
+            parseInt(minutes) || 0,
+            parseInt(seconds) || 0
+          );
+          startTimeMs = today.getTime();
+        }
+      } catch {
+        return false;
+      }
+
+      // Check if start_time is between now and futureTime
+      return startTimeMs >= currentTime && startTimeMs <= futureTime;
+    });
+
+    // Sort by start_time after filtering (in JavaScript)
+    filteredData.sort((a, b) => {
+      if (!a.start_time || !b.start_time) return 0;
+      const timeA = new Date(a.start_time).getTime() || 0;
+      const timeB = new Date(b.start_time).getTime() || 0;
+      return timeA - timeB;
+    });
+
+    console.log(
+      `�� [DEBUG] getMorningOfReminders: Found ${data.length} assignments for today, ${filteredData.length} within next ${hoursAhead} hours`
+    );
+
+    if (filteredData.length === 0) {
+      return [];
+    }
+
+    return transformReminderData(filteredData);
   }
 }

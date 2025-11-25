@@ -58,6 +58,107 @@ export type Database = {
           },
         ]
       }
+      brands: {
+        Row: {
+          brand_name: string | null
+          brand_type: string | null
+          created_at: string | null
+          customer_id: string
+          id: string
+          status: string | null
+          twilio_brand_sid: string | null
+          updated_at: string | null
+          waba_id: string | null
+        }
+        Insert: {
+          brand_name?: string | null
+          brand_type?: string | null
+          created_at?: string | null
+          customer_id: string
+          id?: string
+          status?: string | null
+          twilio_brand_sid?: string | null
+          updated_at?: string | null
+          waba_id?: string | null
+        }
+        Update: {
+          brand_name?: string | null
+          brand_type?: string | null
+          created_at?: string | null
+          customer_id?: string
+          id?: string
+          status?: string | null
+          twilio_brand_sid?: string | null
+          updated_at?: string | null
+          waba_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brands_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "isv_customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaigns: {
+        Row: {
+          brand_id: string
+          campaign_sid: string | null
+          created_at: string | null
+          customer_id: string
+          estimated_volume: number | null
+          id: string
+          messaging_service_sid: string | null
+          sample_message: string | null
+          status: string | null
+          updated_at: string | null
+          use_case: string | null
+        }
+        Insert: {
+          brand_id: string
+          campaign_sid?: string | null
+          created_at?: string | null
+          customer_id: string
+          estimated_volume?: number | null
+          id?: string
+          messaging_service_sid?: string | null
+          sample_message?: string | null
+          status?: string | null
+          updated_at?: string | null
+          use_case?: string | null
+        }
+        Update: {
+          brand_id?: string
+          campaign_sid?: string | null
+          created_at?: string | null
+          customer_id?: string
+          estimated_volume?: number | null
+          id?: string
+          messaging_service_sid?: string | null
+          sample_message?: string | null
+          status?: string | null
+          updated_at?: string | null
+          use_case?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaigns_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaigns_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "isv_customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           company_name: string
@@ -207,6 +308,193 @@ export type Database = {
           },
         ]
       }
+      isv_customers: {
+        Row: {
+          address: string | null
+          business_type: string | null
+          company_id: string | null
+          contact_email: string
+          contact_name: string | null
+          contact_phone: string | null
+          created_at: string | null
+          estimated_monthly_volume: number | null
+          id: string
+          legal_name: string
+          meta_admin_email: string | null
+          meta_business_manager_id: string | null
+          name: string
+          opt_in_description: string | null
+          phone_number_preference: string | null
+          status: string | null
+          tax_id: string | null
+          updated_at: string | null
+          use_case_descriptions: string | null
+          website: string | null
+        }
+        Insert: {
+          address?: string | null
+          business_type?: string | null
+          company_id?: string | null
+          contact_email: string
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          estimated_monthly_volume?: number | null
+          id?: string
+          legal_name: string
+          meta_admin_email?: string | null
+          meta_business_manager_id?: string | null
+          name: string
+          opt_in_description?: string | null
+          phone_number_preference?: string | null
+          status?: string | null
+          tax_id?: string | null
+          updated_at?: string | null
+          use_case_descriptions?: string | null
+          website?: string | null
+        }
+        Update: {
+          address?: string | null
+          business_type?: string | null
+          company_id?: string | null
+          contact_email?: string
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          estimated_monthly_volume?: number | null
+          id?: string
+          legal_name?: string
+          meta_admin_email?: string | null
+          meta_business_manager_id?: string | null
+          name?: string
+          opt_in_description?: string | null
+          phone_number_preference?: string | null
+          status?: string | null
+          tax_id?: string | null
+          updated_at?: string | null
+          use_case_descriptions?: string | null
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "isv_customers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      isv_messages: {
+        Row: {
+          body: string | null
+          created_at: string | null
+          customer_id: string
+          direction: string
+          error_code: string | null
+          error_message: string | null
+          from_number: string
+          id: string
+          status: string | null
+          template_id: string | null
+          to_number: string
+          twilio_sid: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string | null
+          customer_id: string
+          direction: string
+          error_code?: string | null
+          error_message?: string | null
+          from_number: string
+          id?: string
+          status?: string | null
+          template_id?: string | null
+          to_number: string
+          twilio_sid?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          body?: string | null
+          created_at?: string | null
+          customer_id?: string
+          direction?: string
+          error_code?: string | null
+          error_message?: string | null
+          from_number?: string
+          id?: string
+          status?: string | null
+          template_id?: string | null
+          to_number?: string
+          twilio_sid?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "isv_messages_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "isv_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "isv_messages_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      isv_numbers: {
+        Row: {
+          country_code: string | null
+          created_at: string | null
+          customer_id: string
+          id: string
+          messaging_service_sid: string | null
+          phone_number: string
+          provisioned_for_whatsapp: boolean | null
+          twilio_number_sid: string
+          updated_at: string | null
+          whatsapp_status: string | null
+        }
+        Insert: {
+          country_code?: string | null
+          created_at?: string | null
+          customer_id: string
+          id?: string
+          messaging_service_sid?: string | null
+          phone_number: string
+          provisioned_for_whatsapp?: boolean | null
+          twilio_number_sid: string
+          updated_at?: string | null
+          whatsapp_status?: string | null
+        }
+        Update: {
+          country_code?: string | null
+          created_at?: string | null
+          customer_id?: string
+          id?: string
+          messaging_service_sid?: string | null
+          phone_number?: string
+          provisioned_for_whatsapp?: boolean | null
+          twilio_number_sid?: string
+          updated_at?: string | null
+          whatsapp_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "isv_numbers_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "isv_customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_assignments: {
         Row: {
           associate_id: string
@@ -217,6 +505,8 @@ export type Database = {
           last_confirmation_time: string | null
           last_reminder_time: string | null
           num_reminders: number | null
+          reminder_sent_at: string[] | null
+          reminder_types: string[] | null
           start_time: string | null
           work_date: string | null
         }
@@ -229,6 +519,8 @@ export type Database = {
           last_confirmation_time?: string | null
           last_reminder_time?: string | null
           num_reminders?: number | null
+          reminder_sent_at?: string[] | null
+          reminder_types?: string[] | null
           start_time?: string | null
           work_date?: string | null
         }
@@ -241,6 +533,8 @@ export type Database = {
           last_confirmation_time?: string | null
           last_reminder_time?: string | null
           num_reminders?: number | null
+          reminder_sent_at?: string[] | null
+          reminder_types?: string[] | null
           start_time?: string | null
           work_date?: string | null
         }
@@ -309,6 +603,7 @@ export type Database = {
           sender_type: string
           sent_at: string | null
           status: string | null
+          twilio_sid: string | null
         }
         Insert: {
           body?: string | null
@@ -319,6 +614,7 @@ export type Database = {
           sender_type: string
           sent_at?: string | null
           status?: string | null
+          twilio_sid?: string | null
         }
         Update: {
           body?: string | null
@@ -329,6 +625,7 @@ export type Database = {
           sender_type?: string
           sent_at?: string | null
           status?: string | null
+          twilio_sid?: string | null
         }
         Relationships: [
           {
@@ -372,6 +669,179 @@ export type Database = {
           },
         ]
       }
+      opt_outs: {
+        Row: {
+          created_at: string | null
+          customer_id: string
+          id: string
+          opt_in_proof: Json | null
+          opt_out_method: string | null
+          opt_out_type: string | null
+          phone_number: string
+        }
+        Insert: {
+          created_at?: string | null
+          customer_id: string
+          id?: string
+          opt_in_proof?: Json | null
+          opt_out_method?: string | null
+          opt_out_type?: string | null
+          phone_number: string
+        }
+        Update: {
+          created_at?: string | null
+          customer_id?: string
+          id?: string
+          opt_in_proof?: Json | null
+          opt_out_method?: string | null
+          opt_out_type?: string | null
+          phone_number?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opt_outs_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "isv_customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reminder_schedules: {
+        Row: {
+          created_at: string | null
+          id: string
+          job_id: string
+          reminder_type: string
+          schedule_arn: string
+          scheduled_time: string
+          start_time: string
+          updated_at: string | null
+          work_date: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          job_id: string
+          reminder_type: string
+          schedule_arn: string
+          scheduled_time: string
+          start_time: string
+          updated_at?: string | null
+          work_date: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          job_id?: string
+          reminder_type?: string
+          schedule_arn?: string
+          scheduled_time?: string
+          start_time?: string
+          updated_at?: string | null
+          work_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_job"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      templates: {
+        Row: {
+          body: string
+          category: string | null
+          created_at: string | null
+          customer_id: string
+          id: string
+          language: string | null
+          rejection_reason: string | null
+          status: string | null
+          template_name: string
+          twilio_template_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          body: string
+          category?: string | null
+          created_at?: string | null
+          customer_id: string
+          id?: string
+          language?: string | null
+          rejection_reason?: string | null
+          status?: string | null
+          template_name: string
+          twilio_template_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          body?: string
+          category?: string | null
+          created_at?: string | null
+          customer_id?: string
+          id?: string
+          language?: string | null
+          rejection_reason?: string | null
+          status?: string | null
+          template_name?: string
+          twilio_template_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "templates_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "isv_customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      twilio_subaccounts: {
+        Row: {
+          auth_token_encrypted: string
+          created_at: string | null
+          customer_id: string
+          friendly_name: string | null
+          id: string
+          status: string | null
+          subaccount_sid: string
+          updated_at: string | null
+        }
+        Insert: {
+          auth_token_encrypted: string
+          created_at?: string | null
+          customer_id: string
+          friendly_name?: string | null
+          id?: string
+          status?: string | null
+          subaccount_sid: string
+          updated_at?: string | null
+        }
+        Update: {
+          auth_token_encrypted?: string
+          created_at?: string | null
+          customer_id?: string
+          friendly_name?: string | null
+          id?: string
+          status?: string | null
+          subaccount_sid?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "twilio_subaccounts_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "isv_customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_profiles: {
         Row: {
           company_id: string | null
@@ -404,6 +874,50 @@ export type Database = {
           },
         ]
       }
+      webhook_events: {
+        Row: {
+          created_at: string | null
+          customer_id: string | null
+          error: string | null
+          event_payload: Json
+          event_type: string
+          id: string
+          processed: boolean | null
+          processed_at: string | null
+          retry_count: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          customer_id?: string | null
+          error?: string | null
+          event_payload: Json
+          event_type: string
+          id?: string
+          processed?: boolean | null
+          processed_at?: string | null
+          retry_count?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          customer_id?: string | null
+          error?: string | null
+          event_payload?: Json
+          event_type?: string
+          id?: string
+          processed?: boolean | null
+          processed_at?: string | null
+          retry_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_events_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "isv_customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -413,10 +927,8 @@ export type Database = {
     }
     Enums: {
       confirmation_status_enum:
-        | "UNCONFIRMED"
-        | "SOFT_CONFIRMED"
-        | "LIKELY_CONFIRMED"
         | "CONFIRMED"
+        | "UNCONFIRMED"
         | "DECLINED"
       job_status_enum: "ACTIVE" | "PAST" | "UPCOMING"
     }
@@ -547,10 +1059,8 @@ export const Constants = {
   public: {
     Enums: {
       confirmation_status_enum: [
-        "UNCONFIRMED",
-        "SOFT_CONFIRMED",
-        "LIKELY_CONFIRMED",
         "CONFIRMED",
+        "UNCONFIRMED",
         "DECLINED",
       ],
       job_status_enum: ["ACTIVE", "PAST", "UPCOMING"],

@@ -16,6 +16,8 @@ export interface UseRemindersPageReturn {
   newCustomerName: string;
   newStartDate: string;
   newStartTime: string;
+  newNightBeforeTime: string;
+  newDayOfTime: string;
 
   // Computed
   filteredJobs: JobWithCount[];
@@ -30,12 +32,16 @@ export interface UseRemindersPageReturn {
   setNewCustomerName: (name: string) => void;
   setNewStartDate: (date: string) => void;
   setNewStartTime: (time: string) => void;
+  setNewNightBeforeTime: (time: string) => void;
+  setNewDayOfTime: (time: string) => void;
   loadJobs: () => Promise<void>;
   createReminder: (
     jobTitle: string,
     customerName: string,
     startDate: string,
-    startTime: string
+    startTime: string,
+    nightBeforeTime?: string | null,
+    dayOfTime?: string | null
   ) => Promise<void>;
   deleteReminder: (jobId: string) => Promise<void>;
   resetForm: () => void;
@@ -53,6 +59,8 @@ export function useRemindersPage(
   const [newCustomerName, setNewCustomerName] = useState("");
   const [newStartDate, setNewStartDate] = useState("");
   const [newStartTime, setNewStartTime] = useState("");
+  const [newNightBeforeTime, setNewNightBeforeTime] = useState("19:00"); // Default 7:00 PM
+  const [newDayOfTime, setNewDayOfTime] = useState("07:00"); // Default 7:00 AM
 
   // Fetch jobs and their associate counts
   const loadJobs = useCallback(async () => {
@@ -62,7 +70,7 @@ export function useRemindersPage(
       if (!jobsRes.ok) throw new Error("Failed to fetch jobs");
       const jobsData: Job[] = await jobsRes.json();
 
-      // Fetch associate counts for each job
+      // Fetch associate counts and reminder status for each job
       const jobsWithCounts = await Promise.all(
         jobsData.map(async (job) => {
           try {
@@ -71,16 +79,26 @@ export function useRemindersPage(
             );
             if (assignmentsRes.ok) {
               const assignments = await assignmentsRes.json();
+              const assignmentArray = Array.isArray(assignments)
+                ? assignments
+                : [];
+              // Calculate minimum num_reminders to determine status
+              // (starts at 3, decreases as reminders are sent)
+              const numReminders =
+                assignmentArray.length > 0
+                  ? Math.min(
+                      ...assignmentArray.map((a: any) => a.num_reminders ?? 3)
+                    )
+                  : undefined;
               return {
                 ...job,
-                associateCount: Array.isArray(assignments)
-                  ? assignments.length
-                  : 0,
+                associateCount: assignmentArray.length,
+                numReminders,
               };
             }
-            return { ...job, associateCount: 0 };
+            return { ...job, associateCount: 0, numReminders: undefined };
           } catch {
-            return { ...job, associateCount: 0 };
+            return { ...job, associateCount: 0, numReminders: undefined };
           }
         })
       );
@@ -123,9 +141,24 @@ export function useRemindersPage(
     jobTitle: string,
     customerName: string,
     startDate: string,
-    startTime: string
+    startTime: string,
+    nightBeforeTime?: string | null,
+    dayOfTime?: string | null
   ) => {
     if (!jobTitle.trim()) return;
+
+    // Validate that date/time is not in the past
+    if (startDate && startTime) {
+      const now = new Date();
+      const selectedDate = new Date(`${startDate}T${startTime}`);
+      const bufferMs = 2 * 60 * 1000; // 2 minutes buffer
+
+      if (selectedDate.getTime() <= now.getTime() + bufferMs) {
+        throw new Error(
+          "Cannot schedule reminders in the past. Please select a future date and time."
+        );
+      }
+    }
 
     // Format start_time if provided (convert local time to UTC timestamp)
     let formattedStartTime: string | null = null;
@@ -160,6 +193,11 @@ export function useRemindersPage(
       job_status: "ACTIVE",
       start_date: startDate || new Date().toISOString().slice(0, 10),
       start_time: formattedStartTime,
+      night_before_time:
+        nightBeforeTime && nightBeforeTime.trim()
+          ? nightBeforeTime.trim()
+          : "19:00", // Default 7:00 PM
+      day_of_time: dayOfTime && dayOfTime.trim() ? dayOfTime.trim() : "07:00", // Default 7:00 AM
     };
 
     console.log("Job to create:", JSON.stringify(newJob, null, 2));
@@ -225,6 +263,8 @@ export function useRemindersPage(
     setNewCustomerName("");
     setNewStartDate("");
     setNewStartTime("");
+    setNewNightBeforeTime("19:00"); // Reset to default 7:00 PM
+    setNewDayOfTime("07:00"); // Reset to default 7:00 AM
   };
 
   return {
@@ -237,6 +277,8 @@ export function useRemindersPage(
     newCustomerName,
     newStartDate,
     newStartTime,
+    newNightBeforeTime,
+    newDayOfTime,
     // Computed
     filteredJobs,
     scheduledCount,
@@ -249,6 +291,8 @@ export function useRemindersPage(
     setNewCustomerName,
     setNewStartDate,
     setNewStartTime,
+    setNewNightBeforeTime,
+    setNewDayOfTime,
     loadJobs,
     createReminder,
     deleteReminder,

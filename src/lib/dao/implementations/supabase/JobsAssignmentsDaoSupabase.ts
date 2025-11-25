@@ -1,6 +1,7 @@
 import { createClient } from "../../../supabase/server";
 import { ConfirmationStatus } from "@/model/enums/ConfirmationStatus";
 import { IJobAssignments } from "../../interfaces/IJobAssignments";
+import { localDateTimeToUTCISO } from "@/utils/timeServer";
 
 export class JobsAssignmentsDaoSupabase implements IJobAssignments {
   private extractHour(value: string | null): number | null {
@@ -24,15 +25,113 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
     if (hour === null) return false;
     return hour >= 8 && hour <= 23;
   }
+
+  /**
+   * Extract time portion (HH:MM:SS) from a timestamp string
+   * Handles both full ISO timestamps and time-only strings
+   */
+  private extractTimeFromTimestamp(timestamp: string): string {
+    if (!timestamp) return "";
+
+    // If it's already in HH:MM:SS format, return as is
+    if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(timestamp)) {
+      return timestamp.length === 5 ? `${timestamp}:00` : timestamp;
+    }
+
+    // Try to parse as Date and extract time
+    const date = new Date(timestamp);
+    if (!isNaN(date.getTime())) {
+      const hours = date.getUTCHours().toString().padStart(2, "0");
+      const minutes = date.getUTCMinutes().toString().padStart(2, "0");
+      const seconds = date.getUTCSeconds().toString().padStart(2, "0");
+      return `${hours}:${minutes}:${seconds}`;
+    }
+
+    // If parsing fails, try to extract time from string
+    const timeMatch = timestamp.match(/(\d{1,2}):(\d{2})(:(\d{2}))?/);
+    if (timeMatch) {
+      return timeMatch[0];
+    }
+
+    return timestamp;
+  }
+
+  private normalizeWorkDateValue(workDate: string | null | undefined) {
+    if (!workDate || !workDate.trim()) return null;
+    const trimmed = workDate.trim();
+    if (/^\d{1,2}:\d{2}$/.test(trimmed)) {
+      console.warn(
+        `work_date contains time-only value "${workDate}", setting to null`
+      );
+      return null;
+    }
+    const parsedDate = new Date(trimmed);
+    if (isNaN(parsedDate.getTime())) {
+      console.warn(`Invalid work_date value "${workDate}", setting to null`);
+      return null;
+    }
+    return parsedDate.toISOString().split("T")[0];
+  }
+
+  private normalizeStartTimeValue(
+    startTime: string | null | undefined,
+    normalizedWorkDate: string | null
+  ): string | null {
+    if (!startTime || (typeof startTime === "string" && !startTime.trim())) {
+      return null;
+    }
+    const trimmed = startTime.trim();
+    const addSeconds = (value: string) =>
+      value.split(":").length === 2 ? `${value}:00` : value;
+
+    const timeOnlyRegex = /^\d{1,2}:\d{2}(?::\d{2})?$/;
+    if (timeOnlyRegex.test(trimmed)) {
+      if (!normalizedWorkDate) {
+        console.warn(
+          `Cannot apply timezone conversion for start_time "${startTime}" without work_date`
+        );
+        return null;
+      }
+      try {
+        return localDateTimeToUTCISO(normalizedWorkDate, addSeconds(trimmed));
+      } catch (error) {
+        console.warn(
+          `Failed to normalize start_time "${startTime}" with work_date "${normalizedWorkDate}":`,
+          error
+        );
+        return null;
+      }
+    }
+
+    const localDateTimeRegex =
+      /^\d{4}-\d{2}-\d{2}[ T]\d{1,2}:\d{2}(?::\d{2})?$/;
+    if (localDateTimeRegex.test(trimmed)) {
+      const [datePartRaw, timePartRaw] = trimmed.replace("T", " ").split(" ");
+      try {
+        return localDateTimeToUTCISO(datePartRaw, addSeconds(timePartRaw));
+      } catch (error) {
+        console.warn(
+          `Failed to normalize start_time "${startTime}" interpreted as local datetime:`,
+          error
+        );
+        return null;
+      }
+    }
+
+    const parsed = new Date(trimmed);
+    if (isNaN(parsed.getTime())) {
+      console.warn(`Invalid start_time value "${startTime}", setting to null`);
+      return null;
+    }
+    return parsed.toISOString();
+  }
   async insertJobsAssignments(
     jobsAssignments: {
       job_id: string;
       associate_id: string;
       confirmation_status:
-        | "UNCONFIRMED"
-        | "SOFT_CONFIRMED"
-        | "LIKELY_CONFIRMED"
         | "CONFIRMED"
+        | "UNCONFIRMED"
         | "DECLINED";
       work_date: string | null;
       start_time: string | null;
@@ -56,74 +155,24 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
           );
           return false; // Skip this assignment
         }
-        // Validate allowed time window 08:00-23:00 if present
-        if (!this.isWithinAllowedHours(assignment.start_time)) {
-          console.warn(
-            `start_time must be between 08:00 and 23:00 - skipping assignment (start_time=${assignment.start_time})`
-          );
-          return false;
-        }
         return true;
       })
       .map((assignment) => {
-        // Validate and format the start_time field
-        let formattedStartTime = assignment.start_time;
-
-        if (formattedStartTime && formattedStartTime.trim()) {
-          // Check if it's a time value (like "14:00") and format it properly
-          if (/^\d{1,2}:\d{2}$/.test(formattedStartTime.trim())) {
-            // If it's just a time, we need to combine it with a date
-            // For now, we'll use today's date as the base
-            const today = new Date();
-            const dateStr = today.toISOString().split("T")[0];
-            formattedStartTime = `${dateStr} ${formattedStartTime}:00`;
-            console.log(
-              `Formatted start_time: "${assignment.start_time}" -> "${formattedStartTime}"`
-            );
-          } else {
-            // Try to parse as a full timestamp
-            const date = new Date(formattedStartTime);
-            if (isNaN(date.getTime())) {
-              console.warn(
-                `Invalid start_time value "${formattedStartTime}", setting to null`
-              );
-              formattedStartTime = null;
-            } else {
-              formattedStartTime = date.toISOString();
-            }
-          }
-          // Final allowed-hours check after formatting
-          if (!this.isWithinAllowedHours(formattedStartTime)) {
-            console.warn(
-              `start_time must be between 08:00 and 23:00 - setting to null (start_time=${formattedStartTime})`
-            );
-            formattedStartTime = null;
-          }
+        const formattedWorkDate = this.normalizeWorkDateValue(
+          assignment.work_date
+        );
+        if (!formattedWorkDate) {
+          const jobLabel = assignment.job_id
+            ? ` for job ${assignment.job_id}`
+            : "";
+          throw new Error(
+            `Work date is required${jobLabel} before assigning associates. Please set a shift date and try again.`
+          );
         }
-
-        // Validate and format the work_date field
-        let formattedWorkDate = assignment.work_date;
-        if (formattedWorkDate && formattedWorkDate.trim()) {
-          // Check if it's a time value (like "14:00") and convert to null
-          if (/^\d{1,2}:\d{2}$/.test(formattedWorkDate.trim())) {
-            console.warn(
-              `work_date contains time value "${formattedWorkDate}", setting to null`
-            );
-            formattedWorkDate = null;
-          } else {
-            // Try to parse as a date
-            const date = new Date(formattedWorkDate);
-            if (isNaN(date.getTime())) {
-              console.warn(
-                `Invalid work_date value "${formattedWorkDate}", setting to null`
-              );
-              formattedWorkDate = null;
-            } else {
-              // Format as ISO date string
-              formattedWorkDate = date.toISOString().split("T")[0];
-            }
-          }
-        }
+        const formattedStartTime = this.normalizeStartTimeValue(
+          assignment.start_time,
+          formattedWorkDate
+        );
 
         return {
           ...assignment,
@@ -213,10 +262,8 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
     assignmentData: {
       associate_id: string;
       confirmation_status?:
-        | "UNCONFIRMED"
-        | "SOFT_CONFIRMED"
-        | "LIKELY_CONFIRMED"
         | "CONFIRMED"
+        | "UNCONFIRMED"
         | "DECLINED";
       work_date: string | null;
       start_time: string | null;
@@ -225,65 +272,18 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
   ) {
     const supabase = await createClient();
 
-    // Validate and format the start_time field
-    let formattedStartTime = assignmentData.start_time;
-
-    // start_time is optional - only validate if provided
-    if (formattedStartTime && formattedStartTime.trim()) {
-      // Check if it's a time value (like "14:00") and format it properly
-      if (/^\d{1,2}:\d{2}$/.test(formattedStartTime.trim())) {
-        // If it's just a time, we need to combine it with a date
-        // For now, we'll use today's date as the base
-        const today = new Date();
-        const dateStr = today.toISOString().split("T")[0];
-        formattedStartTime = `${dateStr} ${formattedStartTime}:00`;
-        console.log(
-          `Formatted start_time: "${assignmentData.start_time}" -> "${formattedStartTime}"`
-        );
-      } else {
-        // Try to parse as a full timestamp
-        const date = new Date(formattedStartTime);
-        if (isNaN(date.getTime())) {
-          console.warn(
-            `Invalid start_time value "${formattedStartTime}", setting to null`
-          );
-          formattedStartTime = null;
-        } else {
-          formattedStartTime = date.toISOString();
-        }
-      }
-    }
-
-    // Enforce allowed hours (only if start_time is provided)
-    if (formattedStartTime && !this.isWithinAllowedHours(formattedStartTime)) {
+    const formattedWorkDate = this.normalizeWorkDateValue(
+      assignmentData.work_date
+    );
+    if (!formattedWorkDate) {
       throw new Error(
-        `start_time must be between 08:00 and 23:00 (got ${formattedStartTime})`
+        "Work date is required to assign associates. Please update the reminder’s shift date."
       );
     }
-
-    // Validate and format the work_date field
-    let formattedWorkDate = assignmentData.work_date;
-    if (formattedWorkDate && formattedWorkDate.trim()) {
-      // Check if it's a time value (like "14:00") and convert to null
-      if (/^\d{1,2}:\d{2}$/.test(formattedWorkDate.trim())) {
-        console.warn(
-          `work_date contains time value "${formattedWorkDate}", setting to null`
-        );
-        formattedWorkDate = null;
-      } else {
-        // Try to parse as a date
-        const date = new Date(formattedWorkDate);
-        if (isNaN(date.getTime())) {
-          console.warn(
-            `Invalid work_date value "${formattedWorkDate}", setting to null`
-          );
-          formattedWorkDate = null;
-        } else {
-          // Format as ISO date string
-          formattedWorkDate = date.toISOString().split("T")[0];
-        }
-      }
-    }
+    const formattedStartTime = this.normalizeStartTimeValue(
+      assignmentData.start_time,
+      formattedWorkDate
+    );
 
     const insertData = {
       job_id: jobId,
@@ -314,6 +314,48 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
       throw new Error(JSON.stringify(error));
     }
 
+    // Create EventBridge schedules if work_date and start_time are provided
+    if (formattedWorkDate && formattedStartTime) {
+      try {
+        // Extract time portion from start_time (might be full timestamp)
+        const timePortion = this.extractTimeFromTimestamp(formattedStartTime);
+        const eventBridgeService = new (
+          await import("@/lib/services/eventbridgeScheduleService")
+        ).EventBridgeScheduleService();
+
+        // Fetch job reminder times
+        const { data: jobData } = await supabase
+          .from("jobs")
+          .select("night_before_time, day_of_time")
+          .eq("id", jobId)
+          .single();
+
+        const createdArns = await eventBridgeService.createReminderSchedules(
+          jobId,
+          formattedWorkDate,
+          timePortion,
+          insertData.num_reminders || 2,
+          jobData?.night_before_time || null,
+          jobData?.day_of_time || null
+        );
+        if (createdArns.length > 0) {
+          console.log(
+            `Created ${createdArns.length} EventBridge schedule(s) for job ${jobId}, date ${formattedWorkDate}, time ${timePortion}`
+          );
+        } else {
+          console.log(
+            `No EventBridge schedules created for job ${jobId}, date ${formattedWorkDate}, time ${timePortion} (all reminders were in the past or already exist)`
+          );
+        }
+      } catch (scheduleError) {
+        // Log error but don't fail the assignment creation
+        console.error(
+          "Error creating EventBridge schedules (assignment still created):",
+          scheduleError
+        );
+      }
+    }
+
     // Format work_date to return only the date portion (YYYY-MM-DD)
     return data.map((assignment) => ({
       ...assignment,
@@ -340,92 +382,45 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
     console.log("Job Assignment AssociateId:", associateId);
     console.log("Job Assignment updates:", updates);
 
+    // Get current assignment to check if work_date or start_time are changing
+    const { data: currentAssignment } = await supabase
+      .from("job_assignments")
+      .select("work_date, start_time, num_reminders")
+      .eq("job_id", jobId)
+      .eq("associate_id", associateId)
+      .single();
+
+    const oldWorkDate = currentAssignment?.work_date
+      ? currentAssignment.work_date.split("T")[0]
+      : null;
+    const oldStartTime = currentAssignment?.start_time
+      ? this.extractTimeFromTimestamp(currentAssignment.start_time)
+      : null;
+
     const cleanedUpdates = Object.fromEntries(
       Object.entries(updates).filter(([, value]) => value !== "")
     );
 
-    // Process start_time if it's being updated
-    if (cleanedUpdates.start_time) {
-      let formattedStartTime = cleanedUpdates.start_time;
-
-      // Validate that start_time is not empty or null
-      if (
-        !formattedStartTime ||
-        (typeof formattedStartTime === "string" && !formattedStartTime.trim())
-      ) {
-        console.warn(
-          "start_time cannot be empty or null - removing from update"
-        );
-        delete cleanedUpdates.start_time;
-      } else if (
-        formattedStartTime &&
-        typeof formattedStartTime === "string" &&
-        formattedStartTime.trim()
-      ) {
-        // Check if it's a time value (like "14:00") and format it properly
-        if (/^\d{1,2}:\d{2}$/.test(formattedStartTime.trim())) {
-          // If it's just a time, we need to combine it with a date
-          // Use the work_date if available, otherwise use today's date
-          const workDate =
-            cleanedUpdates.work_date || new Date().toISOString().split("T")[0];
-          formattedStartTime = `${workDate} ${formattedStartTime}:00`;
-          console.log(
-            `Formatted start_time: "${cleanedUpdates.start_time}" -> "${formattedStartTime}" (using work_date: ${workDate})`
-          );
-          // Assign the formatted time back to cleanedUpdates
-          cleanedUpdates.start_time = formattedStartTime;
-        } else {
-          // Try to parse as a full timestamp
-          const date = new Date(formattedStartTime);
-          if (isNaN(date.getTime())) {
-            console.warn(
-              `Invalid start_time value "${formattedStartTime}", keeping original value`
-            );
-            // Don't delete or modify - keep the original value
-          } else {
-            formattedStartTime = date.toISOString();
-            // Assign the formatted time back to cleanedUpdates
-            cleanedUpdates.start_time = formattedStartTime;
-          }
-        }
-        // Enforce allowed hours on update
-        if (!this.isWithinAllowedHours(cleanedUpdates.start_time as string)) {
-          throw new Error(
-            `start_time must be between 08:00 and 23:00 (got ${cleanedUpdates.start_time})`
-          );
-        }
+    if (cleanedUpdates.work_date) {
+      const normalizedWorkDate = this.normalizeWorkDateValue(
+        cleanedUpdates.work_date as string
+      );
+      if (normalizedWorkDate) {
+        cleanedUpdates.work_date = normalizedWorkDate;
+      } else {
+        delete cleanedUpdates.work_date;
       }
     }
 
-    // Process work_date if it's being updated
-    if (cleanedUpdates.work_date) {
-      let formattedWorkDate = cleanedUpdates.work_date;
-      if (
-        formattedWorkDate &&
-        typeof formattedWorkDate === "string" &&
-        formattedWorkDate.trim()
-      ) {
-        // Check if it's a time value (like "14:00") and convert to null
-        if (/^\d{1,2}:\d{2}$/.test(formattedWorkDate.trim())) {
-          console.warn(
-            `work_date contains time value "${formattedWorkDate}", setting to null`
-          );
-          delete cleanedUpdates.work_date;
-        } else {
-          // Try to parse as a date
-          const date = new Date(formattedWorkDate);
-          if (isNaN(date.getTime())) {
-            console.warn(
-              `Invalid work_date value "${formattedWorkDate}", setting to null`
-            );
-            delete cleanedUpdates.work_date;
-          } else {
-            // Format as ISO date string
-            formattedWorkDate = date.toISOString().split("T")[0];
-          }
-        }
+    if (cleanedUpdates.start_time) {
+      const normalizedStart = this.normalizeStartTimeValue(
+        cleanedUpdates.start_time as string,
+        (cleanedUpdates.work_date as string) || oldWorkDate
+      );
+      if (normalizedStart) {
+        cleanedUpdates.start_time = normalizedStart;
       } else {
-        cleanedUpdates.work_date = formattedWorkDate;
+        delete cleanedUpdates.start_time;
       }
     }
 
@@ -450,6 +445,118 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
       throw new Error(JSON.stringify(error));
     }
 
+    // Update EventBridge schedules if work_date or start_time changed
+    const newWorkDate = cleanedUpdates.work_date
+      ? (cleanedUpdates.work_date as string).split("T")[0]
+      : oldWorkDate;
+    const newStartTime = cleanedUpdates.start_time
+      ? this.extractTimeFromTimestamp(cleanedUpdates.start_time as string)
+      : oldStartTime;
+
+    // Determine if we need to create, update, or delete schedules
+    const hasOldValues = oldWorkDate && oldStartTime;
+    const hasNewValues = newWorkDate && newStartTime;
+    const valuesChanged =
+      hasOldValues &&
+      hasNewValues &&
+      (oldWorkDate !== newWorkDate || oldStartTime !== newStartTime);
+
+    if (hasNewValues && !hasOldValues) {
+      // Case 1: Creating schedules for the first time (assignment didn't have work_date/start_time before)
+      try {
+        const eventBridgeService = new (
+          await import("@/lib/services/eventbridgeScheduleService")
+        ).EventBridgeScheduleService();
+
+        // Fetch job reminder times
+        const { data: jobData } = await supabase
+          .from("jobs")
+          .select("night_before_time, day_of_time")
+          .eq("id", jobId)
+          .single();
+
+        const createdArns = await eventBridgeService.createReminderSchedules(
+          jobId,
+          newWorkDate,
+          newStartTime,
+          currentAssignment?.num_reminders || 2,
+          jobData?.night_before_time || null,
+          jobData?.day_of_time || null
+        );
+        if (createdArns.length > 0) {
+          console.log(
+            `Created ${createdArns.length} EventBridge schedule(s) for job ${jobId}, date ${newWorkDate}, time ${newStartTime}`
+          );
+        } else {
+          console.log(
+            `No EventBridge schedules created for job ${jobId}, date ${newWorkDate}, time ${newStartTime} (all reminders were in the past or already exist)`
+          );
+        }
+      } catch (scheduleError) {
+        // Log error but don't fail the assignment update
+        console.error(
+          "Error creating EventBridge schedules (assignment still updated):",
+          scheduleError
+        );
+      }
+    } else if (valuesChanged) {
+      // Case 2: Updating existing schedules (both old and new values exist and are different)
+      try {
+        const eventBridgeService = new (
+          await import("@/lib/services/eventbridgeScheduleService")
+        ).EventBridgeScheduleService();
+
+        // Fetch job reminder times
+        const { data: jobData } = await supabase
+          .from("jobs")
+          .select("night_before_time, day_of_time")
+          .eq("id", jobId)
+          .single();
+
+        await eventBridgeService.updateReminderSchedules(
+          jobId,
+          oldWorkDate!,
+          oldStartTime!,
+          newWorkDate,
+          newStartTime,
+          currentAssignment?.num_reminders || 2,
+          jobData?.night_before_time || null,
+          jobData?.day_of_time || null
+        );
+        console.log(
+          `Updated EventBridge schedules for job ${jobId} from ${oldWorkDate}/${oldStartTime} to ${newWorkDate}/${newStartTime}`
+        );
+      } catch (scheduleError) {
+        // Log error but don't fail the assignment update
+        console.error(
+          "Error updating EventBridge schedules (assignment still updated):",
+          scheduleError
+        );
+      }
+    } else if (hasOldValues && !hasNewValues) {
+      // Case 3: Deleting schedules (old values existed but new values don't)
+      try {
+        const eventBridgeService = new (
+          await import("@/lib/services/eventbridgeScheduleService")
+        ).EventBridgeScheduleService();
+
+        await eventBridgeService.deleteReminderSchedules(
+          jobId,
+          oldWorkDate!,
+          oldStartTime!
+        );
+        console.log(
+          `Deleted EventBridge schedules for job ${jobId}, date ${oldWorkDate}, time ${oldStartTime}`
+        );
+      } catch (scheduleError) {
+        // Log error but don't fail the assignment update
+        console.error(
+          "Error deleting EventBridge schedules (assignment still updated):",
+          scheduleError
+        );
+      }
+    }
+
     // Format work_date to return only the date portion (YYYY-MM-DD)
     return data.map((assignment) => ({
       ...assignment,
@@ -462,6 +569,14 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
   async deleteJobAssignment(jobId: string, associateId: string) {
     const supabase = await createClient();
 
+    // Get assignment details before deleting (for schedule cleanup)
+    const { data: assignment } = await supabase
+      .from("job_assignments")
+      .select("work_date, start_time")
+      .eq("job_id", jobId)
+      .eq("associate_id", associateId)
+      .single();
+
     const { error } = await supabase
       .from("job_assignments")
       .delete()
@@ -471,6 +586,32 @@ export class JobsAssignmentsDaoSupabase implements IJobAssignments {
     if (error) {
       console.error("Error deleting job assignment:", error);
       throw new Error(JSON.stringify(error));
+    }
+
+    // Delete EventBridge schedules if work_date and start_time were set
+    if (assignment?.work_date && assignment?.start_time) {
+      try {
+        const workDate = assignment.work_date.split("T")[0];
+        const startTime = this.extractTimeFromTimestamp(assignment.start_time);
+        const eventBridgeService = new (
+          await import("@/lib/services/eventbridgeScheduleService")
+        ).EventBridgeScheduleService();
+
+        await eventBridgeService.deleteReminderSchedules(
+          jobId,
+          workDate,
+          startTime
+        );
+        console.log(
+          `Deleted EventBridge schedules for job ${jobId}, date ${workDate}, time ${startTime}`
+        );
+      } catch (scheduleError) {
+        // Log error but don't fail the deletion
+        console.error(
+          "Error deleting EventBridge schedules (assignment still deleted):",
+          scheduleError
+        );
+      }
     }
 
     return { success: true };
