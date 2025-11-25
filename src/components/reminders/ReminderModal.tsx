@@ -53,7 +53,6 @@ function TimeDropdown({
   value,
   onChange,
   options,
-  label,
 }: TimeDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);

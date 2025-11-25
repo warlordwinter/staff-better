@@ -27,7 +27,7 @@ export const getStatus = (
   // Check if there are any associates assigned
   if (!job.associateCount || job.associateCount === 0) {
     return {
-      label: "Waiting for Assigned Associates",
+      label: "Need Assigned Associates",
       color: "bg-gray-400",
       textColor: "text-white",
     };
@@ -88,7 +88,7 @@ export const getStatusDisplay = (
   // If no assignments, show waiting status
   if (!assignments || assignments.length === 0) {
     return {
-      label: "Waiting for Assigned Associates",
+      label: "Need Assigned Associates",
       color: "bg-gray-400",
       textColor: "text-white",
     };
