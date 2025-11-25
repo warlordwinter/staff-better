@@ -7,9 +7,7 @@
  * Uses the actual reminder times from the job, with fallback to defaults
  */
 export function formatReminderSendTimes(
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _workDate: string | null | undefined,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _startTime: string | null | undefined,
   nightBeforeTime?: string | null,
   dayOfTime?: string | null
@@ -46,9 +44,7 @@ export function formatReminderSendTimes(
  * Uses the actual reminder times from the job, with fallback to defaults
  */
 export function formatReminderSendTimesDetail(
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _workDate: string | null | undefined,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _startTime: string | null | undefined,
   nightBeforeTime?: string | null,
   dayOfTime?: string | null
