@@ -235,6 +235,65 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Validate required secrets for router stack
+        run: |
+          echo "Validating required GitHub secrets for Message Router stack..."
+          MISSING_SECRETS=()
+
+          # Check each secret (GitHub Actions will show empty string if not set)
+          check_secret() {
+            local secret_name=$1
+            local secret_value="$2"
+            if [ -z "$secret_value" ] || [ "$secret_value" = "" ]; then
+              MISSING_SECRETS+=("$secret_name")
+              echo "  ❌ $secret_name: NOT SET or EMPTY"
+            else
+              # Show first few chars for verification (but mask sensitive ones)
+              if [[ "$secret_name" == *"PASSWORD"* ]] || [[ "$secret_name" == *"KEY"* ]] || [[ "$secret_name" == *"TOKEN"* ]]; then
+                echo "  ✅ $secret_name: SET (length: ${#secret_value} chars)"
+              else
+                echo "  ✅ $secret_name: SET (value: ${secret_value:0:20}...)"
+              fi
+            fi
+          }
+
+          echo "Checking secrets..."
+          check_secret "NEXT_PUBLIC_SUPABASE_URL" "${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}"
+          check_secret "SUPABASE_SERVICE_ROLE_KEY" "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
+          check_secret "JWT_VERIFICATION_KEY" "${{ secrets.JWT_VERIFICATION_KEY }}"
+          check_secret "ROUTER_VPC_ID" "${{ secrets.ROUTER_VPC_ID }}"
+          check_secret "ROUTER_PRIVATE_SUBNET_1_ID" "${{ secrets.ROUTER_PRIVATE_SUBNET_1_ID }}"
+          check_secret "ROUTER_PRIVATE_SUBNET_2_ID" "${{ secrets.ROUTER_PRIVATE_SUBNET_2_ID }}"
+          check_secret "AMAZON_MQ_ADMIN_USER" "${{ secrets.AMAZON_MQ_ADMIN_USER }}"
+          check_secret "AMAZON_MQ_ADMIN_PASSWORD" "${{ secrets.AMAZON_MQ_ADMIN_PASSWORD }}"
+
+          if [ ${#MISSING_SECRETS[@]} -gt 0 ]; then
+            echo ""
+            echo "❌ Missing or empty GitHub secrets for Message Router stack:"
+            printf '  - %s\n' "${MISSING_SECRETS[@]}"
+            echo ""
+            echo "Please add these secrets in: Repository Settings → Secrets and variables → Actions"
+            echo ""
+            echo "📋 How to find/create these values:"
+            echo ""
+            echo "VPC and Subnets (from AWS Console → VPC):"
+            echo "  - ROUTER_VPC_ID: VPC ID where Lambdas/Amazon MQ will run"
+            echo "  - ROUTER_PRIVATE_SUBNET_1_ID: First private subnet ID"
+            echo "  - ROUTER_PRIVATE_SUBNET_2_ID: Second private subnet ID (must be in different AZ)"
+            echo ""
+            echo "Amazon MQ Credentials (you'll create these):"
+            echo "  - AMAZON_MQ_ADMIN_USER: Username for RabbitMQ broker (e.g., 'admin')"
+            echo "  - AMAZON_MQ_ADMIN_PASSWORD: Password for RabbitMQ broker (strong password)"
+            echo ""
+            echo "JWT Verification:"
+            echo "  - JWT_VERIFICATION_KEY: Supabase JWT public key or JWKS URL"
+            echo "    Get from: Supabase Dashboard → Project Settings → API → JWT Settings"
+            exit 1
+          fi
+
+          echo ""
+          echo "✅ All required secrets are set and non-empty"
+
       - name: Deploy Message Router CloudFormation Stack
         run: |
           echo "Deploying Message Router CloudFormation stack..."
