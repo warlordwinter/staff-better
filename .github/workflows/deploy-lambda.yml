@@ -297,19 +297,77 @@ jobs:
       - name: Deploy Message Router CloudFormation Stack
         run: |
           echo "Deploying Message Router CloudFormation stack..."
+
+          # Verify secrets are still set (double-check before deploy)
+          echo "Verifying secrets before deployment..."
+          if [ -z "${{ secrets.ROUTER_VPC_ID }}" ]; then
+            echo "❌ ERROR: ROUTER_VPC_ID is empty!"
+            exit 1
+          fi
+          if [ -z "${{ secrets.ROUTER_PRIVATE_SUBNET_1_ID }}" ]; then
+            echo "❌ ERROR: ROUTER_PRIVATE_SUBNET_1_ID is empty!"
+            exit 1
+          fi
+          if [ -z "${{ secrets.ROUTER_PRIVATE_SUBNET_2_ID }}" ]; then
+            echo "❌ ERROR: ROUTER_PRIVATE_SUBNET_2_ID is empty!"
+            exit 1
+          fi
+          if [ -z "${{ secrets.AMAZON_MQ_ADMIN_USER }}" ]; then
+            echo "❌ ERROR: AMAZON_MQ_ADMIN_USER is empty!"
+            exit 1
+          fi
+          if [ -z "${{ secrets.AMAZON_MQ_ADMIN_PASSWORD }}" ]; then
+            echo "❌ ERROR: AMAZON_MQ_ADMIN_PASSWORD is empty!"
+            exit 1
+          fi
+
+          echo "✅ All secrets verified, proceeding with deployment..."
+
+          # Use explicit parameter file to avoid shell escaping issues
+          cat > /tmp/router-params.json << EOF
+          [
+            {
+              "ParameterKey": "SupabaseUrl",
+              "ParameterValue": "${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}"
+            },
+            {
+              "ParameterKey": "SupabaseServiceRoleKey",
+              "ParameterValue": "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
+            },
+            {
+              "ParameterKey": "JwtVerificationKey",
+              "ParameterValue": "${{ secrets.JWT_VERIFICATION_KEY }}"
+            },
+            {
+              "ParameterKey": "VpcId",
+              "ParameterValue": "${{ secrets.ROUTER_VPC_ID }}"
+            },
+            {
+              "ParameterKey": "PrivateSubnet1Id",
+              "ParameterValue": "${{ secrets.ROUTER_PRIVATE_SUBNET_1_ID }}"
+            },
+            {
+              "ParameterKey": "PrivateSubnet2Id",
+              "ParameterValue": "${{ secrets.ROUTER_PRIVATE_SUBNET_2_ID }}"
+            },
+            {
+              "ParameterKey": "AmazonMqAdminUser",
+              "ParameterValue": "${{ secrets.AMAZON_MQ_ADMIN_USER }}"
+            },
+            {
+              "ParameterKey": "AmazonMqAdminPassword",
+              "ParameterValue": "${{ secrets.AMAZON_MQ_ADMIN_PASSWORD }}"
+            }
+          ]
+          EOF
+
+          # Deploy using parameter file (more reliable than command-line args)
           aws cloudformation deploy \
             --stack-name ${{ env.ROUTER_STACK_NAME }} \
             --template-file ${{ env.ROUTER_CLOUDFORMATION_TEMPLATE }} \
             --capabilities CAPABILITY_NAMED_IAM \
-            --parameter-overrides \
-              SupabaseUrl=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }} \
-              SupabaseServiceRoleKey=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }} \
-              JwtVerificationKey=${{ secrets.JWT_VERIFICATION_KEY }} \
-              VpcId=${{ secrets.ROUTER_VPC_ID }} \
-              PrivateSubnet1Id=${{ secrets.ROUTER_PRIVATE_SUBNET_1_ID }} \
-              PrivateSubnet2Id=${{ secrets.ROUTER_PRIVATE_SUBNET_2_ID }} \
-              AmazonMqAdminUser=${{ secrets.AMAZON_MQ_ADMIN_USER }} \
-              AmazonMqAdminPassword=${{ secrets.AMAZON_MQ_ADMIN_PASSWORD }}
+            --parameter-overrides file:///tmp/router-params.json \
+            --region ${{ env.AWS_REGION }}
 
       - name: Get Message Router stack outputs
         if: success()
