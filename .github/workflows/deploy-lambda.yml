@@ -323,50 +323,21 @@ jobs:
 
           echo "✅ All secrets verified, proceeding with deployment..."
 
-          # Use explicit parameter file to avoid shell escaping issues
-          cat > /tmp/router-params.json << EOF
-          [
-            {
-              "ParameterKey": "SupabaseUrl",
-              "ParameterValue": "${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}"
-            },
-            {
-              "ParameterKey": "SupabaseServiceRoleKey",
-              "ParameterValue": "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
-            },
-            {
-              "ParameterKey": "JwtVerificationKey",
-              "ParameterValue": "${{ secrets.JWT_VERIFICATION_KEY }}"
-            },
-            {
-              "ParameterKey": "VpcId",
-              "ParameterValue": "${{ secrets.ROUTER_VPC_ID }}"
-            },
-            {
-              "ParameterKey": "PrivateSubnet1Id",
-              "ParameterValue": "${{ secrets.ROUTER_PRIVATE_SUBNET_1_ID }}"
-            },
-            {
-              "ParameterKey": "PrivateSubnet2Id",
-              "ParameterValue": "${{ secrets.ROUTER_PRIVATE_SUBNET_2_ID }}"
-            },
-            {
-              "ParameterKey": "AmazonMqAdminUser",
-              "ParameterValue": "${{ secrets.AMAZON_MQ_ADMIN_USER }}"
-            },
-            {
-              "ParameterKey": "AmazonMqAdminPassword",
-              "ParameterValue": "${{ secrets.AMAZON_MQ_ADMIN_PASSWORD }}"
-            }
-          ]
-          EOF
-
-          # Deploy using parameter file (more reliable than command-line args)
+          # Deploy using command-line parameters (AWS CLI handles escaping)
+          # Each parameter is passed as Key=Value, and AWS CLI properly escapes special chars
           aws cloudformation deploy \
             --stack-name ${{ env.ROUTER_STACK_NAME }} \
             --template-file ${{ env.ROUTER_CLOUDFORMATION_TEMPLATE }} \
             --capabilities CAPABILITY_NAMED_IAM \
-            --parameter-overrides file:///tmp/router-params.json \
+            --parameter-overrides \
+              "SupabaseUrl=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" \
+              "SupabaseServiceRoleKey=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+              "JwtVerificationKey=${{ secrets.JWT_VERIFICATION_KEY }}" \
+              "VpcId=${{ secrets.ROUTER_VPC_ID }}" \
+              "PrivateSubnet1Id=${{ secrets.ROUTER_PRIVATE_SUBNET_1_ID }}" \
+              "PrivateSubnet2Id=${{ secrets.ROUTER_PRIVATE_SUBNET_2_ID }}" \
+              "AmazonMqAdminUser=${{ secrets.AMAZON_MQ_ADMIN_USER }}" \
+              "AmazonMqAdminPassword=${{ secrets.AMAZON_MQ_ADMIN_PASSWORD }}" \
             --region ${{ env.AWS_REGION }}
 
       - name: Get Message Router stack outputs
