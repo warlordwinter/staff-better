@@ -156,29 +156,26 @@ jobs:
         if: steps.check-stack.outputs.exists == 'true'
         run: |
           echo "Updating CloudFormation stack..."
-          aws cloudformation update-stack \
+          # Use 'deploy' command which handles "no updates" case gracefully
+          aws cloudformation deploy \
             --stack-name ${{ env.STACK_NAME }} \
-            --template-body file://${{ env.CLOUDFORMATION_TEMPLATE }} \
-            --parameters \
-              ParameterKey=TwilioAccountSid,UsePreviousValue=true \
-              ParameterKey=TwilioAuthToken,UsePreviousValue=true \
-              ParameterKey=TwilioDefaultFrom,UsePreviousValue=true \
-              ParameterKey=SupabaseUrl,UsePreviousValue=true \
-              ParameterKey=SupabaseServiceRoleKey,UsePreviousValue=true \
-              ParameterKey=SesFromEmail,ParameterValue=${{ secrets.SES_FROM_EMAIL }} \
-              ParameterKey=ApiBaseUrl,ParameterValue=${{ secrets.API_BASE_URL }} \
-              ParameterKey=CronSecret,ParameterValue=${{ secrets.CRON_SECRET }} \
-            --region ${{ env.AWS_REGION }} \
-            --capabilities CAPABILITY_NAMED_IAM || EXIT_CODE=$?
+            --template-file ${{ env.CLOUDFORMATION_TEMPLATE }} \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --parameter-overrides \
+              TwilioAccountSid=${{ secrets.TWILIO_ACCOUNT_SID }} \
+              TwilioAuthToken=${{ secrets.TWILIO_AUTH_TOKEN }} \
+              TwilioDefaultFrom=${{ secrets.TWILIO_PHONE_NUMBER_REMINDERS }} \
+              SupabaseUrl=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }} \
+              SupabaseServiceRoleKey=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }} \
+              SesFromEmail=${{ secrets.SES_FROM_EMAIL }} \
+              ApiBaseUrl=${{ secrets.API_BASE_URL }} \
+              CronSecret=${{ secrets.CRON_SECRET }} \
+            --region ${{ env.AWS_REGION }} || EXIT_CODE=$?
 
           # Exit code 255 means no updates are to be performed, which is OK
           if [ "${EXIT_CODE:-0}" = "255" ]; then
-            echo "ℹ️ No stack updates detected"
+            echo "ℹ️ No stack updates detected - stack is already up to date"
           else
-            echo "Waiting for stack update to complete..."
-            aws cloudformation wait stack-update-complete \
-              --stack-name ${{ env.STACK_NAME }} \
-              --region ${{ env.AWS_REGION }}
             echo "✅ Stack updated successfully"
           fi
 
