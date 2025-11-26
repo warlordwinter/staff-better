@@ -59,7 +59,6 @@ Resources:
       AutoMinorVersionUpgrade: true
       SubnetIds:
         - !Ref PrivateSubnet1Id
-        - !Ref PrivateSubnet2Id
       SecurityGroups:
         - !Ref MessageBrokerSecurityGroup
       Users:
