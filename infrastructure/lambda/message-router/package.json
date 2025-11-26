@@ -1,0 +1,17 @@
+{
+    "name": "message-router-lambda",
+    "version": "1.0.0",
+    "description": "Lambda function to route messages and reminders into RabbitMQ (Amazon MQ)",
+    "main": "index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "dependencies": {
+        "@supabase/supabase-js": "^2.53.0",
+        "jsonwebtoken": "^9.0.2",
+        "amqplib": "^0.10.3"
+    },
+    "engines": {
+        "node": ">=20.x"
+    }
+}

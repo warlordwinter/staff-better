@@ -1,0 +1,344 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CloudFormation stack for message router API, Amazon MQ (RabbitMQ), and worker Lambdas"
+
+Parameters:
+  VpcId:
+    Type: String
+    Description: "VPC where Amazon MQ broker and Lambdas will run"
+  PrivateSubnet1Id:
+    Type: String
+    Description: "Private subnet 1 for broker/Lambdas"
+  PrivateSubnet2Id:
+    Type: String
+    Description: "Private subnet 2 for broker/Lambdas"
+  SupabaseUrl:
+    Type: String
+    Description: "Supabase project URL"
+  SupabaseServiceRoleKey:
+    Type: String
+    Description: "Supabase service role key"
+    NoEcho: true
+  JwtVerificationKey:
+    Type: String
+    Description: "Public key or JWKS URL for validating Supabase JWTs"
+  AmazonMqAdminUser:
+    Type: String
+    Description: "Amazon MQ broker admin username"
+    NoEcho: true
+  AmazonMqAdminPassword:
+    Type: String
+    Description: "Amazon MQ broker admin password"
+    NoEcho: true
+
+Resources:
+  MessageBrokerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Security group for Amazon MQ broker and Lambdas"
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5671
+          ToPort: 5671
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+
+  MessageBroker:
+    Type: AWS::AmazonMQ::Broker
+    Properties:
+      BrokerName: MessageRouterBroker
+      EngineType: RABBITMQ
+      EngineVersion: "3.11.20"
+      HostInstanceType: mq.t3.micro
+      DeploymentMode: SINGLE_INSTANCE
+      PubliclyAccessible: false
+      AutoMinorVersionUpgrade: true
+      SubnetIds:
+        - !Ref PrivateSubnet1Id
+        - !Ref PrivateSubnet2Id
+      SecurityGroups:
+        - !Ref MessageBrokerSecurityGroup
+      Users:
+        - Username: !Ref AmazonMqAdminUser
+          Password: !Ref AmazonMqAdminPassword
+
+  RouterLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: MessageRouterLambdaRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: RouterEnvAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "arn:aws:logs:*:*:*"
+
+  SendWorkerLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: SendWorkerLambdaRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: SendWorkerLogs
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "arn:aws:logs:*:*:*"
+
+  ReminderWorkerLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: ReminderWorkerLambdaRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: ReminderWorkerLogs
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "arn:aws:logs:*:*:*"
+
+  MessageRouterLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: MessageRouter
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role: !GetAtt RouterLambdaRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref MessageBrokerSecurityGroup
+        SubnetIds:
+          - !Ref PrivateSubnet1Id
+          - !Ref PrivateSubnet2Id
+      Environment:
+        Variables:
+          SUPABASE_URL: !Ref SupabaseUrl
+          SUPABASE_SERVICE_ROLE_KEY: !Ref SupabaseServiceRoleKey
+          JWT_VERIFICATION_KEY: !Ref JwtVerificationKey
+          RABBITMQ_URL: !Select [0, !GetAtt MessageBroker.AmqpEndpoints]
+          RATE_LIMIT_TABLE_NAME: !Ref RateLimitTable
+          DLQ_URL: !Ref MessageProcessingDlq
+      Code:
+        ZipFile: |
+          // Placeholder - real code deployed via CI
+          exports.handler = async (event) => {
+            console.log("MessageRouter placeholder invoked", JSON.stringify(event));
+            return { statusCode: 200, body: JSON.stringify({ ok: true }) };
+          };
+
+  SendWorkerLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: SendWorker
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role: !GetAtt SendWorkerLambdaRole.Arn
+      Timeout: 60
+      MemorySize: 256
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref MessageBrokerSecurityGroup
+        SubnetIds:
+          - !Ref PrivateSubnet1Id
+          - !Ref PrivateSubnet2Id
+      Environment:
+        Variables:
+          RABBITMQ_URL: !Select [0, !GetAtt MessageBroker.AmqpEndpoints]
+          DLQ_URL: !Ref MessageProcessingDlq
+      Code:
+        ZipFile: |
+          // Placeholder - real code deployed via CI
+          exports.handler = async (event) => {
+            console.log("SendWorker placeholder invoked", JSON.stringify(event));
+          };
+
+  ReminderWorkerLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: ReminderWorker
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role: !GetAtt ReminderWorkerLambdaRole.Arn
+      Timeout: 60
+      MemorySize: 256
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref MessageBrokerSecurityGroup
+        SubnetIds:
+          - !Ref PrivateSubnet1Id
+          - !Ref PrivateSubnet2Id
+      Environment:
+        Variables:
+          RABBITMQ_URL: !Select [0, !GetAtt MessageBroker.AmqpEndpoints]
+          DLQ_URL: !Ref MessageProcessingDlq
+      Code:
+        ZipFile: |
+          // Placeholder - real code deployed via CI
+          exports.handler = async (event) => {
+            console.log("ReminderWorker placeholder invoked", JSON.stringify(event));
+          };
+
+  MessageRouterApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: MessageRouterApi
+      Description: "API Gateway for message router Lambda"
+
+  MessageRouterApiResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref MessageRouterApi
+      ParentId: !GetAtt MessageRouterApi.RootResourceId
+      PathPart: "messages"
+
+  MessageRouterApiMethodPost:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref MessageRouterApi
+      ResourceId: !Ref MessageRouterApiResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub
+          - arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
+          - { Region: !Ref AWS::Region, LambdaArn: !GetAtt MessageRouterLambda.Arn }
+
+  MessageRouterApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - MessageRouterApiMethodPost
+    Properties:
+      RestApiId: !Ref MessageRouterApi
+      StageName: prod
+
+  MessageRouterLambdaPermissionApiGateway:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref MessageRouterLambda
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${MessageRouterApi}/*
+
+  RateLimitTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: MessageRouterRateLimits
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: company_id
+          AttributeType: S
+        - AttributeName: window
+          AttributeType: S
+      KeySchema:
+        - AttributeName: company_id
+          KeyType: HASH
+        - AttributeName: window
+          KeyType: RANGE
+
+  MessageProcessingDlq:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: MessageProcessingDlq
+      MessageRetentionPeriod: 1209600
+
+  MessageRouterErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: MessageRouterLambdaErrors
+      AlarmDescription: "Alarm on MessageRouter Lambda errors"
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref MessageRouterLambda
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+
+  SendWorkerErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: SendWorkerLambdaErrors
+      AlarmDescription: "Alarm on SendWorker Lambda errors"
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref SendWorkerLambda
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+
+  ReminderWorkerErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: ReminderWorkerLambdaErrors
+      AlarmDescription: "Alarm on ReminderWorker Lambda errors"
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref ReminderWorkerLambda
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+
+Outputs:
+  MessageRouterApiUrl:
+    Description: "Invoke URL for Message Router API"
+    Value: !Sub "https://${MessageRouterApi}.execute-api.${AWS::Region}.amazonaws.com/prod/messages"
+

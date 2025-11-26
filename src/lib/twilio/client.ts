@@ -19,6 +19,10 @@ export const twilioClient = twilio(
   process.env.TWILIO_AUTH_TOKEN
 );
 
+export function createTwilioClient(accountSid: string, authToken: string) {
+  return twilio(accountSid, authToken);
+}
+
 // Phone number for sending reminder messages
 export const TWILIO_PHONE_NUMBER_REMINDERS =
   process.env.TWILIO_PHONE_NUMBER_REMINDERS;

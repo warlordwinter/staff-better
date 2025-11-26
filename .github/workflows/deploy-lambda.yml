@@ -13,10 +13,12 @@ env:
   AWS_REGION: us-east-1
   STACK_NAME: reminder-scheduler-stack
   CLOUDFORMATION_TEMPLATE: infrastructure/cloudformation/reminder-scheduler-stack.yaml
+  ROUTER_STACK_NAME: message-router-stack
+  ROUTER_CLOUDFORMATION_TEMPLATE: infrastructure/cloudformation/message-router-stack.yaml
 
 jobs:
   deploy-cloudformation:
-    name: Deploy CloudFormation Stack
+    name: Deploy Reminder Scheduler Stack
     runs-on: ubuntu-latest
 
     permissions:
@@ -215,11 +217,58 @@ jobs:
             echo "Stack status: $STACK_STATUS - No cleanup needed"
           fi
 
-  deploy-reminder-processor:
-    name: Deploy Reminder Processor Lambda
+  deploy-message-router-stack:
+    name: Deploy Message Router Stack
     runs-on: ubuntu-latest
     needs: deploy-cloudformation
     if: always() && (needs.deploy-cloudformation.result == 'success' || needs.deploy-cloudformation.result == 'skipped')
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy Message Router CloudFormation Stack
+        run: |
+          echo "Deploying Message Router CloudFormation stack..."
+          aws cloudformation deploy \
+            --stack-name ${{ env.ROUTER_STACK_NAME }} \
+            --template-file ${{ env.ROUTER_CLOUDFORMATION_TEMPLATE }} \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --parameter-overrides \
+              SupabaseUrl=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }} \
+              SupabaseServiceRoleKey=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }} \
+              JwtVerificationKey=${{ secrets.JWT_VERIFICATION_KEY }} \
+              VpcId=${{ secrets.ROUTER_VPC_ID }} \
+              PrivateSubnet1Id=${{ secrets.ROUTER_PRIVATE_SUBNET_1_ID }} \
+              PrivateSubnet2Id=${{ secrets.ROUTER_PRIVATE_SUBNET_2_ID }} \
+              AmazonMqAdminUser=${{ secrets.AMAZON_MQ_ADMIN_USER }} \
+              AmazonMqAdminPassword=${{ secrets.AMAZON_MQ_ADMIN_PASSWORD }}
+
+      - name: Get Message Router stack outputs
+        if: success()
+        run: |
+          echo "📋 Message Router Stack Outputs:"
+          aws cloudformation describe-stacks \
+            --stack-name ${{ env.ROUTER_STACK_NAME }} \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Stacks[0].Outputs' \
+            --output table
+
+  deploy-reminder-processor:
+    name: Deploy Reminder Processor Lambda
+    runs-on: ubuntu-latest
+    needs: [deploy-cloudformation, deploy-message-router-stack]
     env:
       LAMBDA_FUNCTION_NAME: ReminderProcessor
       LAMBDA_DIR: infrastructure/lambda/reminder-processor
@@ -313,8 +362,7 @@ jobs:
   deploy-daily-summary:
     name: Deploy Daily Summary Email Lambda
     runs-on: ubuntu-latest
-    needs: deploy-cloudformation
-    if: always() && (needs.deploy-cloudformation.result == 'success' || needs.deploy-cloudformation.result == 'skipped')
+    needs: [deploy-cloudformation, deploy-message-router-stack]
     env:
       LAMBDA_FUNCTION_NAME: DailySummaryEmail
       LAMBDA_DIR: infrastructure/lambda/daily-summary-email
@@ -404,3 +452,95 @@ jobs:
         run: |
           rm -f function.zip
           echo "Cleaned up deployment package"
+
+  deploy-message-router-lambdas:
+    name: Deploy Message Router Lambdas
+    runs-on: ubuntu-latest
+    needs: deploy-message-router-stack
+    env:
+      ROUTER_LAMBDA_NAME: MessageRouter
+      SEND_WORKER_LAMBDA_NAME: SendWorker
+      REMINDER_WORKER_LAMBDA_NAME: ReminderWorker
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Message Router dependencies
+        working-directory: infrastructure/lambda/message-router
+        run: npm ci --omit=dev
+
+      - name: Package Message Router Lambda
+        working-directory: infrastructure/lambda/message-router
+        run: zip -r function.zip index.js node_modules/ -q
+
+      - name: Install Send Worker dependencies
+        working-directory: infrastructure/lambda/send-worker
+        run: npm ci --omit=dev
+
+      - name: Package Send Worker Lambda
+        working-directory: infrastructure/lambda/send-worker
+        run: zip -r function.zip index.js node_modules/ -q
+
+      - name: Install Reminder Worker dependencies
+        working-directory: infrastructure/lambda/reminder-worker
+        run: npm ci --omit=dev
+
+      - name: Package Reminder Worker Lambda
+        working-directory: infrastructure/lambda/reminder-worker
+        run: zip -r function.zip index.js node_modules/ -q
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy Message Router Lambda
+        working-directory: infrastructure/lambda/message-router
+        run: |
+          aws lambda update-function-code \
+            --function-name ${{ env.ROUTER_LAMBDA_NAME }} \
+            --zip-file fileb://function.zip \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Deploy Send Worker Lambda
+        working-directory: infrastructure/lambda/send-worker
+        run: |
+          aws lambda update-function-code \
+            --function-name ${{ env.SEND_WORKER_LAMBDA_NAME }} \
+            --zip-file fileb://function.zip \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Deploy Reminder Worker Lambda
+        working-directory: infrastructure/lambda/reminder-worker
+        run: |
+          aws lambda update-function-code \
+            --function-name ${{ env.REMINDER_WORKER_LAMBDA_NAME }} \
+            --zip-file fileb://function.zip \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Cleanup Message Router package
+        if: always()
+        working-directory: infrastructure/lambda/message-router
+        run: rm -f function.zip
+
+      - name: Cleanup Send Worker package
+        if: always()
+        working-directory: infrastructure/lambda/send-worker
+        run: rm -f function.zip
+
+      - name: Cleanup Reminder Worker package
+        if: always()
+        working-directory: infrastructure/lambda/reminder-worker
+        run: rm -f function.zip
