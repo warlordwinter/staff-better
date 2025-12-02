@@ -30,7 +30,8 @@
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "resend": "^6.4.2",
-    "twilio": "^5.8.0"
+    "twilio": "^5.8.0",
+    "jsonwebtoken": "^9.0.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -42,6 +43,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/jsonwebtoken": "^9.0.7",
     "babel-jest": "^29.7.0",
     "eslint": "^9",
     "eslint-config-next": "15.3.5",

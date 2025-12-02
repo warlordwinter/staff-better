@@ -183,7 +183,7 @@ Resources:
       Runtime: nodejs20.x
       Handler: index.handler
       Role: !GetAtt RouterLambdaRole.Arn
-      Timeout: 30
+      Timeout: 60
       MemorySize: 256
       VpcConfig:
         SecurityGroupIds:

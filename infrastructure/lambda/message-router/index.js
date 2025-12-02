@@ -14,7 +14,10 @@ const jwt = require("jsonwebtoken");
 const amqp = require("amqplib");
 const { createClient } = require("@supabase/supabase-js");
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
-const { DynamoDBDocumentClient, UpdateCommand } = require("@aws-sdk/lib-dynamodb");
+const {
+  DynamoDBDocumentClient,
+  UpdateCommand,
+} = require("@aws-sdk/lib-dynamodb");
 const { SQSClient, SendMessageCommand } = require("@aws-sdk/client-sqs");
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -95,12 +98,12 @@ async function sendToDlq(payload, error) {
     failed_at: new Date().toISOString(),
     source: "message-router",
   };
-  
+
   const command = new SendMessageCommand({
     QueueUrl: DLQ_URL,
     MessageBody: JSON.stringify(body),
   });
-  
+
   await sqs.send(command);
 }
 
@@ -109,7 +112,9 @@ async function checkRateLimit(companyId) {
     return;
   }
   const now = new Date();
-  const windowKey = `${now.getUTCFullYear()}-${now.getUTCMonth() + 1}-${now.getUTCDate()}-${now.getUTCHours()}-${now.getUTCMinutes()}`;
+  const windowKey = `${now.getUTCFullYear()}-${
+    now.getUTCMonth() + 1
+  }-${now.getUTCDate()}-${now.getUTCHours()}-${now.getUTCMinutes()}`;
   const limitPerMinute = 60;
 
   const command = new UpdateCommand({
@@ -129,7 +134,8 @@ async function checkRateLimit(companyId) {
   });
 
   const result = await dynamoDb.send(command);
-  const current = result.Attributes && result.Attributes.count ? result.Attributes.count : 1;
+  const current =
+    result.Attributes && result.Attributes.count ? result.Attributes.count : 1;
   if (current > limitPerMinute) {
     const err = new Error("Rate limit exceeded");
     err.code = "RATE_LIMIT";
@@ -149,9 +155,26 @@ exports.handler = async (event) => {
     }
 
     const authHeader =
-      (event.headers && (event.headers.authorization || event.headers.Authorization)) ||
+      (event.headers &&
+        (event.headers.authorization || event.headers.Authorization)) ||
       null;
-    const claims = await verifyJwt(authHeader);
+
+    // Handle JWT/auth errors separately - don't send to DLQ, return immediately
+    let claims;
+    try {
+      claims = await verifyJwt(authHeader);
+    } catch (authError) {
+      console.error("Authentication error:", authError.message);
+      return {
+        statusCode: 401,
+        body: JSON.stringify({
+          error: "Unauthorized",
+          message:
+            authError.message || "Invalid or missing authentication token",
+        }),
+      };
+    }
+
     const companyId = claims.company_id || claims["company_id"];
 
     if (!companyId) {
@@ -171,9 +194,7 @@ exports.handler = async (event) => {
       };
     }
 
-    const type =
-      message_type ||
-      (target_time ? "reminder" : "immediate");
+    const type = message_type || (target_time ? "reminder" : "immediate");
 
     if (type !== "immediate" && type !== "reminder") {
       return {
@@ -218,16 +239,30 @@ exports.handler = async (event) => {
     };
   } catch (error) {
     console.error("Router error:", error);
-    try {
-      await sendToDlq(event, error);
-    } catch (dlqError) {
-      console.error("Failed to send to DLQ:", dlqError);
+
+    // Determine if this is a client error (4xx) or server error (5xx)
+    const isClientError =
+      error.message &&
+      (error.message.includes("required") ||
+        error.message.includes("invalid") ||
+        error.message.includes("missing") ||
+        error.message.includes("No Twilio subaccount"));
+
+    // Only send server errors to DLQ, and make it non-blocking
+    if (!isClientError && DLQ_URL) {
+      // Send to DLQ asynchronously without blocking response
+      sendToDlq(event, error).catch((dlqError) => {
+        console.error("Failed to send to DLQ (non-blocking):", dlqError);
+      });
     }
+
+    const statusCode = isClientError ? 400 : 500;
     return {
-      statusCode: 500,
-      body: JSON.stringify({ error: error.message || "Internal server error" }),
+      statusCode: statusCode,
+      body: JSON.stringify({
+        error: error.message || "Internal server error",
+        type: isClientError ? "client_error" : "server_error",
+      }),
     };
   }
 };
-
-
