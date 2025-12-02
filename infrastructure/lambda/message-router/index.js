@@ -10,6 +10,7 @@
 // 9. Publish to send-queue or reminder-queue
 // 10. Return 200/4xx depending on validation
 
+const { randomUUID } = require("crypto");
 const jwt = require("jsonwebtoken");
 const amqp = require("amqplib");
 const { createClient } = require("@supabase/supabase-js");
@@ -210,6 +211,34 @@ exports.handler = async (event) => {
       };
     }
 
+    let normalizedTargetTime = null;
+    if (type === "reminder") {
+      const parsedTarget = new Date(target_time);
+      if (
+        !target_time ||
+        typeof target_time !== "string" ||
+        Number.isNaN(parsedTarget.getTime())
+      ) {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({
+            error: "target_time must be a valid ISO-8601 timestamp",
+          }),
+        };
+      }
+
+      if (parsedTarget.getTime() <= Date.now()) {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({
+            error: "target_time must be in the future",
+          }),
+        };
+      }
+
+      normalizedTargetTime = parsedTarget.toISOString();
+    }
+
     const supabase = createSupabaseAdminClient();
     const twilioSubaccount = await getTwilioSubaccountForCompany(
       supabase,
@@ -222,10 +251,11 @@ exports.handler = async (event) => {
       from: from || null,
       body: message,
       message_type: type,
-      target_time: target_time || null,
+      target_time: normalizedTargetTime,
       twilio_subaccount_sid: twilioSubaccount.subaccount_sid,
       twilio_auth_token_encrypted: twilioSubaccount.auth_token_encrypted,
       created_at: new Date().toISOString(),
+      message_id: randomUUID(),
     };
 
     await checkRateLimit(companyId);
@@ -247,21 +277,26 @@ exports.handler = async (event) => {
         error.message.includes("invalid") ||
         error.message.includes("missing") ||
         error.message.includes("No Twilio subaccount"));
+    const isRateLimitError = error.code === "RATE_LIMIT";
 
     // Only send server errors to DLQ, and make it non-blocking
-    if (!isClientError && DLQ_URL) {
+    if (!isClientError && !isRateLimitError && DLQ_URL) {
       // Send to DLQ asynchronously without blocking response
       sendToDlq(event, error).catch((dlqError) => {
         console.error("Failed to send to DLQ (non-blocking):", dlqError);
       });
     }
 
-    const statusCode = isClientError ? 400 : 500;
+    const statusCode = isRateLimitError ? 429 : isClientError ? 400 : 500;
     return {
       statusCode: statusCode,
       body: JSON.stringify({
         error: error.message || "Internal server error",
-        type: isClientError ? "client_error" : "server_error",
+        type: isRateLimitError
+          ? "rate_limit"
+          : isClientError
+          ? "client_error"
+          : "server_error",
       }),
     };
   }
