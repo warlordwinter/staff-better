@@ -154,9 +154,25 @@ jobs:
 
       - name: Deploy CloudFormation Stack (Update)
         if: steps.check-stack.outputs.exists == 'true'
+        timeout-minutes: 20
         run: |
           echo "Updating CloudFormation stack..."
+
+          # Check current stack status
+          echo "📋 Checking current stack status..."
+          CURRENT_STATUS=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.STACK_NAME }} \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Stacks[0].StackStatus' \
+            --output text 2>/dev/null || echo "UNKNOWN")
+          echo "   Current status: $CURRENT_STATUS"
+
           # Use 'deploy' command which handles "no updates" case gracefully
+          echo "🚀 Starting stack update (this may take 5-15 minutes)..."
+          echo "   ⏱️  Timeout set to 20 minutes"
+          echo "   📦 Stack: ${{ env.STACK_NAME }}"
+          echo "   🌍 Region: ${{ env.AWS_REGION }}"
+
           aws cloudformation deploy \
             --stack-name ${{ env.STACK_NAME }} \
             --template-file ${{ env.CLOUDFORMATION_TEMPLATE }} \
@@ -170,7 +186,8 @@ jobs:
               SesFromEmail=${{ secrets.SES_FROM_EMAIL }} \
               ApiBaseUrl=${{ secrets.API_BASE_URL }} \
               CronSecret=${{ secrets.CRON_SECRET }} \
-            --region ${{ env.AWS_REGION }} || EXIT_CODE=$?
+            --region ${{ env.AWS_REGION }} \
+            --no-fail-on-empty-changeset || EXIT_CODE=$?
 
           # Exit code 255 means no updates are to be performed, which is OK
           if [ "${EXIT_CODE:-0}" = "255" ]; then
@@ -403,10 +420,26 @@ jobs:
 
       - name: Deploy Message Router CloudFormation Stack (Update)
         if: steps.check-router-stack.outputs.exists == 'true'
+        timeout-minutes: 30
         run: |
           echo "Updating Message Router CloudFormation stack..."
 
+          # Check current stack status
+          echo "📋 Checking current stack status..."
+          CURRENT_STATUS=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.ROUTER_STACK_NAME }} \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Stacks[0].StackStatus' \
+            --output text 2>/dev/null || echo "UNKNOWN")
+          echo "   Current status: $CURRENT_STATUS"
+
           # Deploy using command-line parameters (AWS CLI handles escaping)
+          echo "🚀 Starting stack update (this may take 10-25 minutes for message router stack)..."
+          echo "   ⏱️  Timeout set to 30 minutes"
+          echo "   📦 Stack: ${{ env.ROUTER_STACK_NAME }}"
+          echo "   🌍 Region: ${{ env.AWS_REGION }}"
+          echo "   ⚠️  Note: Message router stack includes Amazon MQ which can take longer to update"
+
           aws cloudformation deploy \
             --stack-name ${{ env.ROUTER_STACK_NAME }} \
             --template-file ${{ env.ROUTER_CLOUDFORMATION_TEMPLATE }} \
@@ -420,16 +453,13 @@ jobs:
               "PrivateSubnet2Id=${{ secrets.ROUTER_PRIVATE_SUBNET_2_ID }}" \
               "AmazonMqAdminUser=${{ secrets.AMAZON_MQ_ADMIN_USER }}" \
               "AmazonMqAdminPassword=${{ secrets.AMAZON_MQ_ADMIN_PASSWORD }}" \
-            --region ${{ env.AWS_REGION }} || EXIT_CODE=$?
+            --region ${{ env.AWS_REGION }} \
+            --no-fail-on-empty-changeset || EXIT_CODE=$?
 
           # Exit code 255 means no updates are to be performed, which is OK
           if [ "${EXIT_CODE:-0}" = "255" ]; then
             echo "ℹ️ No stack updates detected - stack is already up to date"
           else
-            echo "Waiting for stack update to complete..."
-            aws cloudformation wait stack-update-complete \
-              --stack-name ${{ env.ROUTER_STACK_NAME }} \
-              --region ${{ env.AWS_REGION }}
             echo "✅ Stack updated successfully"
           fi
 
