@@ -1,39 +1,48 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "CloudFormation stack for message router API, Amazon MQ (RabbitMQ), and worker Lambdas"
+Description: "CloudFormation stack for message router API, Amazon MQ (RabbitMQ), and worker Lambdas (no NAT Gateway, Lambdas in public subnet)"
 
 Parameters:
   VpcId:
     Type: String
     Description: "VPC where Amazon MQ broker and Lambdas will run"
+
   PrivateSubnet1Id:
     Type: String
-    Description: "Private subnet 1 for broker/Lambdas"
+    Description: "Private subnet 1 for broker"
+
   PrivateSubnet2Id:
     Type: String
-    Description: "Private subnet 2 for broker/Lambdas"
+    Description: "Private subnet 2 for broker"
+
   PublicSubnetId:
     Type: String
-    Description: "Public subnet (with internet access) for NAT Gateway"
+    Description: "Public subnet (with internet access) for Lambdas"
+
   SupabaseUrl:
     Type: String
     Description: "Supabase project URL"
+
   SupabaseServiceRoleKey:
     Type: String
     Description: "Supabase service role key"
     NoEcho: true
+
   JwtVerificationKey:
     Type: String
     Description: "Public key or JWKS URL for validating Supabase JWTs"
+
   AmazonMqAdminUser:
     Type: String
     Description: "Amazon MQ broker admin username"
     NoEcho: true
+
   AmazonMqAdminPassword:
     Type: String
     Description: "Amazon MQ broker admin password"
     NoEcho: true
 
 Resources:
+  # --- Security Group ---
   MessageBrokerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -50,8 +59,9 @@ Resources:
           ToPort: 65535
           CidrIp: 0.0.0.0/0
 
+  # --- Amazon MQ Broker (private) ---
   MessageBroker:
-    Type: AWS::AmazonMQ::Broker # note this takes about 15-20 minutes to create.
+    Type: AWS::AmazonMQ::Broker
     Properties:
       BrokerName: MessageRouterBroker
       EngineType: RABBITMQ
@@ -68,43 +78,7 @@ Resources:
         - Username: !Ref AmazonMqAdminUser
           Password: !Ref AmazonMqAdminPassword
 
-  NatEip:
-    Type: AWS::EC2::EIP
-    Properties:
-      Domain: vpc
-
-  NatGateway:
-    Type: AWS::EC2::NatGateway
-    Properties:
-      AllocationId: !GetAtt NatEip.AllocationId
-      SubnetId: !Ref PublicSubnetId
-      ConnectivityType: public
-
-  PrivateRouteTable:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref VpcId
-
-  PrivateDefaultRoute:
-    Type: AWS::EC2::Route
-    DependsOn: NatGateway
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable
-      DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref NatGateway
-
-  PrivateSubnet1RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      SubnetId: !Ref PrivateSubnet1Id
-      RouteTableId: !Ref PrivateRouteTable
-
-  PrivateSubnet2RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      SubnetId: !Ref PrivateSubnet2Id
-      RouteTableId: !Ref PrivateRouteTable
-
+  # --- IAM Roles ---
   RouterLambdaRole:
     Type: AWS::IAM::Role
     Properties:
@@ -216,6 +190,7 @@ Resources:
                   - ec2:UnassignPrivateIpAddresses
                 Resource: "*"
 
+  # --- Lambdas (in public subnet) ---
   MessageRouterLambda:
     Type: AWS::Lambda::Function
     Properties:
@@ -229,8 +204,7 @@ Resources:
         SecurityGroupIds:
           - !Ref MessageBrokerSecurityGroup
         SubnetIds:
-          - !Ref PrivateSubnet1Id
-          - !Ref PrivateSubnet2Id
+          - !Ref PublicSubnetId
       Environment:
         Variables:
           SUPABASE_URL: !Ref SupabaseUrl
@@ -241,7 +215,6 @@ Resources:
           DLQ_URL: !Ref MessageProcessingDlq
       Code:
         ZipFile: |
-          // Placeholder - real code deployed via CI
           exports.handler = async (event) => {
             console.log("MessageRouter placeholder invoked", JSON.stringify(event));
             return { statusCode: 200, body: JSON.stringify({ ok: true }) };
@@ -260,15 +233,13 @@ Resources:
         SecurityGroupIds:
           - !Ref MessageBrokerSecurityGroup
         SubnetIds:
-          - !Ref PrivateSubnet1Id
-          - !Ref PrivateSubnet2Id
+          - !Ref PublicSubnetId
       Environment:
         Variables:
           RABBITMQ_URL: !Select [0, !GetAtt MessageBroker.AmqpEndpoints]
           DLQ_URL: !Ref MessageProcessingDlq
       Code:
         ZipFile: |
-          // Placeholder - real code deployed via CI
           exports.handler = async (event) => {
             console.log("SendWorker placeholder invoked", JSON.stringify(event));
           };
@@ -286,19 +257,18 @@ Resources:
         SecurityGroupIds:
           - !Ref MessageBrokerSecurityGroup
         SubnetIds:
-          - !Ref PrivateSubnet1Id
-          - !Ref PrivateSubnet2Id
+          - !Ref PublicSubnetId
       Environment:
         Variables:
           RABBITMQ_URL: !Select [0, !GetAtt MessageBroker.AmqpEndpoints]
           DLQ_URL: !Ref MessageProcessingDlq
       Code:
         ZipFile: |
-          // Placeholder - real code deployed via CI
           exports.handler = async (event) => {
             console.log("ReminderWorker placeholder invoked", JSON.stringify(event));
           };
 
+  # --- API Gateway ---
   MessageRouterApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
@@ -345,6 +315,7 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${MessageRouterApi}/*
 
+  # --- DynamoDB Table ---
   RateLimitTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -361,12 +332,14 @@ Resources:
         - AttributeName: window
           KeyType: RANGE
 
+  # --- Dead Letter Queue ---
   MessageProcessingDlq:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: MessageProcessingDlq
       MessageRetentionPeriod: 1209600
 
+  # --- CloudWatch Alarms ---
   MessageRouterErrorsAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
