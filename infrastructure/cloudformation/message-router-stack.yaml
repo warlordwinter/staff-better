@@ -48,7 +48,7 @@ Resources:
           CidrIp: 0.0.0.0/0
 
   MessageBroker:
-    Type: AWS::AmazonMQ::Broker
+    Type: AWS::AmazonMQ::Broker # note this takes about 15-20 minutes to create.
     Properties:
       BrokerName: MessageRouterBroker
       EngineType: RABBITMQ

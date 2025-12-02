@@ -13,8 +13,9 @@
 const jwt = require("jsonwebtoken");
 const amqp = require("amqplib");
 const { createClient } = require("@supabase/supabase-js");
-
-const AWS = require("aws-sdk");
+const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
+const { DynamoDBDocumentClient, UpdateCommand } = require("@aws-sdk/lib-dynamodb");
+const { SQSClient, SendMessageCommand } = require("@aws-sdk/client-sqs");
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -26,8 +27,8 @@ const DLQ_URL = process.env.DLQ_URL;
 const SEND_QUEUE = "send-queue";
 const REMINDER_QUEUE = "reminder-queue";
 
-const dynamoDb = new AWS.DynamoDB.DocumentClient();
-const sqs = new AWS.SQS();
+const dynamoDb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
+const sqs = new SQSClient({});
 
 function createSupabaseAdminClient() {
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -94,12 +95,13 @@ async function sendToDlq(payload, error) {
     failed_at: new Date().toISOString(),
     source: "message-router",
   };
-  await sqs
-    .sendMessage({
-      QueueUrl: DLQ_URL,
-      MessageBody: JSON.stringify(body),
-    })
-    .promise();
+  
+  const command = new SendMessageCommand({
+    QueueUrl: DLQ_URL,
+    MessageBody: JSON.stringify(body),
+  });
+  
+  await sqs.send(command);
 }
 
 async function checkRateLimit(companyId) {
@@ -110,7 +112,7 @@ async function checkRateLimit(companyId) {
   const windowKey = `${now.getUTCFullYear()}-${now.getUTCMonth() + 1}-${now.getUTCDate()}-${now.getUTCHours()}-${now.getUTCMinutes()}`;
   const limitPerMinute = 60;
 
-  const params = {
+  const command = new UpdateCommand({
     TableName: RATE_LIMIT_TABLE_NAME,
     Key: {
       company_id: companyId,
@@ -124,9 +126,9 @@ async function checkRateLimit(companyId) {
       ":inc": 1,
     },
     ReturnValues: "UPDATED_NEW",
-  };
+  });
 
-  const result = await dynamoDb.update(params).promise();
+  const result = await dynamoDb.send(command);
   const current = result.Attributes && result.Attributes.count ? result.Attributes.count : 1;
   if (current > limitPerMinute) {
     const err = new Error("Rate limit exceeded");
