@@ -190,7 +190,7 @@ Resources:
                   - ec2:UnassignPrivateIpAddresses
                 Resource: "*"
 
-  # --- Lambdas (in public subnet) ---
+  # --- Lambdas (moved to Public Subnet) ---
   MessageRouterLambda:
     Type: AWS::Lambda::Function
     Properties:
