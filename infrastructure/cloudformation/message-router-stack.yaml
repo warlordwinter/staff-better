@@ -14,10 +14,6 @@ Parameters:
     Type: String
     Description: "Private subnet 2 for broker"
 
-  PublicSubnetId:
-    Type: AWS::EC2::Subnet::Id
-    Description: "Public subnet (with internet access) where Lambdas get deployed"
-
   SupabaseUrl:
     Type: String
     Description: "Supabase project URL"
@@ -103,18 +99,16 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource: "arn:aws:logs:*:*:*"
-        - PolicyName: RouterVpcAccess
+        - PolicyName: RouterQueueAccess
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
-                  - ec2:CreateNetworkInterface
-                  - ec2:DescribeNetworkInterfaces
-                  - ec2:DeleteNetworkInterface
-                  - ec2:AssignPrivateIpAddresses
-                  - ec2:UnassignPrivateIpAddresses
-                Resource: "*"
+                  - sqs:SendMessage
+                Resource:
+                  - !GetAtt BrokerMessageQueue.Arn
+                  - !GetAtt MessageProcessingDlq.Arn
 
   SendWorkerLambdaRole:
     Type: AWS::IAM::Role
@@ -152,6 +146,20 @@ Resources:
                   - ec2:AssignPrivateIpAddresses
                   - ec2:UnassignPrivateIpAddresses
                 Resource: "*"
+        - PolicyName: SendWorkerQueueAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: !GetAtt BrokerMessageQueue.Arn
+              - Effect: Allow
+                Action:
+                  - sqs:SendMessage
+                Resource: !GetAtt MessageProcessingDlq.Arn
 
   ReminderWorkerLambdaRole:
     Type: AWS::IAM::Role
@@ -189,6 +197,20 @@ Resources:
                   - ec2:AssignPrivateIpAddresses
                   - ec2:UnassignPrivateIpAddresses
                 Resource: "*"
+        - PolicyName: ReminderWorkerQueueAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: !GetAtt BrokerMessageQueue.Arn
+              - Effect: Allow
+                Action:
+                  - sqs:SendMessage
+                Resource: !GetAtt MessageProcessingDlq.Arn
 
   # --- Lambdas (moved to Public Subnet) ---
   MessageRouterLambda:
@@ -200,19 +222,14 @@ Resources:
       Role: !GetAtt RouterLambdaRole.Arn
       Timeout: 60
       MemorySize: 256
-      VpcConfig:
-        SecurityGroupIds:
-          - !Ref MessageBrokerSecurityGroup
-        SubnetIds:
-          - !Ref PublicSubnetId
       Environment:
         Variables:
           SUPABASE_URL: !Ref SupabaseUrl
           SUPABASE_SERVICE_ROLE_KEY: !Ref SupabaseServiceRoleKey
           JWT_VERIFICATION_KEY: !Ref JwtVerificationKey
-          RABBITMQ_URL: !Select [0, !GetAtt MessageBroker.AmqpEndpoints]
           RATE_LIMIT_TABLE_NAME: !Ref RateLimitTable
           DLQ_URL: !Ref MessageProcessingDlq
+          BROKER_MESSAGE_QUEUE_URL: !Ref BrokerMessageQueue
       Code:
         ZipFile: |
           exports.handler = async (event) => {
@@ -233,7 +250,8 @@ Resources:
         SecurityGroupIds:
           - !Ref MessageBrokerSecurityGroup
         SubnetIds:
-          - !Ref PublicSubnetId
+          - !Ref PrivateSubnet1Id
+          - !Ref PrivateSubnet2Id
       Environment:
         Variables:
           RABBITMQ_URL: !Select [0, !GetAtt MessageBroker.AmqpEndpoints]
@@ -257,7 +275,8 @@ Resources:
         SecurityGroupIds:
           - !Ref MessageBrokerSecurityGroup
         SubnetIds:
-          - !Ref PublicSubnetId
+          - !Ref PrivateSubnet1Id
+          - !Ref PrivateSubnet2Id
       Environment:
         Variables:
           RABBITMQ_URL: !Select [0, !GetAtt MessageBroker.AmqpEndpoints]
@@ -339,6 +358,39 @@ Resources:
       QueueName: MessageProcessingDlq
       MessageRetentionPeriod: 1209600
 
+  BrokerMessageQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: BrokerMessageQueue
+      VisibilityTimeout: 60
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt MessageProcessingDlq.Arn
+        maxReceiveCount: 5
+
+  SendWorkerQueueMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: 5
+      Enabled: true
+      EventSourceArn: !GetAtt BrokerMessageQueue.Arn
+      FunctionName: !Ref SendWorkerLambda
+      MaximumBatchingWindowInSeconds: 5
+      FilterCriteria:
+        Filters:
+          - Pattern: '{"messageAttributes":{"MessageType":{"stringValue":["immediate"]}}}'
+
+  ReminderWorkerQueueMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: 5
+      Enabled: true
+      EventSourceArn: !GetAtt BrokerMessageQueue.Arn
+      FunctionName: !Ref ReminderWorkerLambda
+      MaximumBatchingWindowInSeconds: 5
+      FilterCriteria:
+        Filters:
+          - Pattern: '{"messageAttributes":{"MessageType":{"stringValue":["reminder"]}}}'
+
   # --- CloudWatch Alarms ---
   MessageRouterErrorsAlarm:
     Type: AWS::CloudWatch::Alarm
@@ -392,3 +444,6 @@ Outputs:
   MessageRouterApiUrl:
     Description: "Invoke URL for Message Router API"
     Value: !Sub "https://${MessageRouterApi}.execute-api.${AWS::Region}.amazonaws.com/prod/messages"
+  BrokerMessageQueueUrl:
+    Description: "URL for the broker handoff queue"
+    Value: !Ref BrokerMessageQueue

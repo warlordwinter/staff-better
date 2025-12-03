@@ -1,15 +1,16 @@
 // PSEUDOCODE
-// 1. Receive event with one or more message payloads
-// 2. For each payload:
-//    - Extract Twilio subaccount SID and token
-//    - Create Twilio client
-//    - Send SMS immediately
-//    - On error, log and send failed payload to DLQ
+// 1. Lambda invoked by SQS (immediate messages only via filter).
+// 2. Parse JSON payloads from Records.
+// 3. Establish a RabbitMQ channel inside the VPC.
+// 4. Publish each payload onto the broker send queue.
+// 5. Send failures to the DLQ without blocking other records.
 
-const twilio = require("twilio");
+const amqp = require("amqplib");
 const AWS = require("aws-sdk");
 
 const DLQ_URL = process.env.DLQ_URL;
+const RABBITMQ_URL = process.env.RABBITMQ_URL;
+const SEND_QUEUE = "send-queue";
 
 const sqs = new AWS.SQS();
 
@@ -32,50 +33,11 @@ async function sendToDlq(payload, error) {
     .promise();
 }
 
-async function processMessage(messagePayload) {
-  const {
-    to,
-    from,
-    body,
-    twilio_subaccount_sid,
-    twilio_auth_token_encrypted,
-  } = messagePayload;
-
-  if (!to || !body || !twilio_subaccount_sid || !twilio_auth_token_encrypted) {
-    throw new Error("Invalid payload: missing required fields");
-  }
-
-  // NOTE: auth_token_encrypted is assumed to be usable as-is here.
-  // If KMS or another encryption mechanism is used, decrypt before use.
-  const client = twilio(twilio_subaccount_sid, twilio_auth_token_encrypted);
-
-  const fromNumber = from || process.env.TWILIO_DEFAULT_FROM;
-
-  if (!fromNumber) {
-    throw new Error("No FROM number configured");
-  }
-
-  const result = await client.messages.create({
-    to,
-    from: fromNumber,
-    body,
-  });
-
-  console.log("SMS sent:", {
-    sid: result.sid,
-    status: result.status,
-    to: result.to,
-    from: result.from,
-  });
-}
-
 function extractPayloadsFromEvent(event) {
   if (!event) return [];
-  // Generic support: single payload
   if (event.company_id && event.to && event.body) {
     return [event];
   }
-  // SQS-style Records
   if (Array.isArray(event.Records)) {
     return event.Records.map((r) => {
       try {
@@ -88,18 +50,58 @@ function extractPayloadsFromEvent(event) {
   return [];
 }
 
+async function publishToBroker(channel, payload) {
+  if (!payload || !payload.company_id) {
+    throw new Error("Invalid payload: missing company_id");
+  }
+  await channel.assertQueue(SEND_QUEUE, { durable: true });
+  channel.sendToQueue(SEND_QUEUE, Buffer.from(JSON.stringify(payload)), {
+    persistent: true,
+  });
+}
+
 exports.handler = async (event) => {
   console.log("SendWorker event:", JSON.stringify(event));
   const payloads = extractPayloadsFromEvent(event);
 
-  for (const payload of payloads) {
-    try {
-      await processMessage(payload);
-    } catch (error) {
-      console.error("Error processing send-worker payload:", error);
-      await sendToDlq(payload, error);
+  if (!payloads.length) {
+    return;
+  }
+
+  if (!RABBITMQ_URL) {
+    console.error("RABBITMQ_URL is not configured. Failing batch.");
+    await Promise.all(payloads.map((p) => sendToDlq(p, new Error("Missing broker URL"))));
+    return;
+  }
+
+  let connection;
+  let channel;
+
+  try {
+    connection = await amqp.connect(RABBITMQ_URL);
+    channel = await connection.createChannel();
+
+    for (const payload of payloads) {
+      try {
+        await publishToBroker(channel, payload);
+      } catch (error) {
+        console.error("Error forwarding payload to broker:", error);
+        await sendToDlq(payload, error);
+      }
+    }
+  } catch (connectionError) {
+    console.error("Failed to establish RabbitMQ connection:", connectionError);
+    await Promise.all(payloads.map((payload) => sendToDlq(payload, connectionError)));
+  } finally {
+    if (channel) {
+      await channel.close().catch((err) =>
+        console.error("Failed to close channel:", err)
+      );
+    }
+    if (connection) {
+      await connection.close().catch((err) =>
+        console.error("Failed to close connection:", err)
+      );
     }
   }
 };
-
-

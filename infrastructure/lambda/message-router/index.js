@@ -1,18 +1,13 @@
 // PSEUDOCODE (kept as comments for clarity)
-// 1. Parse HTTP request event from API Gateway
-// 2. Extract Authorization header (JWT) and validate
-// 3. Decode JWT to get company_id
-// 4. Parse JSON body: { to, body, target_time?, message_type? }
-// 5. Determine message_type: immediate vs reminder
-// 6. Lookup Twilio subaccount for company via Supabase
-// 7. Build payload with company/twilio info
-// 8. Connect to RabbitMQ (Amazon MQ) using environment connection string
-// 9. Publish to send-queue or reminder-queue
-// 10. Return 200/4xx depending on validation
+// 1. Validate HTTP method + Authorization header, verify JWT.
+// 2. Parse request body, derive message_type (immediate/reminder) and validate inputs.
+// 3. Normalize reminder timestamps and enforce rate limiting via DynamoDB.
+// 4. Fetch Twilio subaccount metadata for the company from Supabase.
+// 5. Build a broker payload and enqueue it onto the BrokerMessageQueue (SQS) with message attributes.
+// 6. Return 200 on success, map validation/rate errors to 4xx, and push server errors to DLQ asynchronously.
 
 const { randomUUID } = require("crypto");
 const jwt = require("jsonwebtoken");
-const amqp = require("amqplib");
 const { createClient } = require("@supabase/supabase-js");
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 const {
@@ -24,12 +19,9 @@ const { SQSClient, SendMessageCommand } = require("@aws-sdk/client-sqs");
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const JWT_VERIFICATION_KEY = process.env.JWT_VERIFICATION_KEY;
-const RABBITMQ_URL = process.env.RABBITMQ_URL;
 const RATE_LIMIT_TABLE_NAME = process.env.RATE_LIMIT_TABLE_NAME;
 const DLQ_URL = process.env.DLQ_URL;
-
-const SEND_QUEUE = "send-queue";
-const REMINDER_QUEUE = "reminder-queue";
+const BROKER_MESSAGE_QUEUE_URL = process.env.BROKER_MESSAGE_QUEUE_URL;
 
 const dynamoDb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const sqs = new SQSClient({});
@@ -74,18 +66,23 @@ async function getTwilioSubaccountForCompany(supabase, companyId) {
   return data;
 }
 
-async function publishToQueue(queueName, payload) {
-  const conn = await amqp.connect(RABBITMQ_URL);
-  try {
-    const channel = await conn.createChannel();
-    await channel.assertQueue(queueName, { durable: true });
-    channel.sendToQueue(queueName, Buffer.from(JSON.stringify(payload)), {
-      persistent: true,
-    });
-    await channel.close();
-  } finally {
-    await conn.close();
+async function enqueueForBroker(messageType, payload) {
+  if (!BROKER_MESSAGE_QUEUE_URL) {
+    throw new Error("BROKER_MESSAGE_QUEUE_URL is not configured");
   }
+
+  const command = new SendMessageCommand({
+    QueueUrl: BROKER_MESSAGE_QUEUE_URL,
+    MessageBody: JSON.stringify(payload),
+    MessageAttributes: {
+      MessageType: {
+        DataType: "String",
+        StringValue: messageType,
+      },
+    },
+  });
+
+  await sqs.send(command);
 }
 
 async function sendToDlq(payload, error) {
@@ -259,9 +256,7 @@ exports.handler = async (event) => {
     };
 
     await checkRateLimit(companyId);
-
-    const queueName = type === "immediate" ? SEND_QUEUE : REMINDER_QUEUE;
-    await publishToQueue(queueName, payload);
+    await enqueueForBroker(type, payload);
 
     return {
       statusCode: 200,
