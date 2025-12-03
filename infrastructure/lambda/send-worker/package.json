@@ -7,6 +7,8 @@
         "test": "echo \"Error: no test specified\" && exit 1"
     },
     "dependencies": {
+        "amqplib": "^0.10.9",
+        "aws-sdk": "^2.1692.0",
         "twilio": "^5.8.0"
     },
     "engines": {
