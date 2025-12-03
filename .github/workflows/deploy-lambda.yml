@@ -365,15 +365,15 @@ jobs:
             --template-body file://${{ env.ROUTER_CLOUDFORMATION_TEMPLATE }} \
             --capabilities CAPABILITY_NAMED_IAM \
             --parameters \
-              ParameterKey=SupabaseUrl,ParameterValue=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }} \
-              ParameterKey=SupabaseServiceRoleKey,ParameterValue=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }} \
-              ParameterKey=JwtVerificationKey,ParameterValue=${{ secrets.JWT_VERIFICATION_KEY }} \
-              ParameterKey=VpcId,ParameterValue=${{ secrets.ROUTER_VPC_ID }} \
-              ParameterKey=PrivateSubnet1Id,ParameterValue=${{ secrets.ROUTER_PRIVATE_SUBNET_1_ID }} \
-              ParameterKey=PrivateSubnet2Id,ParameterValue=${{ secrets.ROUTER_PRIVATE_SUBNET_2_ID }} \
-              ParameterKey=PublicSubnetId,ParameterValue=${{ secrets.ROUTER_PUBLIC_SUBNET_ID }} \
-              ParameterKey=AmazonMqAdminUser,ParameterValue=${{ secrets.AMAZON_MQ_ADMIN_USER }} \
-              ParameterKey=AmazonMqAdminPassword,ParameterValue=${{ secrets.AMAZON_MQ_ADMIN_PASSWORD }} \
+              ParameterKey=SupabaseUrl,ParameterValue="${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" \
+              ParameterKey=SupabaseServiceRoleKey,ParameterValue="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+              ParameterKey=JwtVerificationKey,ParameterValue="${{ secrets.JWT_VERIFICATION_KEY }}" \
+              ParameterKey=VpcId,ParameterValue="${{ secrets.ROUTER_VPC_ID }}" \
+              ParameterKey=PrivateSubnet1Id,ParameterValue="${{ secrets.ROUTER_PRIVATE_SUBNET_1_ID }}" \
+              ParameterKey=PrivateSubnet2Id,ParameterValue="${{ secrets.ROUTER_PRIVATE_SUBNET_2_ID }}" \
+              ParameterKey=PublicSubnetId,ParameterValue="${{ secrets.ROUTER_PUBLIC_SUBNET_ID }}" \
+              ParameterKey=AmazonMqAdminUser,ParameterValue="${{ secrets.AMAZON_MQ_ADMIN_USER }}" \
+              ParameterKey=AmazonMqAdminPassword,ParameterValue="${{ secrets.AMAZON_MQ_ADMIN_PASSWORD }}" \
             --region ${{ env.AWS_REGION }} \
             --on-failure DELETE
 
