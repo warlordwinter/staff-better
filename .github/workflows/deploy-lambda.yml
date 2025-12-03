@@ -281,7 +281,6 @@ jobs:
           check_secret "ROUTER_VPC_ID" "${{ secrets.ROUTER_VPC_ID }}"
           check_secret "ROUTER_PRIVATE_SUBNET_1_ID" "${{ secrets.ROUTER_PRIVATE_SUBNET_1_ID }}"
           check_secret "ROUTER_PRIVATE_SUBNET_2_ID" "${{ secrets.ROUTER_PRIVATE_SUBNET_2_ID }}"
-          check_secret "ROUTER_PUBLIC_SUBNET_ID" "${{ secrets.ROUTER_PUBLIC_SUBNET_ID }}"
           check_secret "AMAZON_MQ_ADMIN_USER" "${{ secrets.AMAZON_MQ_ADMIN_USER }}"
           check_secret "AMAZON_MQ_ADMIN_PASSWORD" "${{ secrets.AMAZON_MQ_ADMIN_PASSWORD }}"
 
@@ -371,7 +370,6 @@ jobs:
               ParameterKey=VpcId,ParameterValue="${{ secrets.ROUTER_VPC_ID }}" \
               ParameterKey=PrivateSubnet1Id,ParameterValue="${{ secrets.ROUTER_PRIVATE_SUBNET_1_ID }}" \
               ParameterKey=PrivateSubnet2Id,ParameterValue="${{ secrets.ROUTER_PRIVATE_SUBNET_2_ID }}" \
-              ParameterKey=PublicSubnetId,ParameterValue="${{ secrets.ROUTER_PUBLIC_SUBNET_ID }}" \
               ParameterKey=AmazonMqAdminUser,ParameterValue="${{ secrets.AMAZON_MQ_ADMIN_USER }}" \
               ParameterKey=AmazonMqAdminPassword,ParameterValue="${{ secrets.AMAZON_MQ_ADMIN_PASSWORD }}" \
             --region ${{ env.AWS_REGION }} \
@@ -453,7 +451,6 @@ jobs:
               "VpcId=${{ secrets.ROUTER_VPC_ID }}" \
               "PrivateSubnet1Id=${{ secrets.ROUTER_PRIVATE_SUBNET_1_ID }}" \
               "PrivateSubnet2Id=${{ secrets.ROUTER_PRIVATE_SUBNET_2_ID }}" \
-              "PublicSubnetId=${{ secrets.ROUTER_PUBLIC_SUBNET_ID }}" \
               "AmazonMqAdminUser=${{ secrets.AMAZON_MQ_ADMIN_USER }}" \
               "AmazonMqAdminPassword=${{ secrets.AMAZON_MQ_ADMIN_PASSWORD }}" \
             --region ${{ env.AWS_REGION }} \
