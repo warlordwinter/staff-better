@@ -15,8 +15,8 @@ Parameters:
     Description: "Private subnet 2 for broker"
 
   PublicSubnetId:
-    Type: String
-    Description: "Public subnet (with internet access) for Lambdas"
+    Type: AWS::EC2::Subnet::Id
+    Description: "Public subnet (with internet access) where Lambdas get deployed"
 
   SupabaseUrl:
     Type: String
