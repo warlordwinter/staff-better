@@ -109,6 +109,14 @@ Resources:
                 Resource:
                   - !GetAtt BrokerMessageQueue.Arn
                   - !GetAtt MessageProcessingDlq.Arn
+        - PolicyName: RouterRateLimitTableAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:UpdateItem
+                Resource: !GetAtt RateLimitTable.Arn
 
   SendWorkerLambdaRole:
     Type: AWS::IAM::Role
