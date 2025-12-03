@@ -18,6 +18,12 @@ EVENTBRIDGE_SCHEDULE_GROUP=default
 AWS_REGION=us-east-1
 AWS_ACCESS_KEY_ID=your-aws-access-key-id
 AWS_SECRET_ACCESS_KEY=your-aws-secret-access-key
+
+# Twilio Configuration
+TWILIO_ACCOUNT_SID=your-master-account-sid
+TWILIO_AUTH_TOKEN=your-master-auth-token
+TWILIO_PHONE_NUMBER_REMINDERS=+15555555555
+TWILIO_SUBACCOUNT_ENCRYPTION_KEY=base64-or-hex-encoded-32-byte-key
 ```
 
 ### For Production (Vercel/Other Platforms)
@@ -46,6 +52,9 @@ Add these environment variables in your hosting platform's dashboard:
 - **EVENTBRIDGE_SCHEDULE_GROUP**: Optional, defaults to "default" - the EventBridge schedule group name
 - **AWS_REGION**: AWS region where your resources are deployed
 - **AWS_ACCESS_KEY_ID** / **AWS_SECRET_ACCESS_KEY**: AWS credentials for creating EventBridge schedules from your app
+- **TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN**: Master Twilio credentials used to provision child accounts and send SMS
+- **TWILIO_PHONE_NUMBER_REMINDERS**: Default phone number for reminder messages
+- **TWILIO_SUBACCOUNT_ENCRYPTION_KEY**: 32-byte key (64-char hex or base64) used to encrypt newly created subaccount auth tokens before storing them
 
 ## Where These Are Used in Code
 
@@ -54,6 +63,7 @@ Add these environment variables in your hosting platform's dashboard:
   - Creating a new job assignment (`insertSingleJobAssignment`)
   - Updating a job assignment's work_date or start_time (`updateJobAssignment`)
   - Deleting a job assignment (`deleteJobAssignment`)
+- `src/lib/twilio/client.ts` and `src/lib/twilio/subaccounts.ts` - Use the Twilio variables to send SMS and provision encrypted child accounts for each company signup
 
 ## Important Notes
 

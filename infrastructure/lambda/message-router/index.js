@@ -48,10 +48,12 @@ function parseBody(event) {
 }
 
 async function getTwilioSubaccountForCompany(supabase, companyId) {
+  const customer = await getIsvCustomerForCompany(supabase, companyId);
+
   const { data, error } = await supabase
     .from("twilio_subaccounts")
     .select("subaccount_sid, auth_token_encrypted")
-    .eq("customer_id", companyId)
+    .eq("customer_id", customer.id)
     .single();
 
   if (error) {
@@ -61,6 +63,25 @@ async function getTwilioSubaccountForCompany(supabase, companyId) {
 
   if (!data) {
     throw new Error("No Twilio subaccount configured for company");
+  }
+
+  return data;
+}
+
+async function getIsvCustomerForCompany(supabase, companyId) {
+  const { data, error } = await supabase
+    .from("isv_customers")
+    .select("id")
+    .eq("company_id", companyId)
+    .single();
+
+  if (error) {
+    console.error("Error fetching ISV customer:", error);
+    throw new Error("Failed to resolve ISV customer for company");
+  }
+
+  if (!data) {
+    throw new Error("No ISV customer configured for company");
   }
 
   return data;

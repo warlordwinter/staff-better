@@ -33,6 +33,12 @@ EVENTBRIDGE_SCHEDULE_GROUP=default
 AWS_REGION=us-east-1
 AWS_ACCESS_KEY_ID=paste-your-access-key-id-here
 AWS_SECRET_ACCESS_KEY=paste-your-secret-access-key-here
+
+# Twilio Configuration
+TWILIO_ACCOUNT_SID=your-master-account-sid
+TWILIO_AUTH_TOKEN=your-master-auth-token
+TWILIO_PHONE_NUMBER_REMINDERS=+15555555555
+TWILIO_SUBACCOUNT_ENCRYPTION_KEY=base64-or-hex-encoded-32-byte-key
 ```
 
 ### 3. Deploy Lambda Function Code
