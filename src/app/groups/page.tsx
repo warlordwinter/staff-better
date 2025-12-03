@@ -203,7 +203,7 @@ export default function GroupsPage() {
   return (
     <div className="min-h-screen flex flex-col bg-white">
       <Navbar />
-      <main className="flex-1 w-full max-w-7xl mx-auto px-6 py-8 mt-24">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-6 py-8">
         {/* Header Section */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
