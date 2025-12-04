@@ -28,26 +28,29 @@ interface ActivityData {
   credits: number;
 }
 
-// Placeholder function for future Twilio API integration
-// TODO: Replace with actual Twilio API call
+// Fetch usage data from Twilio API
 async function fetchUsageData(
   month: string,
   year: string
 ): Promise<UsageData> {
-  // This will be replaced with actual Twilio API integration
-  // Example: const response = await fetch(`/api/twilio/usage?month=${month}&year=${year}`);
-  // return await response.json();
+  const response = await fetch(
+    `/api/twilio/usage?month=${encodeURIComponent(month)}&year=${encodeURIComponent(year)}`
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(
+      errorData.error || `Failed to fetch usage data: ${response.statusText}`
+    );
+  }
+
+  const data = await response.json();
   
-  // Mock data for now
+  // Convert ISO date strings back to Date objects
   return {
-    smsMessages: 847,
-    whatsappMessages: 523,
-    smsCredits: 847 * 7, // 5,929 credits
-    whatsappCredits: 523 * 5, // 2,615 credits
-    totalCreditsUsed: 847 * 7 + 523 * 5, // 8,544 credits
-    creditLimit: 25000,
-    billingPeriodStart: new Date(2024, 11, 1), // Dec 1, 2024
-    billingPeriodEnd: new Date(2024, 11, 31), // Dec 31, 2024
+    ...data,
+    billingPeriodStart: new Date(data.billingPeriodStart),
+    billingPeriodEnd: new Date(data.billingPeriodEnd),
   };
 }
 
@@ -85,13 +88,13 @@ const months = [
   "December",
 ];
 
-const years = ["2024", "2023", "2022"];
+const years = ["2025", "2026", "2027", "2028", "2029", "2030"];
 
 export default function UsagePage() {
   const router = useRouter();
   const { loading: authLoading, isAuthenticated } = useAuthCheck();
   const [selectedMonth, setSelectedMonth] = useState("December");
-  const [selectedYear, setSelectedYear] = useState("2024");
+  const [selectedYear, setSelectedYear] = useState("2025");
   const [usageData, setUsageData] = useState<UsageData | null>(null);
   const [activityData, setActivityData] = useState<ActivityData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -113,6 +116,10 @@ export default function UsagePage() {
         setActivityData(activity);
       } catch (error) {
         console.error("Error fetching usage data:", error);
+        // Set error state - you might want to add an error state variable
+        // For now, we'll just log it and keep loading false
+        setUsageData(null);
+        setActivityData([]);
       } finally {
         setLoading(false);
       }

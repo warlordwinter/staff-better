@@ -55,8 +55,31 @@ Add these environment variables in your hosting platform's dashboard:
   - Updating a job assignment's work_date or start_time (`updateJobAssignment`)
   - Deleting a job assignment (`deleteJobAssignment`)
 
+## Twilio Usage API Configuration
+
+For the Twilio Usage API integration, you need to add an encryption key:
+
+```bash
+# Encryption key for Twilio subaccount auth tokens
+# Generate a 32-byte (64 hex characters) random key:
+# node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+ENCRYPTION_KEY=your-64-character-hex-encryption-key-here
+```
+
+**How to generate the encryption key:**
+
+Run this command to generate a secure random key:
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+Copy the output (64 hex characters) and set it as `ENCRYPTION_KEY` in your environment variables.
+
+**Important:** This key is used to encrypt/decrypt Twilio subaccount authentication tokens stored in the database. Keep it secure and never commit it to version control.
+
 ## Important Notes
 
 1. **Never commit `.env.local`** - It's already in `.gitignore`
 2. **Restart your dev server** after adding environment variables
 3. **The Lambda function** gets its environment variables from CloudFormation (already set), so you don't need to configure those separately
+4. **ENCRYPTION_KEY** must be set for Twilio usage tracking to work properly
