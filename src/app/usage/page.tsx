@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import Navbar from "@/components/ui/navBar";
 import Footer from "@/components/ui/footer";
 import LoadingSpinner from "@/components/ui/loadingSpinner";
@@ -63,6 +62,10 @@ async function fetchActivityData(
   // Example: const response = await fetch(`/api/twilio/activity?month=${month}&year=${year}`);
   // return await response.json();
   
+  // Suppress unused variable warnings - these will be used when API is integrated
+  void month;
+  void year;
+  
   // Mock data for now
   return [
     { date: "Dec 2, 2024", sms: 23, whatsapp: 18, credits: (23 * 7) + (18 * 5) },
@@ -91,7 +94,6 @@ const months = [
 const years = ["2025", "2026", "2027", "2028", "2029", "2030"];
 
 export default function UsagePage() {
-  const router = useRouter();
   const { loading: authLoading, isAuthenticated } = useAuthCheck();
   const [selectedMonth, setSelectedMonth] = useState("December");
   const [selectedYear, setSelectedYear] = useState("2025");

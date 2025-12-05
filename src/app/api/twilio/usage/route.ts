@@ -91,19 +91,19 @@ export async function GET(request: NextRequest) {
     try {
       // Query SMS usage
       const smsRecords = await subaccountClient.usage.records.list({
-        category: "sms",
+        category: "sms" as any,
         startDate: startDateStr,
         endDate: endDateStr,
-      });
+      } as any);
 
       // Query WhatsApp usage (handle gracefully if not available)
       let whatsappRecords: any[] = [];
       try {
         whatsappRecords = await subaccountClient.usage.records.list({
-          category: "whatsapp",
+          category: "whatsapp" as any,
           startDate: startDateStr,
           endDate: endDateStr,
-        });
+        } as any);
       } catch (whatsappError: any) {
         // WhatsApp not enabled or category not available - that's okay
         console.log("WhatsApp usage not available:", whatsappError.message);
