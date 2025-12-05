@@ -1,28 +1,18 @@
 // PSEUDOCODE
-// 1. Lambda triggered by EventBridge schedule (runs periodically to drain queue)
-// 2. Connects to RabbitMQ and consumes messages from send-queue
+// 1. Lambda triggered by SQS (MessageSenderQueue)
+// 2. Parses JSON payloads from SQS Records
 // 3. Decrypts Twilio auth token from payload
 // 4. Creates Twilio client with subaccount credentials
 // 5. Sends SMS via Twilio
-// 6. Acknowledges messages after successful sending
-// 7. Handles errors and sends to DLQ if needed
+// 6. Handles errors and sends to DLQ if needed
 
-const amqp = require("amqplib");
 const twilio = require("twilio");
 const { createDecipheriv } = require("crypto");
 const AWS = require("aws-sdk");
 
 const DLQ_URL = process.env.DLQ_URL;
-const RABBITMQ_ENDPOINT = process.env.RABBITMQ_ENDPOINT;
-const RABBITMQ_USERNAME = process.env.RABBITMQ_USERNAME;
-const RABBITMQ_PASSWORD = process.env.RABBITMQ_PASSWORD;
-const SEND_QUEUE = "send-queue";
 const TWILIO_SUBACCOUNT_ENCRYPTION_KEY =
   process.env.TWILIO_SUBACCOUNT_ENCRYPTION_KEY;
-const MAX_MESSAGES_PER_INVOCATION = parseInt(
-  process.env.MAX_MESSAGES_PER_INVOCATION || "10",
-  10
-);
 
 const sqs = new AWS.SQS();
 
@@ -154,18 +144,81 @@ async function sendSMS(payload) {
   const authToken = decryptTwilioAuthToken(twilio_auth_token_encrypted);
 
   // Create Twilio client with subaccount credentials
-  const twilioClient = twilio(twilio_subaccount_sid, authToken);
+  // Configure with longer timeout for VPC Lambda connections
+  const twilioClient = twilio(twilio_subaccount_sid, authToken, {
+    httpClient: {
+      timeout: 30000, // 30 second timeout (default is usually 10s)
+    },
+  });
 
   // Format phone numbers
   const formattedTo = formatPhoneNumber(to);
   const formattedFrom = from ? formatPhoneNumber(from) : null;
 
-  // Send SMS
-  const message = await twilioClient.messages.create({
-    to: formattedTo,
-    from: formattedFrom || undefined,
-    body: messageBody,
-  });
+  // Send SMS with retry logic for network issues
+  let message;
+  const maxRetries = 3;
+  let lastError;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      message = await twilioClient.messages.create({
+        to: formattedTo,
+        from: formattedFrom || undefined,
+        body: messageBody,
+      });
+      break; // Success, exit retry loop
+    } catch (error) {
+      lastError = error;
+
+      // Check if it's a network error (connection timeout, DNS, etc.)
+      const isNetworkError =
+        error.message.includes("ETIMEDOUT") ||
+        error.message.includes("ECONNRESET") ||
+        error.message.includes("ENOTFOUND") ||
+        error.message.includes("connect") ||
+        error.code === "ETIMEDOUT" ||
+        error.code === "ECONNRESET" ||
+        error.code === "ENOTFOUND";
+
+      // Check if it's a Twilio API error (authentication, validation, etc.)
+      const isTwilioApiError =
+        error.status === 401 || // Unauthorized
+        error.status === 400 || // Bad Request
+        error.status === 403 || // Forbidden
+        error.status === 404 || // Not Found
+        error.code === 20003 || // Twilio error codes
+        error.code === 21211 || // Invalid 'To' phone number
+        error.code === 21212 || // Invalid 'From' phone number
+        (error.response && error.response.status >= 400);
+
+      if (isTwilioApiError) {
+        // Twilio API error - don't retry, this is a permanent issue
+        console.error("Twilio API error (credentials/validation issue):", {
+          status: error.status,
+          code: error.code,
+          message: error.message,
+          moreInfo: error.moreInfo,
+        });
+        throw error;
+      }
+
+      if (isNetworkError && attempt < maxRetries) {
+        const delay = attempt * 1000; // Exponential backoff: 1s, 2s, 3s
+        console.warn(
+          `Network error on attempt ${attempt}/${maxRetries}, retrying in ${delay}ms:`,
+          error.message
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        continue;
+      }
+      throw error; // Re-throw if not a network error or out of retries
+    }
+  }
+
+  if (!message) {
+    throw lastError || new Error("Failed to send SMS after retries");
+  }
 
   console.log("SMS sent successfully:", {
     messageId: message_id,
@@ -181,21 +234,43 @@ async function sendSMS(payload) {
   };
 }
 
-async function processMessage(channel, message) {
-  let payload;
+function extractPayloadsFromEvent(event) {
+  if (!event || !event.Records) {
+    return [];
+  }
+
+  return event.Records.map((record) => {
+    try {
+      return JSON.parse(record.body);
+    } catch (error) {
+      console.error("Error parsing SQS message body:", error);
+      return null;
+    }
+  }).filter(Boolean);
+}
+
+async function processMessage(payload) {
   try {
-    payload = JSON.parse(message.content.toString());
-    console.log("Processing message from queue:", {
+    console.log("Processing message:", {
       messageId: payload.message_id,
       companyId: payload.company_id,
       to: payload.to,
     });
 
-    await sendSMS(payload);
+    // Validate payload has required fields for SMS sending
+    if (
+      !payload.twilio_subaccount_sid ||
+      !payload.twilio_auth_token_encrypted
+    ) {
+      const error = new Error(
+        "Invalid message format: missing Twilio credentials. This message may be from a different source."
+      );
+      error.code = "INVALID_MESSAGE_FORMAT";
+      throw error;
+    }
 
-    // Acknowledge message after successful processing
-    channel.ack(message);
-    console.log("Message processed and acknowledged:", payload.message_id);
+    await sendSMS(payload);
+    console.log("Message processed successfully:", payload.message_id);
     return { success: true, messageId: payload.message_id };
   } catch (error) {
     console.error("Error processing message:", {
@@ -209,12 +284,6 @@ async function processMessage(channel, message) {
       await sendToDlq(payload, error);
     }
 
-    // Reject message (don't requeue if it's a permanent error)
-    const isPermanentError =
-      error.message.includes("Missing required") ||
-      error.message.includes("Invalid") ||
-      error.message.includes("Encrypted token");
-    channel.nack(message, false, !isPermanentError);
     return {
       success: false,
       messageId: payload?.message_id,
@@ -223,174 +292,46 @@ async function processMessage(channel, message) {
   }
 }
 
-function buildRabbitMQUrl(endpoint, username, password) {
-  if (!endpoint || !username || !password) {
-    throw new Error("RabbitMQ endpoint, username, and password are required");
-  }
-
-  // Remove protocol if present, extract hostname
-  let hostname = endpoint.replace(/^amqps?:\/\//, "").replace(/:\d+$/, "");
-
-  // URL encode username and password to handle special characters
-  const encodedUsername = encodeURIComponent(username);
-  const encodedPassword = encodeURIComponent(password);
-
-  // Construct full connection URL: amqps://username:password@hostname:5671/%2F
-  return `amqps://${encodedUsername}:${encodedPassword}@${hostname}:5671/%2F`;
-}
-
 exports.handler = async (event) => {
-  console.log("MessageSender Lambda invoked");
-
-  if (!RABBITMQ_ENDPOINT || !RABBITMQ_USERNAME || !RABBITMQ_PASSWORD) {
-    console.error("RabbitMQ configuration is incomplete");
-    return {
-      statusCode: 500,
-      body: "RabbitMQ endpoint, username, or password not configured",
-    };
-  }
+  console.log(
+    "MessageSender Lambda invoked with event:",
+    JSON.stringify(event)
+  );
 
   if (!TWILIO_SUBACCOUNT_ENCRYPTION_KEY) {
     console.error("TWILIO_SUBACCOUNT_ENCRYPTION_KEY is not configured");
-    return {
-      statusCode: 500,
-      body: "TWILIO_SUBACCOUNT_ENCRYPTION_KEY not configured",
-    };
+    // For SQS-triggered Lambdas, we should process messages even if config is missing
+    // and let individual message processing handle the error
   }
 
-  let connection;
-  let channel;
+  const payloads = extractPayloadsFromEvent(event);
+  console.log(`Extracted ${payloads.length} payload(s) from SQS event`);
+
+  if (!payloads.length) {
+    console.log("No payloads to process");
+    return;
+  }
+
   const results = { processed: 0, succeeded: 0, failed: 0 };
 
-  try {
-    const rabbitMQUrl = buildRabbitMQUrl(
-      RABBITMQ_ENDPOINT,
-      RABBITMQ_USERNAME,
-      RABBITMQ_PASSWORD
-    );
-    console.log("Connecting to RabbitMQ...");
-    connection = await amqp.connect(rabbitMQUrl);
-    channel = await connection.createChannel();
-
-    console.log(`Asserting queue '${SEND_QUEUE}' exists`);
-    await channel.assertQueue(SEND_QUEUE, { durable: true });
-
-    // Get queue info to see how many messages are waiting
-    const queueInfo = await channel.checkQueue(SEND_QUEUE);
-    console.log(
-      `Queue '${SEND_QUEUE}' has ${queueInfo.messageCount} messages waiting`
-    );
-
-    if (queueInfo.messageCount === 0) {
-      console.log("No messages in queue, exiting");
-      return {
-        statusCode: 200,
-        body: JSON.stringify({ message: "No messages to process" }),
-      };
-    }
-
-    // Consume up to MAX_MESSAGES_PER_INVOCATION messages
-    const messagesToProcess = Math.min(
-      queueInfo.messageCount,
-      MAX_MESSAGES_PER_INVOCATION
-    );
-    console.log(`Processing up to ${messagesToProcess} messages`);
-
-    let messagesReceived = 0;
-    let consumerTag = null;
-
-    // Set up consumer
-    await new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        if (consumerTag) {
-          channel
-            .cancel(consumerTag)
-            .catch((err) => console.error("Error cancelling consumer:", err));
-        }
-        resolve();
-      }, 50000); // Stop after 50 seconds to leave time for cleanup
-
-      channel.consume(SEND_QUEUE, async (message) => {
-        if (!message) {
-          return;
-        }
-
-        // Store consumerTag on first message
-        if (!consumerTag) {
-          consumerTag = message.fields.consumerTag;
-        }
-
-        if (messagesReceived >= messagesToProcess) {
-          if (consumerTag) {
-            channel
-              .cancel(consumerTag)
-              .catch((err) => console.error("Error cancelling consumer:", err));
-          }
-          clearTimeout(timeout);
-          resolve();
-          return;
-        }
-
-        messagesReceived++;
-        results.processed++;
-
-        const result = await processMessage(channel, message);
-        if (result.success) {
-          results.succeeded++;
-        } else {
-          results.failed++;
-        }
-
-        // If we've processed all messages, cancel consumer and resolve
-        if (messagesReceived >= messagesToProcess) {
-          if (consumerTag) {
-            channel
-              .cancel(consumerTag)
-              .catch((err) => console.error("Error cancelling consumer:", err));
-          }
-          clearTimeout(timeout);
-          resolve();
-        }
-      });
-
-      // Handle consumer errors
-      channel.on("error", (err) => {
-        console.error("Channel error:", err);
-        clearTimeout(timeout);
-        reject(err);
-      });
-    });
-
-    console.log("Processing complete:", results);
-    return {
-      statusCode: 200,
-      body: JSON.stringify({
-        message: "Processing complete",
-        results: results,
-      }),
-    };
-  } catch (error) {
-    console.error("Error in MessageSender handler:", {
-      error: error.message,
-      stack: error.stack,
-    });
-    return {
-      statusCode: 500,
-      body: JSON.stringify({
-        error: "Internal server error",
-        message: error.message,
-      }),
-    };
-  } finally {
-    if (channel) {
-      await channel
-        .close()
-        .catch((err) => console.error("Failed to close channel:", err));
-    }
-    if (connection) {
-      await connection
-        .close()
-        .catch((err) => console.error("Failed to close connection:", err));
+  // Process all messages from SQS batch
+  for (const payload of payloads) {
+    results.processed++;
+    const result = await processMessage(payload);
+    if (result.success) {
+      results.succeeded++;
+    } else {
+      results.failed++;
     }
   }
+
+  console.log("Processing complete:", results);
+
+  // SQS will automatically delete messages on success
+  // Failed messages will be retried based on SQS configuration
+  return {
+    processed: results.processed,
+    succeeded: results.succeeded,
+    failed: results.failed,
+  };
 };

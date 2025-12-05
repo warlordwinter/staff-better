@@ -14,6 +14,14 @@ Parameters:
     Type: String
     Description: "Private subnet 2 for broker"
 
+  PublicSubnet1Id:
+    Type: String
+    Description: "Public subnet 1 for Lambdas that need internet access"
+
+  PublicSubnet2Id:
+    Type: String
+    Description: "Public subnet 2 for Lambdas that need internet access"
+
   SupabaseUrl:
     Type: String
     Description: "Supabase project URL"
@@ -172,7 +180,9 @@ Resources:
               - Effect: Allow
                 Action:
                   - sqs:SendMessage
-                Resource: !GetAtt MessageProcessingDlq.Arn
+                Resource:
+                  - !GetAtt MessageProcessingDlq.Arn
+                  - !GetAtt MessageSenderQueue.Arn
 
   ReminderWorkerLambdaRole:
     Type: AWS::IAM::Role
@@ -267,6 +277,12 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: !GetAtt MessageSenderQueue.Arn
+              - Effect: Allow
+                Action:
                   - sqs:SendMessage
                 Resource: !GetAtt MessageProcessingDlq.Arn
 
@@ -358,17 +374,10 @@ Resources:
       Role: !GetAtt MessageSenderLambdaRole.Arn
       Timeout: 60
       MemorySize: 512
-      VpcConfig:
-        SecurityGroupIds:
-          - !Ref MessageBrokerSecurityGroup
-        SubnetIds:
-          - !Ref PrivateSubnet1Id
-          - !Ref PrivateSubnet2Id
+      # No VpcConfig - Lambda outside VPC has internet access by default
       Environment:
         Variables:
-          RABBITMQ_ENDPOINT: !Select [0, !GetAtt MessageBroker.AmqpEndpoints]
-          RABBITMQ_USERNAME: !Ref AmazonMqAdminUser
-          RABBITMQ_PASSWORD: !Ref AmazonMqAdminPassword
+          MESSAGE_SENDER_QUEUE_URL: !Ref MessageSenderQueue
           DLQ_URL: !Ref MessageProcessingDlq
           TWILIO_SUBACCOUNT_ENCRYPTION_KEY: !Ref TwilioSubaccountEncryptionKey
           MAX_MESSAGES_PER_INVOCATION: "10"
@@ -378,25 +387,15 @@ Resources:
             console.log("MessageSender placeholder invoked", JSON.stringify(event));
           };
 
-  # --- EventBridge Rule for MessageSender ---
-  MessageSenderScheduleRule:
-    Type: AWS::Events::Rule
+  # --- SQS Event Source Mapping for MessageSender ---
+  MessageSenderQueueMapping:
+    Type: AWS::Lambda::EventSourceMapping
     Properties:
-      Name: MessageSenderScheduleRule
-      Description: "Triggers MessageSender Lambda to consume messages from RabbitMQ"
-      ScheduleExpression: "rate(1 minute)"
-      State: ENABLED
-      Targets:
-        - Arn: !GetAtt MessageSenderLambda.Arn
-          Id: "MessageSenderTarget"
-
-  MessageSenderLambdaPermissionEventBridge:
-    Type: AWS::Lambda::Permission
-    Properties:
+      BatchSize: 10
+      Enabled: true
+      EventSourceArn: !GetAtt MessageSenderQueue.Arn
       FunctionName: !Ref MessageSenderLambda
-      Principal: events.amazonaws.com
-      SourceArn: !GetAtt MessageSenderScheduleRule.Arn
-      Action: lambda:InvokeFunction
+      MaximumBatchingWindowInSeconds: 5
 
   # --- API Gateway ---
   MessageRouterApi:
@@ -473,6 +472,15 @@ Resources:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: BrokerMessageQueue
+      VisibilityTimeout: 60
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt MessageProcessingDlq.Arn
+        maxReceiveCount: 5
+
+  MessageSenderQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: MessageSenderQueue
       VisibilityTimeout: 60
       RedrivePolicy:
         deadLetterTargetArn: !GetAtt MessageProcessingDlq.Arn

@@ -9,6 +9,7 @@ const amqp = require("amqplib");
 const AWS = require("aws-sdk");
 
 const DLQ_URL = process.env.DLQ_URL;
+const MESSAGE_SENDER_QUEUE_URL = process.env.MESSAGE_SENDER_QUEUE_URL;
 const RABBITMQ_ENDPOINT = process.env.RABBITMQ_ENDPOINT;
 const RABBITMQ_USERNAME = process.env.RABBITMQ_USERNAME;
 const RABBITMQ_PASSWORD = process.env.RABBITMQ_PASSWORD;
@@ -85,7 +86,29 @@ async function publishToBroker(channel, payload) {
   if (!sent) {
     console.warn("Message was not sent to queue (queue may be full)");
   } else {
-    console.log("Message sent to queue successfully");
+    console.log("Message sent to RabbitMQ queue successfully");
+  }
+}
+
+async function publishToSqs(payload) {
+  if (!MESSAGE_SENDER_QUEUE_URL) {
+    console.warn(
+      "MESSAGE_SENDER_QUEUE_URL not configured, skipping SQS publish"
+    );
+    return;
+  }
+
+  try {
+    await sqs
+      .sendMessage({
+        QueueUrl: MESSAGE_SENDER_QUEUE_URL,
+        MessageBody: JSON.stringify(payload),
+      })
+      .promise();
+    console.log("Message sent to SQS queue successfully");
+  } catch (error) {
+    console.error("Error sending message to SQS:", error);
+    throw error;
   }
 }
 
@@ -140,7 +163,9 @@ exports.handler = async (event) => {
           to: payload.to,
         });
         await publishToBroker(channel, payload);
-        console.log("Successfully published payload to RabbitMQ:", {
+        // Also publish to SQS for MessageSender Lambda (outside VPC)
+        await publishToSqs(payload);
+        console.log("Successfully published payload to RabbitMQ and SQS:", {
           messageId: payload.message_id,
         });
       } catch (error) {

@@ -281,8 +281,11 @@ jobs:
           check_secret "ROUTER_VPC_ID" "${{ secrets.ROUTER_VPC_ID }}"
           check_secret "ROUTER_PRIVATE_SUBNET_1_ID" "${{ secrets.ROUTER_PRIVATE_SUBNET_1_ID }}"
           check_secret "ROUTER_PRIVATE_SUBNET_2_ID" "${{ secrets.ROUTER_PRIVATE_SUBNET_2_ID }}"
+          check_secret "ROUTER_PUBLIC_SUBNET_1_ID" "${{ secrets.ROUTER_PUBLIC_SUBNET_1_ID }}"
+          check_secret "ROUTER_PUBLIC_SUBNET_2_ID" "${{ secrets.ROUTER_PUBLIC_SUBNET_2_ID }}"
           check_secret "AMAZON_MQ_ADMIN_USER" "${{ secrets.AMAZON_MQ_ADMIN_USER }}"
           check_secret "AMAZON_MQ_ADMIN_PASSWORD" "${{ secrets.AMAZON_MQ_ADMIN_PASSWORD }}"
+          check_secret "TWILIO_SUBACCOUNT_ENCRYPTION_KEY" "${{ secrets.TWILIO_SUBACCOUNT_ENCRYPTION_KEY }}"
 
           if [ ${#MISSING_SECRETS[@]} -gt 0 ]; then
             echo ""
@@ -295,12 +298,18 @@ jobs:
             echo ""
             echo "VPC and Subnets (from AWS Console → VPC):"
             echo "  - ROUTER_VPC_ID: VPC ID where Lambdas/Amazon MQ will run"
-            echo "  - ROUTER_PRIVATE_SUBNET_1_ID: First private subnet ID"
-            echo "  - ROUTER_PRIVATE_SUBNET_2_ID: Second private subnet ID (must be in different AZ)"
+            echo "  - ROUTER_PRIVATE_SUBNET_1_ID: First private subnet ID (for Amazon MQ broker)"
+            echo "  - ROUTER_PRIVATE_SUBNET_2_ID: Second private subnet ID (for Amazon MQ broker, must be in different AZ)"
+            echo "  - ROUTER_PUBLIC_SUBNET_1_ID: First public subnet ID (for MessageSender Lambda - needs internet access)"
+            echo "  - ROUTER_PUBLIC_SUBNET_2_ID: Second public subnet ID (for MessageSender Lambda, must be in different AZ)"
             echo ""
             echo "Amazon MQ Credentials (you'll create these):"
             echo "  - AMAZON_MQ_ADMIN_USER: Username for RabbitMQ broker (e.g., 'admin')"
             echo "  - AMAZON_MQ_ADMIN_PASSWORD: Password for RabbitMQ broker (strong password)"
+            echo ""
+            echo "Twilio Encryption:"
+            echo "  - TWILIO_SUBACCOUNT_ENCRYPTION_KEY: 32-byte encryption key (64-char hex or base64-encoded)"
+            echo "    Used to encrypt/decrypt Twilio auth tokens stored in database"
             echo ""
             echo "JWT Verification:"
             echo "  - JWT_VERIFICATION_KEY: Supabase JWT public key or JWKS URL"
@@ -347,12 +356,24 @@ jobs:
             echo "❌ ERROR: ROUTER_PRIVATE_SUBNET_2_ID is empty!"
             exit 1
           fi
+          if [ -z "${{ secrets.ROUTER_PUBLIC_SUBNET_1_ID }}" ]; then
+            echo "❌ ERROR: ROUTER_PUBLIC_SUBNET_1_ID is empty!"
+            exit 1
+          fi
+          if [ -z "${{ secrets.ROUTER_PUBLIC_SUBNET_2_ID }}" ]; then
+            echo "❌ ERROR: ROUTER_PUBLIC_SUBNET_2_ID is empty!"
+            exit 1
+          fi
           if [ -z "${{ secrets.AMAZON_MQ_ADMIN_USER }}" ]; then
             echo "❌ ERROR: AMAZON_MQ_ADMIN_USER is empty!"
             exit 1
           fi
           if [ -z "${{ secrets.AMAZON_MQ_ADMIN_PASSWORD }}" ]; then
             echo "❌ ERROR: AMAZON_MQ_ADMIN_PASSWORD is empty!"
+            exit 1
+          fi
+          if [ -z "${{ secrets.TWILIO_SUBACCOUNT_ENCRYPTION_KEY }}" ]; then
+            echo "❌ ERROR: TWILIO_SUBACCOUNT_ENCRYPTION_KEY is empty!"
             exit 1
           fi
 
@@ -370,8 +391,11 @@ jobs:
               ParameterKey=VpcId,ParameterValue="${{ secrets.ROUTER_VPC_ID }}" \
               ParameterKey=PrivateSubnet1Id,ParameterValue="${{ secrets.ROUTER_PRIVATE_SUBNET_1_ID }}" \
               ParameterKey=PrivateSubnet2Id,ParameterValue="${{ secrets.ROUTER_PRIVATE_SUBNET_2_ID }}" \
+              ParameterKey=PublicSubnet1Id,ParameterValue="${{ secrets.ROUTER_PUBLIC_SUBNET_1_ID }}" \
+              ParameterKey=PublicSubnet2Id,ParameterValue="${{ secrets.ROUTER_PUBLIC_SUBNET_2_ID }}" \
               ParameterKey=AmazonMqAdminUser,ParameterValue="${{ secrets.AMAZON_MQ_ADMIN_USER }}" \
               ParameterKey=AmazonMqAdminPassword,ParameterValue="${{ secrets.AMAZON_MQ_ADMIN_PASSWORD }}" \
+              ParameterKey=TwilioSubaccountEncryptionKey,ParameterValue="${{ secrets.TWILIO_SUBACCOUNT_ENCRYPTION_KEY }}" \
             --region ${{ env.AWS_REGION }} \
             --on-failure DELETE
 
@@ -451,8 +475,11 @@ jobs:
               "VpcId=${{ secrets.ROUTER_VPC_ID }}" \
               "PrivateSubnet1Id=${{ secrets.ROUTER_PRIVATE_SUBNET_1_ID }}" \
               "PrivateSubnet2Id=${{ secrets.ROUTER_PRIVATE_SUBNET_2_ID }}" \
+              "PublicSubnet1Id=${{ secrets.ROUTER_PUBLIC_SUBNET_1_ID }}" \
+              "PublicSubnet2Id=${{ secrets.ROUTER_PUBLIC_SUBNET_2_ID }}" \
               "AmazonMqAdminUser=${{ secrets.AMAZON_MQ_ADMIN_USER }}" \
               "AmazonMqAdminPassword=${{ secrets.AMAZON_MQ_ADMIN_PASSWORD }}" \
+              "TwilioSubaccountEncryptionKey=${{ secrets.TWILIO_SUBACCOUNT_ENCRYPTION_KEY }}" \
             --region ${{ env.AWS_REGION }} \
             --no-fail-on-empty-changeset || EXIT_CODE=$?
 
