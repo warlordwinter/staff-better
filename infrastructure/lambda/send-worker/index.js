@@ -9,7 +9,9 @@ const amqp = require("amqplib");
 const AWS = require("aws-sdk");
 
 const DLQ_URL = process.env.DLQ_URL;
-const RABBITMQ_URL = process.env.RABBITMQ_URL;
+const RABBITMQ_ENDPOINT = process.env.RABBITMQ_ENDPOINT;
+const RABBITMQ_USERNAME = process.env.RABBITMQ_USERNAME;
+const RABBITMQ_PASSWORD = process.env.RABBITMQ_PASSWORD;
 const SEND_QUEUE = "send-queue";
 
 const sqs = new AWS.SQS();
@@ -48,6 +50,22 @@ function extractPayloadsFromEvent(event) {
     }).filter(Boolean);
   }
   return [];
+}
+
+function buildRabbitMQUrl(endpoint, username, password) {
+  if (!endpoint || !username || !password) {
+    throw new Error("RabbitMQ endpoint, username, and password are required");
+  }
+
+  // Remove protocol if present, extract hostname
+  let hostname = endpoint.replace(/^amqps?:\/\//, "").replace(/:\d+$/, "");
+
+  // URL encode username and password to handle special characters
+  const encodedUsername = encodeURIComponent(username);
+  const encodedPassword = encodeURIComponent(password);
+
+  // Construct full connection URL: amqps://username:password@hostname:5671/%2F
+  return `amqps://${encodedUsername}:${encodedPassword}@${hostname}:5671/%2F`;
 }
 
 async function publishToBroker(channel, payload) {
@@ -92,10 +110,12 @@ exports.handler = async (event) => {
     });
   });
 
-  if (!RABBITMQ_URL) {
-    console.error("RABBITMQ_URL is not configured. Failing batch.");
+  if (!RABBITMQ_ENDPOINT || !RABBITMQ_USERNAME || !RABBITMQ_PASSWORD) {
+    console.error("RabbitMQ configuration is incomplete. Failing batch.");
     await Promise.all(
-      payloads.map((p) => sendToDlq(p, new Error("Missing broker URL")))
+      payloads.map((p) =>
+        sendToDlq(p, new Error("Missing RabbitMQ configuration"))
+      )
     );
     return;
   }
@@ -104,7 +124,12 @@ exports.handler = async (event) => {
   let channel;
 
   try {
-    connection = await amqp.connect(RABBITMQ_URL);
+    const rabbitMQUrl = buildRabbitMQUrl(
+      RABBITMQ_ENDPOINT,
+      RABBITMQ_USERNAME,
+      RABBITMQ_PASSWORD
+    );
+    connection = await amqp.connect(rabbitMQUrl);
     channel = await connection.createChannel();
 
     for (const payload of payloads) {

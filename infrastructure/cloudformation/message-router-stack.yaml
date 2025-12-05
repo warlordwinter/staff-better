@@ -312,7 +312,9 @@ Resources:
           - !Ref PrivateSubnet2Id
       Environment:
         Variables:
-          RABBITMQ_URL: !Select [0, !GetAtt MessageBroker.AmqpEndpoints]
+          RABBITMQ_ENDPOINT: !Select [0, !GetAtt MessageBroker.AmqpEndpoints]
+          RABBITMQ_USERNAME: !Ref AmazonMqAdminUser
+          RABBITMQ_PASSWORD: !Ref AmazonMqAdminPassword
           DLQ_URL: !Ref MessageProcessingDlq
       Code:
         ZipFile: |
@@ -337,7 +339,9 @@ Resources:
           - !Ref PrivateSubnet2Id
       Environment:
         Variables:
-          RABBITMQ_URL: !Select [0, !GetAtt MessageBroker.AmqpEndpoints]
+          RABBITMQ_ENDPOINT: !Select [0, !GetAtt MessageBroker.AmqpEndpoints]
+          RABBITMQ_USERNAME: !Ref AmazonMqAdminUser
+          RABBITMQ_PASSWORD: !Ref AmazonMqAdminPassword
           DLQ_URL: !Ref MessageProcessingDlq
       Code:
         ZipFile: |
@@ -362,7 +366,9 @@ Resources:
           - !Ref PrivateSubnet2Id
       Environment:
         Variables:
-          RABBITMQ_URL: !Select [0, !GetAtt MessageBroker.AmqpEndpoints]
+          RABBITMQ_ENDPOINT: !Select [0, !GetAtt MessageBroker.AmqpEndpoints]
+          RABBITMQ_USERNAME: !Ref AmazonMqAdminUser
+          RABBITMQ_PASSWORD: !Ref AmazonMqAdminPassword
           DLQ_URL: !Ref MessageProcessingDlq
           TWILIO_SUBACCOUNT_ENCRYPTION_KEY: !Ref TwilioSubaccountEncryptionKey
           MAX_MESSAGES_PER_INVOCATION: "10"
