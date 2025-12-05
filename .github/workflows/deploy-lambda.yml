@@ -721,6 +721,7 @@ jobs:
       ROUTER_LAMBDA_NAME: MessageRouter
       SEND_WORKER_LAMBDA_NAME: SendWorker
       REMINDER_WORKER_LAMBDA_NAME: ReminderWorker
+      MESSAGE_SENDER_LAMBDA_NAME: MessageSender
 
     permissions:
       id-token: write
@@ -759,6 +760,14 @@ jobs:
         working-directory: infrastructure/lambda/reminder-worker
         run: zip -r function.zip index.js node_modules/ -q
 
+      - name: Install Message Sender dependencies
+        working-directory: infrastructure/lambda/message-sender
+        run: npm ci --omit=dev
+
+      - name: Package Message Sender Lambda
+        working-directory: infrastructure/lambda/message-sender
+        run: zip -r function.zip index.js node_modules/ -q
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -790,6 +799,14 @@ jobs:
             --zip-file fileb://function.zip \
             --region ${{ env.AWS_REGION }}
 
+      - name: Deploy Message Sender Lambda
+        working-directory: infrastructure/lambda/message-sender
+        run: |
+          aws lambda update-function-code \
+            --function-name ${{ env.MESSAGE_SENDER_LAMBDA_NAME }} \
+            --zip-file fileb://function.zip \
+            --region ${{ env.AWS_REGION }}
+
       - name: Cleanup Message Router package
         if: always()
         working-directory: infrastructure/lambda/message-router
@@ -803,4 +820,9 @@ jobs:
       - name: Cleanup Reminder Worker package
         if: always()
         working-directory: infrastructure/lambda/reminder-worker
+        run: rm -f function.zip
+
+      - name: Cleanup Message Sender package
+        if: always()
+        working-directory: infrastructure/lambda/message-sender
         run: rm -f function.zip
