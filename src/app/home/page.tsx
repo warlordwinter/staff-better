@@ -165,7 +165,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen flex flex-col bg-white">
       <Navbar />
-      <main className="flex-1 w-full max-w-7xl mx-auto px-6 py-8 mt-24">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-6 py-8">
         {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-5xl font-bold text-black mb-2">

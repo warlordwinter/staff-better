@@ -189,7 +189,7 @@ const JobTable = () => {
   }
 
   return (
-    <div className="flex flex-col gap-6 w-full max-w-6xl mx-auto px-4 mt-24 overflow-x-auto">
+    <div className="flex flex-col gap-6 w-full max-w-6xl mx-auto px-4 overflow-x-auto">
       <JobTableHeader
         onFileSelect={(file) => console.log("Selected file:", file)}
         onAddManually={handleAddJob}

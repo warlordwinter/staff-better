@@ -218,7 +218,7 @@ export default function RemindersPageView({
   return (
     <div className="min-h-screen flex flex-col bg-white overflow-hidden">
       <Navbar />
-      <main className="flex-1 w-full max-w-7xl mx-auto px-6 py-8 mt-24">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-6 py-8">
         {/* Header Section */}
         <div className="mb-8">
           <h1 className="text-black text-5xl font-semibold font-['Inter'] mb-2">
