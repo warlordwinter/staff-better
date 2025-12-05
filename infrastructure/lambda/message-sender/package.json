@@ -1,0 +1,17 @@
+{
+  "name": "message-sender-lambda",
+  "version": "1.0.0",
+  "description": "Lambda that consumes messages from RabbitMQ and sends SMS via Twilio",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.9",
+    "aws-sdk": "^2.1692.0",
+    "twilio": "^5.8.0"
+  },
+  "engines": {
+    "node": ">=20.x"
+  }
+}
