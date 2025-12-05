@@ -3,7 +3,7 @@ import {
   sendReminderSMS,
   sendTwoWaySMS,
   formatPhoneNumber,
-} from "@/lib/twilio/sms";
+} from "@/lib/twilio/adapter";
 import { getCompanyPhoneNumberAdmin } from "@/lib/auth/getCompanyId";
 
 /**
@@ -59,10 +59,13 @@ export async function sendReminderOptOutIfNeeded(
     // Send reminder opt-out message
     const reminderMessage = `This is ${companyName} reminder phone number. This number is purely for information and notification about your upcoming job. You have opted in to be contacted by phone number. You may opt out at anytime using STOP keyword.`;
 
-    const smsResult = await sendReminderSMS({
-      to: formattedPhone,
-      body: reminderMessage,
-    });
+    const smsResult = await sendReminderSMS(
+      {
+        to: formattedPhone,
+        body: reminderMessage,
+      },
+      companyId
+    );
 
     if (!smsResult.success) {
       console.error(
@@ -188,7 +191,8 @@ export async function sendSMSOptOutIfNeeded(
         to: formattedPhone,
         body: companyMessage,
       },
-      twoWayPhoneNumber
+      twoWayPhoneNumber,
+      companyId
     );
 
     if (!smsResult.success) {

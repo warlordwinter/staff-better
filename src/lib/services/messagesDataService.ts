@@ -1,3 +1,5 @@
+import type { SMSResult } from "../twilio/types";
+
 /**
  * Messages Data Service
  *
@@ -22,14 +24,6 @@ export interface Message {
   text: string;
   sender: "incoming" | "outgoing";
   timestamp: string;
-}
-
-interface SendMessageResponse {
-  success: boolean;
-  message_id?: string;
-  to?: string;
-  error?: string;
-  details?: string;
 }
 
 /**
@@ -108,7 +102,7 @@ export class MessagesDataService {
   static async sendMessage(
     associateId: string,
     message: string
-  ): Promise<SendMessageResponse> {
+  ): Promise<SMSResult> {
     const response = await fetch(`/api/associates/${associateId}/message`, {
       method: "POST",
       headers: {
@@ -117,11 +111,12 @@ export class MessagesDataService {
       body: JSON.stringify({ message: message.trim() }),
     });
 
-    const data: SendMessageResponse = await response.json();
+    const data = await response.json();
 
     if (!response.ok) {
       // Check if it's a user-friendly error message
-      const errorMessage = data.error || data.details || "Failed to send message";
+      const errorMessage =
+        data.error || data.details || "Failed to send message";
       throw new Error(errorMessage);
     }
 
@@ -129,7 +124,7 @@ export class MessagesDataService {
       throw new Error(data.error || data.details || "Failed to send message");
     }
 
-    return data;
+    return data as SMSResult;
   }
 
   /**

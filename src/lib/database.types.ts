@@ -808,6 +808,7 @@ export type Database = {
           customer_id: string
           friendly_name: string | null
           id: string
+          messaging_service_sid: string | null
           status: string | null
           subaccount_sid: string
           updated_at: string | null
@@ -818,6 +819,7 @@ export type Database = {
           customer_id: string
           friendly_name?: string | null
           id?: string
+          messaging_service_sid?: string | null
           status?: string | null
           subaccount_sid: string
           updated_at?: string | null
@@ -828,6 +830,7 @@ export type Database = {
           customer_id?: string
           friendly_name?: string | null
           id?: string
+          messaging_service_sid?: string | null
           status?: string | null
           subaccount_sid?: string
           updated_at?: string | null

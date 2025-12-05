@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GroupsDaoSupabase } from "@/lib/dao/implementations/supabase/GroupsDaoSupabase";
 import { requireCompanyId } from "@/lib/auth/getCompanyId";
-import { sendTwoWaySMS, formatPhoneNumber } from "@/lib/twilio/sms";
+import { sendTwoWaySMS, formatPhoneNumber } from "@/lib/twilio/adapter";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const groupsDao = new GroupsDaoSupabase();
@@ -16,6 +16,40 @@ export async function POST(
 ) {
   try {
     const companyId = await requireCompanyId();
+
+    // Ensure ISV customer and Twilio subaccount exist (required by Lambda message router)
+    try {
+      const { ensureIsvCustomerForCompany } = await import(
+        "@/lib/utils/isvCustomerUtils"
+      );
+      await ensureIsvCustomerForCompany(companyId);
+    } catch (isvError) {
+      console.error(
+        "Failed to ensure ISV customer/Twilio subaccount:",
+        isvError
+      );
+      const errorMessage =
+        isvError instanceof Error ? isvError.message : "Unknown error";
+
+      // Provide specific error message for missing Twilio subaccount
+      if (errorMessage.includes("Twilio subaccount not configured")) {
+        return NextResponse.json(
+          {
+            error:
+              "Twilio subaccount not configured. Please complete the company setup process to enable SMS messaging.",
+          },
+          { status: 400 }
+        );
+      }
+
+      return NextResponse.json(
+        {
+          error:
+            "Company setup incomplete. Please contact support to complete company setup.",
+        },
+        { status: 400 }
+      );
+    }
 
     // Get company phone number directly from database (no fallback)
     const supabaseAdmin = createAdminClient();
@@ -115,7 +149,8 @@ export async function POST(
             to: formattedPhone,
             body: body.message.trim(),
           },
-          twoWayPhoneNumber
+          twoWayPhoneNumber,
+          companyId
         );
 
         results.push({

@@ -19,6 +19,40 @@ export async function POST(
     const companyId = await requireCompanyId();
     console.log("📞 [PHONE DEBUG] Company ID:", companyId);
 
+    // Ensure ISV customer and Twilio subaccount exist (required by Lambda message router)
+    try {
+      const { ensureIsvCustomerForCompany } = await import(
+        "@/lib/utils/isvCustomerUtils"
+      );
+      await ensureIsvCustomerForCompany(companyId);
+    } catch (isvError) {
+      console.error(
+        "Failed to ensure ISV customer/Twilio subaccount:",
+        isvError
+      );
+      const errorMessage =
+        isvError instanceof Error ? isvError.message : "Unknown error";
+
+      // Provide specific error message for missing Twilio subaccount
+      if (errorMessage.includes("Twilio subaccount not configured")) {
+        return NextResponse.json(
+          {
+            error:
+              "Twilio subaccount not configured. Please complete the company setup process to enable SMS messaging.",
+          },
+          { status: 400 }
+        );
+      }
+
+      return NextResponse.json(
+        {
+          error:
+            "Company setup incomplete. Please contact support to complete company setup.",
+        },
+        { status: 400 }
+      );
+    }
+
     const twoWayPhoneNumber = await requireCompanyPhoneNumber(companyId);
     console.log(
       "📞 [PHONE DEBUG] Company two-way phone number from database:",
@@ -97,7 +131,7 @@ export async function POST(
 
     // Send the SMS using TwilioMessageService
     try {
-      const messageService = new TwilioMessageService();
+      const messageService = new TwilioMessageService(companyId);
       const formattedPhone = messageService.formatPhoneNumber(
         associate.phone_number
       );
@@ -240,11 +274,7 @@ export async function POST(
         // Continue - SMS was sent successfully
       }
 
-      return NextResponse.json({
-        success: true,
-        message_id: result.messageId,
-        to: associate.phone_number,
-      });
+      return NextResponse.json(result);
     } catch (smsError) {
       console.error("Error sending SMS:", smsError);
       return NextResponse.json(

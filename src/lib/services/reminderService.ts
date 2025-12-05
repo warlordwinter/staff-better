@@ -78,24 +78,29 @@ export class ReminderService {
         reminderType
       );
 
-      const smsResult = await this.messageService.sendReminderSMS({
-        to: formattedPhone,
-        body: messageBody,
-      });
+      // Fetch company_id from associate for JWT token
+      const { createAdminClient } = await import("@/lib/supabase/admin");
+      const supabaseAdmin = createAdminClient();
+      const { data: associate } = await supabaseAdmin
+        .from("associates")
+        .select("company_id")
+        .eq("id", assignment.associate_id)
+        .single();
+
+      const companyId = associate?.company_id;
+
+      const smsResult = await this.messageService.sendReminderSMS(
+        {
+          to: formattedPhone,
+          body: messageBody,
+        },
+        companyId
+      );
 
       // Send opt-out message if this is the first reminder (after sending the reminder)
       if (smsResult.success) {
         try {
-          // Fetch company_id from associate
-          const { createAdminClient } = await import("@/lib/supabase/admin");
-          const supabaseAdmin = createAdminClient();
-          const { data: associate } = await supabaseAdmin
-            .from("associates")
-            .select("company_id")
-            .eq("id", assignment.associate_id)
-            .single();
-
-          if (associate?.company_id) {
+          if (companyId) {
             const { sendReminderOptOutIfNeeded } = await import(
               "@/lib/utils/optOutUtils"
             );

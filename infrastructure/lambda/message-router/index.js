@@ -52,20 +52,27 @@ async function getTwilioSubaccountForCompany(supabase, companyId) {
 
   const { data, error } = await supabase
     .from("twilio_subaccounts")
-    .select("subaccount_sid, auth_token_encrypted")
+    .select("subaccount_sid, auth_token_encrypted, created_at")
     .eq("customer_id", customer.id)
-    .single();
+    .order("created_at", { ascending: false })
+    .limit(2);
 
   if (error) {
     console.error("Error fetching Twilio subaccount:", error);
     throw new Error("Failed to resolve Twilio subaccount");
   }
 
-  if (!data) {
+  if (!data || data.length === 0) {
     throw new Error("No Twilio subaccount configured for company");
   }
 
-  return data;
+  if (data.length > 1) {
+    console.warn(
+      `Multiple Twilio subaccounts found for customer ${customer.id}; using the most recent`
+    );
+  }
+
+  return data[0];
 }
 
 async function getIsvCustomerForCompany(supabase, companyId) {
@@ -103,7 +110,32 @@ async function enqueueForBroker(messageType, payload) {
     },
   });
 
-  await sqs.send(command);
+  console.log("Enqueuing message to broker:", {
+    queueUrl: BROKER_MESSAGE_QUEUE_URL,
+    messageType: messageType,
+    messageId: payload.message_id,
+    companyId: payload.company_id,
+    to: payload.to,
+    from: payload.from,
+  });
+
+  try {
+    const result = await sqs.send(command);
+    console.log("Successfully enqueued message to SQS:", {
+      messageId: payload.message_id,
+      sqsMessageId: result.MessageId,
+      messageType: messageType,
+    });
+    return result;
+  } catch (error) {
+    console.error("Failed to enqueue message to SQS:", {
+      messageId: payload.message_id,
+      error: error.message,
+      errorCode: error.code,
+      messageType: messageType,
+    });
+    throw error;
+  }
 }
 
 async function sendToDlq(payload, error) {
@@ -277,11 +309,26 @@ exports.handler = async (event) => {
     };
 
     await checkRateLimit(companyId);
+
+    console.log("About to enqueue message:", {
+      messageType: type,
+      messageId: payload.message_id,
+      companyId: companyId,
+    });
+
     await enqueueForBroker(type, payload);
+
+    console.log("Message successfully enqueued, returning success response");
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ success: true }),
+      body: JSON.stringify({
+        success: true,
+        messageId: payload.message_id,
+        status: "queued",
+        to: payload.to,
+        from: payload.from,
+      }),
     };
   } catch (error) {
     console.error("Router error:", error);

@@ -54,23 +54,49 @@ async function publishToBroker(channel, payload) {
   if (!payload || !payload.company_id) {
     throw new Error("Invalid payload: missing company_id");
   }
+  console.log(`Asserting queue '${SEND_QUEUE}' exists`);
   await channel.assertQueue(SEND_QUEUE, { durable: true });
-  channel.sendToQueue(SEND_QUEUE, Buffer.from(JSON.stringify(payload)), {
-    persistent: true,
-  });
+  console.log(`Sending message to queue '${SEND_QUEUE}'`);
+  const sent = channel.sendToQueue(
+    SEND_QUEUE,
+    Buffer.from(JSON.stringify(payload)),
+    {
+      persistent: true,
+    }
+  );
+  if (!sent) {
+    console.warn("Message was not sent to queue (queue may be full)");
+  } else {
+    console.log("Message sent to queue successfully");
+  }
 }
 
 exports.handler = async (event) => {
-  console.log("SendWorker event:", JSON.stringify(event));
+  console.log("SendWorker invoked with event:", JSON.stringify(event, null, 2));
   const payloads = extractPayloadsFromEvent(event);
 
+  console.log(`Extracted ${payloads.length} payload(s) from event`);
+
   if (!payloads.length) {
+    console.warn("No payloads extracted from event, exiting");
     return;
   }
 
+  payloads.forEach((payload, index) => {
+    console.log(`Payload ${index + 1}:`, {
+      messageId: payload.message_id,
+      companyId: payload.company_id,
+      to: payload.to,
+      from: payload.from,
+      messageType: payload.message_type,
+    });
+  });
+
   if (!RABBITMQ_URL) {
     console.error("RABBITMQ_URL is not configured. Failing batch.");
-    await Promise.all(payloads.map((p) => sendToDlq(p, new Error("Missing broker URL"))));
+    await Promise.all(
+      payloads.map((p) => sendToDlq(p, new Error("Missing broker URL")))
+    );
     return;
   }
 
@@ -83,25 +109,39 @@ exports.handler = async (event) => {
 
     for (const payload of payloads) {
       try {
+        console.log("Publishing payload to RabbitMQ:", {
+          messageId: payload.message_id,
+          companyId: payload.company_id,
+          to: payload.to,
+        });
         await publishToBroker(channel, payload);
+        console.log("Successfully published payload to RabbitMQ:", {
+          messageId: payload.message_id,
+        });
       } catch (error) {
-        console.error("Error forwarding payload to broker:", error);
+        console.error("Error forwarding payload to broker:", {
+          messageId: payload.message_id,
+          error: error.message,
+          stack: error.stack,
+        });
         await sendToDlq(payload, error);
       }
     }
   } catch (connectionError) {
     console.error("Failed to establish RabbitMQ connection:", connectionError);
-    await Promise.all(payloads.map((payload) => sendToDlq(payload, connectionError)));
+    await Promise.all(
+      payloads.map((payload) => sendToDlq(payload, connectionError))
+    );
   } finally {
     if (channel) {
-      await channel.close().catch((err) =>
-        console.error("Failed to close channel:", err)
-      );
+      await channel
+        .close()
+        .catch((err) => console.error("Failed to close channel:", err));
     }
     if (connection) {
-      await connection.close().catch((err) =>
-        console.error("Failed to close connection:", err)
-      );
+      await connection
+        .close()
+        .catch((err) => console.error("Failed to close connection:", err));
     }
   }
 };

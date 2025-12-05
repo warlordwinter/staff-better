@@ -4,9 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 import type { Database, Tables } from "@/lib/database.types";
 import {
   closeTwilioSubaccount,
+  createMessagingServiceForCompany,
   encryptTwilioAuthToken,
   provisionTwilioSubaccount,
-} from "@/lib/twilio/subaccounts";
+} from "@/lib/twilio/provisioning";
 
 type SupabaseServerClient = SupabaseClient<Database>;
 
@@ -105,8 +106,19 @@ export async function POST(request: NextRequest) {
     );
     twilioSubaccountSid = twilioSubaccount.sid;
 
+    const { sid: messagingServiceSid } = await createMessagingServiceForCompany(
+      {
+        companyId: company.id,
+        companyName: company.company_name,
+        subaccountSid: twilioSubaccount.sid,
+        authToken: twilioSubaccount.authToken,
+      }
+    );
+
     const encryptedToken = encryptTwilioAuthToken(twilioSubaccount.authToken);
 
+    // Note: messaging_service_sid column doesn't exist in the actual database schema
+    // even though it's in the TypeScript types, so we omit it
     const { error: subaccountInsertError } = await supabase
       .from("twilio_subaccounts")
       .insert({
@@ -115,6 +127,7 @@ export async function POST(request: NextRequest) {
         auth_token_encrypted: encryptedToken,
         friendly_name: twilioSubaccount.friendlyName,
         status: twilioSubaccount.status ?? "active",
+        // messaging_service_sid: messagingServiceSid, // Column doesn't exist in DB
       });
 
     if (subaccountInsertError) {
@@ -141,7 +154,10 @@ export async function POST(request: NextRequest) {
           removeCustomerRecord: isvCustomerWasCreated,
         });
       } catch (cleanupError) {
-        console.error("Failed to rollback company setup artifacts:", cleanupError);
+        console.error(
+          "Failed to rollback company setup artifacts:",
+          cleanupError
+        );
       }
     }
 

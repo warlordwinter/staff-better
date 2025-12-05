@@ -63,7 +63,7 @@ Add these environment variables in your hosting platform's dashboard:
   - Creating a new job assignment (`insertSingleJobAssignment`)
   - Updating a job assignment's work_date or start_time (`updateJobAssignment`)
   - Deleting a job assignment (`deleteJobAssignment`)
-- `src/lib/twilio/client.ts` and `src/lib/twilio/subaccounts.ts` - Use the Twilio variables to send SMS and provision encrypted child accounts for each company signup
+- `src/lib/twilio/client.ts` and `src/lib/twilio/provisioning` - Use the Twilio variables to send SMS and provision encrypted child accounts for each company signup
 
 ## Important Notes
 
