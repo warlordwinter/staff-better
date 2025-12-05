@@ -401,6 +401,7 @@ export default function UsagePage() {
                   </tr>
                 )}
               </tbody>
+\
             </table>
           </div>
         </Card>
