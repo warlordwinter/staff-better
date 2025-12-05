@@ -332,6 +332,7 @@ Resources:
           RABBITMQ_USERNAME: !Ref AmazonMqAdminUser
           RABBITMQ_PASSWORD: !Ref AmazonMqAdminPassword
           DLQ_URL: !Ref MessageProcessingDlq
+          MESSAGE_SENDER_QUEUE_URL: !Ref MessageSenderQueue
       Code:
         ZipFile: |
           exports.handler = async (event) => {
