@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "CloudFormation stack for message router API, Amazon MQ (RabbitMQ), and worker Lambdas (no NAT Gateway, Lambdas in public subnet)"
+Description: "CloudFormation stack for message router API, Amazon MQ (RabbitMQ), and worker Lambdas (with NAT Gateway for internet access from private subnets)"
 
 Parameters:
   VpcId:
@@ -67,6 +67,53 @@ Resources:
           FromPort: 0
           ToPort: 65535
           CidrIp: 0.0.0.0/0
+
+  # --- NAT Gateway for Internet Access from Private Subnets ---
+  NatGatewayEip:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: MessageRouterNatGatewayEip
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGatewayEip.AllocationId
+      SubnetId: !Ref PublicSubnet1Id
+      Tags:
+        - Key: Name
+          Value: MessageRouterNatGateway
+
+  # --- Route Table for Private Subnets ---
+  PrivateSubnetRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: Name
+          Value: MessageRouterPrivateSubnetRouteTable
+
+  PrivateSubnetDefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: NatGateway
+    Properties:
+      RouteTableId: !Ref PrivateSubnetRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1Id
+      RouteTableId: !Ref PrivateSubnetRouteTable
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet2Id
+      RouteTableId: !Ref PrivateSubnetRouteTable
 
   # --- Amazon MQ Broker (private) ---
   MessageBroker:
@@ -286,7 +333,7 @@ Resources:
                   - sqs:SendMessage
                 Resource: !GetAtt MessageProcessingDlq.Arn
 
-  # --- Lambdas (moved to Public Subnet) ---
+  # --- Lambdas (in Private Subnets with NAT Gateway for internet access) ---
   MessageRouterLambda:
     Type: AWS::Lambda::Function
     Properties:
@@ -375,7 +422,12 @@ Resources:
       Role: !GetAtt MessageSenderLambdaRole.Arn
       Timeout: 60
       MemorySize: 512
-      # No VpcConfig - Lambda outside VPC has internet access by default
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref MessageBrokerSecurityGroup
+        SubnetIds:
+          - !Ref PrivateSubnet1Id
+          - !Ref PrivateSubnet2Id
       Environment:
         Variables:
           MESSAGE_SENDER_QUEUE_URL: !Ref MessageSenderQueue
@@ -486,6 +538,33 @@ Resources:
       RedrivePolicy:
         deadLetterTargetArn: !GetAtt MessageProcessingDlq.Arn
         maxReceiveCount: 5
+
+  # --- VPC Endpoint for SQS (required for SendWorker in private subnet) ---
+  SqsVpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.sqs"
+      VpcEndpointType: Interface
+      SubnetIds:
+        - !Ref PrivateSubnet1Id
+        - !Ref PrivateSubnet2Id
+      SecurityGroupIds:
+        - !Ref MessageBrokerSecurityGroup
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: "*"
+            Action:
+              - sqs:SendMessage
+              - sqs:ReceiveMessage
+              - sqs:DeleteMessage
+              - sqs:GetQueueAttributes
+            Resource:
+              - !GetAtt MessageSenderQueue.Arn
+              - !GetAtt MessageProcessingDlq.Arn
+              - !GetAtt BrokerMessageQueue.Arn
 
   SendWorkerQueueMapping:
     Type: AWS::Lambda::EventSourceMapping

@@ -91,6 +91,11 @@ async function publishToBroker(channel, payload) {
 }
 
 async function publishToSqs(payload) {
+  console.log(
+    "Attempting to publish to SQS. MESSAGE_SENDER_QUEUE_URL:",
+    MESSAGE_SENDER_QUEUE_URL ? "SET" : "NOT SET"
+  );
+
   if (!MESSAGE_SENDER_QUEUE_URL) {
     console.warn(
       "MESSAGE_SENDER_QUEUE_URL not configured, skipping SQS publish"
@@ -99,6 +104,10 @@ async function publishToSqs(payload) {
   }
 
   try {
+    console.log("Sending message to SQS queue:", {
+      queueUrl: MESSAGE_SENDER_QUEUE_URL,
+      messageId: payload.message_id,
+    });
     await sqs
       .sendMessage({
         QueueUrl: MESSAGE_SENDER_QUEUE_URL,
@@ -107,13 +116,25 @@ async function publishToSqs(payload) {
       .promise();
     console.log("Message sent to SQS queue successfully");
   } catch (error) {
-    console.error("Error sending message to SQS:", error);
+    console.error("Error sending message to SQS:", {
+      error: error.message,
+      code: error.code,
+      stack: error.stack,
+    });
     throw error;
   }
 }
 
 exports.handler = async (event) => {
   console.log("SendWorker invoked with event:", JSON.stringify(event, null, 2));
+  console.log("SendWorker environment variables:", {
+    hasRabbitMQEndpoint: !!RABBITMQ_ENDPOINT,
+    hasRabbitMQUsername: !!RABBITMQ_USERNAME,
+    hasRabbitMQPassword: !!RABBITMQ_PASSWORD,
+    hasDlqUrl: !!DLQ_URL,
+    hasMessageSenderQueueUrl: !!MESSAGE_SENDER_QUEUE_URL,
+    messageSenderQueueUrl: MESSAGE_SENDER_QUEUE_URL || "NOT SET",
+  });
   const payloads = extractPayloadsFromEvent(event);
 
   console.log(`Extracted ${payloads.length} payload(s) from event`);
@@ -163,6 +184,9 @@ exports.handler = async (event) => {
           to: payload.to,
         });
         await publishToBroker(channel, payload);
+        console.log("RabbitMQ publish completed, now publishing to SQS:", {
+          messageId: payload.message_id,
+        });
         // Also publish to SQS for MessageSender Lambda (outside VPC)
         await publishToSqs(payload);
         console.log("Successfully published payload to RabbitMQ and SQS:", {
