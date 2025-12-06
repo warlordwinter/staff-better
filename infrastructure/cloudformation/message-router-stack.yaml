@@ -443,6 +443,9 @@ Resources:
   # --- SQS Event Source Mapping for MessageSender ---
   MessageSenderQueueMapping:
     Type: AWS::Lambda::EventSourceMapping
+    DependsOn:
+      - MessageSenderLambda
+      - SqsVpcEndpoint
     Properties:
       BatchSize: 10
       Enabled: true

@@ -144,12 +144,9 @@ async function sendSMS(payload) {
   const authToken = decryptTwilioAuthToken(twilio_auth_token_encrypted);
 
   // Create Twilio client with subaccount credentials
-  // Configure with longer timeout for VPC Lambda connections
-  const twilioClient = twilio(twilio_subaccount_sid, authToken, {
-    httpClient: {
-      timeout: 30000, // 30 second timeout (default is usually 10s)
-    },
-  });
+  // Note: Using default HTTP client - Twilio SDK handles timeouts appropriately
+  // The retry logic below will handle network timeouts
+  const twilioClient = twilio(twilio_subaccount_sid, authToken);
 
   // Format phone numbers
   const formattedTo = formatPhoneNumber(to);
