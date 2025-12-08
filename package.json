@@ -17,12 +17,14 @@
   "dependencies": {
     "@aws-sdk/client-scheduler": "^3.700.0",
     "@google/genai": "^1.27.0",
+    "@stripe/react-stripe-js": "^5.4.1",
+    "@stripe/stripe-js": "^8.5.3",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.53.0",
     "exceljs": "^4.4.0",
     "markdown": "^0.5.0",
-    "next": "^15.3.5",
+    "next": "^15.3.6",
     "openai": "^5.8.3",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
@@ -30,8 +32,8 @@
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "resend": "^6.4.2",
-    "twilio": "^5.8.0",
-    "jsonwebtoken": "^9.0.2"
+    "stripe": "^20.0.0",
+    "twilio": "^5.8.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
