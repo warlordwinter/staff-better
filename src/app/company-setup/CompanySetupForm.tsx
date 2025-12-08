@@ -8,6 +8,7 @@ interface CompanyFormData {
   companyName: string;
   nonTempEmployees: string;
   email: string;
+  phoneNumber: string;
   zipCode: string;
   systemReadiness: string;
   referralSource: string;
@@ -23,6 +24,7 @@ export default function CompanySetupForm({ userEmail }: CompanySetupFormProps) {
     companyName: "",
     nonTempEmployees: "",
     email: userEmail,
+    phoneNumber: "",
     zipCode: "",
     systemReadiness: "",
     referralSource: "",
@@ -76,7 +78,11 @@ export default function CompanySetupForm({ userEmail }: CompanySetupFormProps) {
       router.push("/home");
     } catch (error) {
       console.error("Error saving company information:", error);
-      setFormError(error instanceof Error ? error.message : "Failed to complete setup. Please try again.");
+      setFormError(
+        error instanceof Error
+          ? error.message
+          : "Failed to complete setup. Please try again."
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -145,6 +151,26 @@ export default function CompanySetupForm({ userEmail }: CompanySetupFormProps) {
             onChange={(e) => handleInputChange("email", e.target.value)}
             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
             placeholder="contact@company.com"
+          />
+        </div>
+
+        {/* Phone Number */}
+        <div>
+          <label
+            htmlFor="phoneNumber"
+            className="block text-sm font-medium text-gray-700"
+          >
+            Phone Number
+          </label>
+          <input
+            id="phoneNumber"
+            name="phoneNumber"
+            type="tel"
+            required
+            value={formData.phoneNumber}
+            onChange={(e) => handleInputChange("phoneNumber", e.target.value)}
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
+            placeholder="+1234567890"
           />
         </div>
 

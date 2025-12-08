@@ -52,7 +52,7 @@ async function getTwilioSubaccountForCompany(supabase, companyId) {
 
   const { data, error } = await supabase
     .from("twilio_subaccounts")
-    .select("subaccount_sid, auth_token_encrypted, created_at")
+    .select("subaccount_sid, auth_token_encrypted, messaging_service_sid, created_at")
     .eq("customer_id", customer.id)
     .order("created_at", { ascending: false })
     .limit(2);
@@ -304,6 +304,7 @@ exports.handler = async (event) => {
       target_time: normalizedTargetTime,
       twilio_subaccount_sid: twilioSubaccount.subaccount_sid,
       twilio_auth_token_encrypted: twilioSubaccount.auth_token_encrypted,
+      twilio_messaging_service_sid: twilioSubaccount.messaging_service_sid || null,
       created_at: new Date().toISOString(),
       message_id: randomUUID(),
     };

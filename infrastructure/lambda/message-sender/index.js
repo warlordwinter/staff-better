@@ -111,6 +111,37 @@ function formatPhoneNumber(phoneNumber) {
   return phoneNumber;
 }
 
+/**
+ * Fetch a valid phone number from the Twilio subaccount
+ * @param {object} twilioClient - Twilio client instance
+ * @returns {Promise<string|null>} - A valid phone number or null if none found
+ */
+async function fetchValidPhoneNumberFromSubaccount(twilioClient) {
+  try {
+    // Fetch incoming phone numbers from the subaccount
+    const incomingNumbers = await twilioClient.incomingPhoneNumbers.list({
+      limit: 10,
+    });
+
+    if (incomingNumbers && incomingNumbers.length > 0) {
+      // Return the first available phone number
+      const phoneNumber = incomingNumbers[0].phoneNumber;
+      console.log(`Found valid phone number from subaccount: ${phoneNumber}`);
+      return phoneNumber;
+    }
+
+    console.warn("No incoming phone numbers found in subaccount");
+    return null;
+  } catch (error) {
+    console.error("Error fetching phone numbers from subaccount:", {
+      status: error.status,
+      code: error.code,
+      message: error.message,
+    });
+    return null;
+  }
+}
+
 async function sendSMS(payload) {
   const {
     to,
@@ -118,6 +149,7 @@ async function sendSMS(payload) {
     body: messageBody,
     twilio_subaccount_sid,
     twilio_auth_token_encrypted,
+    twilio_messaging_service_sid,
     message_id,
     company_id,
   } = payload;
@@ -138,6 +170,7 @@ async function sendSMS(payload) {
     companyId: company_id,
     to: to,
     from: from,
+    messagingServiceSid: twilio_messaging_service_sid || "not provided",
   });
 
   // Decrypt auth token
@@ -150,23 +183,75 @@ async function sendSMS(payload) {
 
   // Format phone numbers
   const formattedTo = formatPhoneNumber(to);
-  const formattedFrom = from ? formatPhoneNumber(from) : null;
+  let formattedFrom = from ? formatPhoneNumber(from) : null;
 
   // Send SMS with retry logic for network issues
   let message;
   const maxRetries = 3;
   let lastError;
+  let hasTriedFallbackPhone = false;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      message = await twilioClient.messages.create({
+      // Build message parameters
+      const messageParams = {
         to: formattedTo,
-        from: formattedFrom || undefined,
         body: messageBody,
-      });
+      };
+
+      // Prefer messaging service SID if available (most reliable)
+      if (twilio_messaging_service_sid) {
+        messageParams.messagingServiceSid = twilio_messaging_service_sid;
+        console.log(
+          `Using messaging service SID: ${twilio_messaging_service_sid}`
+        );
+      } else if (formattedFrom) {
+        messageParams.from = formattedFrom;
+      }
+      // If no from number and no messaging service, Twilio will use default
+
+      message = await twilioClient.messages.create(messageParams);
       break; // Success, exit retry loop
     } catch (error) {
       lastError = error;
+
+      // Handle error 21660: Mismatch between 'From' number and account
+      if (error.code === 21660 && !hasTriedFallbackPhone) {
+        console.warn(
+          `From number mismatch (error 21660). Attempting to fetch valid phone number from subaccount...`
+        );
+        hasTriedFallbackPhone = true;
+
+        // Try to fetch a valid phone number from the subaccount
+        const validPhoneNumber = await fetchValidPhoneNumberFromSubaccount(
+          twilioClient
+        );
+
+        if (validPhoneNumber) {
+          formattedFrom = validPhoneNumber;
+          console.log(
+            `Retrying with valid phone number from subaccount: ${formattedFrom}`
+          );
+          // Continue to retry with the valid phone number
+          continue;
+        } else {
+          // If we can't get a phone number and no messaging service, this is a permanent error
+          if (!twilio_messaging_service_sid) {
+            console.error(
+              "Cannot resolve valid phone number for subaccount and no messaging service SID available"
+            );
+            throw new Error(
+              `From number ${formattedFrom} does not belong to subaccount ${twilio_subaccount_sid}. No valid phone numbers found in subaccount and no messaging service configured.`
+            );
+          }
+          // If we have a messaging service, try using that instead
+          console.log(
+            "Falling back to messaging service SID due to phone number mismatch"
+          );
+          formattedFrom = null; // Clear from number to use messaging service
+          continue;
+        }
+      }
 
       // Check if it's a network error (connection timeout, DNS, etc.)
       const isNetworkError =
@@ -189,8 +274,9 @@ async function sendSMS(payload) {
         error.code === 21212 || // Invalid 'From' phone number
         (error.response && error.response.status >= 400);
 
-      if (isTwilioApiError) {
+      if (isTwilioApiError && error.code !== 21660) {
         // Twilio API error - don't retry, this is a permanent issue
+        // (21660 is handled above with fallback logic)
         console.error("Twilio API error (credentials/validation issue):", {
           status: error.status,
           code: error.code,
@@ -221,6 +307,7 @@ async function sendSMS(payload) {
     messageId: message_id,
     twilioSid: message.sid,
     status: message.status,
+    from: message.from,
   });
 
   return {

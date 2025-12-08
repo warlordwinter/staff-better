@@ -7,6 +7,8 @@ import {
   createMessagingServiceForCompany,
   encryptTwilioAuthToken,
   provisionTwilioSubaccount,
+  provisionBrandForCustomer,
+  provisionCampaignForBrand,
 } from "@/lib/twilio/provisioning";
 
 type SupabaseServerClient = SupabaseClient<Database>;
@@ -17,6 +19,8 @@ export async function POST(request: NextRequest) {
   let isvCustomerId: string | null = null;
   let isvCustomerWasCreated = false;
   let twilioSubaccountSid: string | null = null;
+  let brandId: string | null = null;
+  let campaignId: string | null = null;
 
   try {
     supabase = await createClient();
@@ -36,6 +40,7 @@ export async function POST(request: NextRequest) {
       companyName,
       nonTempEmployees,
       email,
+      phoneNumber,
       zipCode,
       systemReadiness,
       referralSource,
@@ -45,6 +50,7 @@ export async function POST(request: NextRequest) {
     if (
       !companyName ||
       !email ||
+      !phoneNumber ||
       !zipCode ||
       !systemReadiness ||
       !referralSource
@@ -61,6 +67,7 @@ export async function POST(request: NextRequest) {
       .insert({
         company_name: companyName,
         email: email,
+        phone_number: phoneNumber,
         non_temp_employees: nonTempEmployees,
         zip_code: zipCode,
         system_readiness: systemReadiness,
@@ -117,8 +124,7 @@ export async function POST(request: NextRequest) {
 
     const encryptedToken = encryptTwilioAuthToken(twilioSubaccount.authToken);
 
-    // Note: messaging_service_sid column doesn't exist in the actual database schema
-    // even though it's in the TypeScript types, so we omit it
+    // Store messaging service SID in database for future use
     const { error: subaccountInsertError } = await supabase
       .from("twilio_subaccounts")
       .insert({
@@ -127,11 +133,55 @@ export async function POST(request: NextRequest) {
         auth_token_encrypted: encryptedToken,
         friendly_name: twilioSubaccount.friendlyName,
         status: twilioSubaccount.status ?? "active",
-        // messaging_service_sid: messagingServiceSid, // Column doesn't exist in DB
+        messaging_service_sid: messagingServiceSid,
       });
 
     if (subaccountInsertError) {
       throw subaccountInsertError;
+    }
+
+    // Create brand for the customer
+    try {
+      const brand = await provisionBrandForCustomer({
+        customerId: isvCustomerId,
+        companyName: company.company_name,
+        subaccountSid: twilioSubaccount.sid,
+        authToken: twilioSubaccount.authToken,
+        supabase,
+      });
+      brandId = brand.id;
+    } catch (error) {
+      // Brand creation may fail if verification is required
+      // Log error but continue - brand can be created manually later
+      console.warn(
+        `Failed to create brand for customer ${isvCustomerId}: ${
+          error instanceof Error ? error.message : "unknown error"
+        }`
+      );
+    }
+
+    // Create campaign for the brand (only if brand was created)
+    if (brandId) {
+      try {
+        const campaign = await provisionCampaignForBrand({
+          brandId: brandId,
+          customerId: isvCustomerId,
+          messagingServiceSid: messagingServiceSid,
+          subaccountSid: twilioSubaccount.sid,
+          authToken: twilioSubaccount.authToken,
+          companyName: company.company_name,
+          supabase,
+        });
+        campaignId = campaign.id;
+      } catch (error) {
+        // Campaign creation may fail if brand is not approved
+        // Log error but continue - campaign can be created manually later
+        console.warn(
+          `Failed to create campaign for brand ${brandId}: ${
+            error instanceof Error ? error.message : "unknown error"
+          }`
+        );
+      }
     }
 
     companyRecord = company;
@@ -152,6 +202,8 @@ export async function POST(request: NextRequest) {
           companyId: companyRecord.id,
           customerId: isvCustomerId,
           removeCustomerRecord: isvCustomerWasCreated,
+          brandId: brandId,
+          campaignId: campaignId,
         });
       } catch (cleanupError) {
         console.error(
@@ -188,13 +240,38 @@ async function ensureIsvCustomerRecord(
     return { id: existingCustomers[0].id, created: false };
   }
 
+  // Estimate monthly volume based on number of employees
+  // Rough estimate: 2-5 messages per employee per month
+  // Cap at PostgreSQL integer max (2,147,483,647) to avoid overflow
+  const MAX_INTEGER = 2147483647;
+  const estimatedMonthlyVolume = company.non_temp_employees
+    ? Math.min(MAX_INTEGER, Math.max(10, company.non_temp_employees * 3))
+    : null;
+
+  // Build use case descriptions from system readiness
+  const useCaseDescriptions = company.system_readiness
+    ? `StaffBetter messaging system for ${company.company_name}. System readiness: ${company.system_readiness}.`
+    : null;
+
+  // Build address from zip code if available
+  const address = company.zip_code ? `Zip Code: ${company.zip_code}` : null;
+
   const { data: customer, error: insertError } = await supabase
     .from("isv_customers")
     .insert({
       company_id: company.id,
       contact_email: company.email,
+      contact_phone: company.phone_number || null,
       legal_name: company.company_name,
       name: company.company_name,
+      contact_name: company.company_name,
+      address: address,
+      estimated_monthly_volume: estimatedMonthlyVolume,
+      use_case_descriptions: useCaseDescriptions,
+      // Set default business type if needed - can be updated later
+      business_type: "STAFFING",
+      // Phone number preference - default to SMS
+      phone_number_preference: "SMS",
     })
     .select("id")
     .single();
@@ -230,12 +307,26 @@ async function cleanupCompanySetupArtifacts({
   companyId,
   customerId,
   removeCustomerRecord,
+  brandId,
+  campaignId,
 }: {
   supabase: SupabaseServerClient;
   companyId: string;
   customerId: string | null;
   removeCustomerRecord: boolean;
+  brandId?: string | null;
+  campaignId?: string | null;
 }) {
+  // Clean up campaign first (has foreign key to brand)
+  if (campaignId) {
+    await supabase.from("campaigns").delete().eq("id", campaignId);
+  }
+
+  // Clean up brand (has foreign key to customer)
+  if (brandId) {
+    await supabase.from("brands").delete().eq("id", brandId);
+  }
+
   if (customerId) {
     await supabase
       .from("twilio_subaccounts")

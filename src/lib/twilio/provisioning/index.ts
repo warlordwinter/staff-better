@@ -1,5 +1,7 @@
-import { createCipheriv, randomBytes } from "crypto";
+import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
 import type { ServiceInstance } from "twilio/lib/rest/messaging/v1/service";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/database.types";
 import { twilioClient, createTwilioClient } from "../client";
 
 const ENCRYPTION_KEY_LENGTH = 32;
@@ -26,6 +28,18 @@ export type CreateMessagingServiceInput = {
 export type MessagingServiceProvisionResult = {
   sid: string;
   friendlyName: string;
+};
+
+export type ProvisionedBrand = {
+  id: string;
+  twilioBrandSid: string | null;
+  status: string | null;
+};
+
+export type ProvisionedCampaign = {
+  id: string;
+  campaignSid: string | null;
+  status: string | null;
 };
 
 function buildFriendlyName(
@@ -84,6 +98,33 @@ export function encryptTwilioAuthToken(authToken: string): string {
     authTag.toString("base64"),
     ciphertext.toString("base64"),
   ].join(":");
+}
+
+export function decryptTwilioAuthToken(encryptedToken: string): string {
+  if (!encryptedToken) {
+    throw new Error("encrypted token is required for decryption");
+  }
+
+  const key = ensureEncryptionKey();
+  const parts = encryptedToken.split(":");
+  if (parts.length !== 3) {
+    throw new Error("Invalid encrypted token format");
+  }
+
+  const [ivBase64, authTagBase64, ciphertextBase64] = parts;
+  const iv = Buffer.from(ivBase64, "base64");
+  const authTag = Buffer.from(authTagBase64, "base64");
+  const ciphertext = Buffer.from(ciphertextBase64, "base64");
+
+  const decipher = createDecipheriv("aes-256-gcm", key, iv);
+  decipher.setAuthTag(authTag);
+
+  const decrypted = Buffer.concat([
+    decipher.update(ciphertext),
+    decipher.final(),
+  ]);
+
+  return decrypted.toString("utf8");
 }
 
 export async function provisionTwilioSubaccount(
@@ -162,5 +203,201 @@ export async function createMessagingServiceForCompany({
   return {
     sid: service.sid,
     friendlyName,
+  };
+}
+
+export type ProvisionBrandInput = {
+  customerId: string;
+  companyName: string;
+  subaccountSid: string;
+  authToken: string;
+  supabase: SupabaseClient<Database>;
+};
+
+export async function provisionBrandForCustomer({
+  customerId,
+  companyName,
+  subaccountSid,
+  authToken,
+  supabase,
+}: ProvisionBrandInput): Promise<ProvisionedBrand> {
+  if (!customerId || !subaccountSid || !authToken || !supabase) {
+    throw new Error(
+      "customerId, subaccountSid, authToken, and supabase are required"
+    );
+  }
+
+  const subaccountClient = createTwilioClient(subaccountSid, authToken);
+  const brandName = companyName || `Brand ${customerId}`;
+
+  let twilioBrandSid: string | null = null;
+  let brandStatus: string | null = null;
+
+  // Attempt to create brand via Twilio API
+  // Note: Brand registration may require a customer profile bundle to be created first
+  // If this fails, the brand record will still be created in the database for manual completion
+  try {
+    const brandRegistration =
+      await subaccountClient.messaging.v1.brandRegistrations.create({
+        brandType: "STANDARD",
+        mock: false,
+      });
+
+    if (brandRegistration?.sid) {
+      twilioBrandSid = brandRegistration.sid;
+      brandStatus = brandRegistration.status || "PENDING";
+    }
+  } catch (error) {
+    // Brand registration may fail if customer profile bundle is required
+    // Log error but continue - brand can be created manually later
+    console.warn(
+      `Failed to create Twilio brand for customer ${customerId}: ${
+        error instanceof Error ? error.message : "unknown error"
+      }`
+    );
+  }
+
+  // Create brand record in database
+  const { data: brand, error: insertError } = await supabase
+    .from("brands")
+    .insert({
+      customer_id: customerId,
+      brand_name: brandName,
+      brand_type: "STANDARD",
+      twilio_brand_sid: twilioBrandSid,
+      status: brandStatus || "PENDING",
+    })
+    .select("id")
+    .single();
+
+  if (insertError || !brand) {
+    throw insertError || new Error("Failed to create brand record in database");
+  }
+
+  return {
+    id: brand.id,
+    twilioBrandSid,
+    status: brandStatus,
+  };
+}
+
+export type ProvisionCampaignInput = {
+  brandId: string;
+  customerId: string;
+  messagingServiceSid: string;
+  subaccountSid: string;
+  authToken: string;
+  companyName: string;
+  supabase: SupabaseClient<Database>;
+};
+
+export async function provisionCampaignForBrand({
+  brandId,
+  customerId,
+  messagingServiceSid,
+  subaccountSid,
+  authToken,
+  companyName,
+  supabase,
+}: ProvisionCampaignInput): Promise<ProvisionedCampaign> {
+  if (
+    !brandId ||
+    !customerId ||
+    !messagingServiceSid ||
+    !subaccountSid ||
+    !authToken ||
+    !supabase
+  ) {
+    throw new Error(
+      "brandId, customerId, messagingServiceSid, subaccountSid, authToken, and supabase are required"
+    );
+  }
+
+  // Get brand to retrieve Twilio brand SID
+  const { data: brand, error: brandError } = await supabase
+    .from("brands")
+    .select("twilio_brand_sid")
+    .eq("id", brandId)
+    .single();
+
+  if (brandError || !brand) {
+    throw new Error("Brand not found");
+  }
+
+  if (!brand.twilio_brand_sid) {
+    throw new Error(
+      "Brand does not have a Twilio brand SID. Brand registration may be pending."
+    );
+  }
+
+  const subaccountClient = createTwilioClient(subaccountSid, authToken);
+
+  // Default use case and sample message
+  const useCase = "STAFF_NOTIFICATIONS";
+  const sampleMessage =
+    `Hello! This is ${companyName || "your staffing company"}. ` +
+    `You have a shift scheduled. Please confirm your availability.`;
+
+  let campaignSid: string | null = null;
+  let campaignStatus: string | null = null;
+
+  // Attempt to create campaign via Twilio API
+  try {
+    const campaign = await subaccountClient.messaging.v1.campaigns.create({
+      brandRegistrationSid: brand.twilio_brand_sid,
+      messagingServiceSid: messagingServiceSid,
+      useCase: useCase,
+      sampleMessage: sampleMessage,
+    });
+
+    if (campaign?.sid) {
+      campaignSid = campaign.sid;
+      campaignStatus = campaign.status || "PENDING";
+    }
+  } catch (error) {
+    // Campaign creation may fail if brand is not approved
+    // Log error but continue - campaign can be created manually later
+    console.warn(
+      `Failed to create Twilio campaign for brand ${brandId}: ${
+        error instanceof Error ? error.message : "unknown error"
+      }`
+    );
+  }
+
+  // Estimate volume based on customer (if available)
+  const { data: customer } = await supabase
+    .from("isv_customers")
+    .select("estimated_monthly_volume")
+    .eq("id", customerId)
+    .single();
+
+  const estimatedVolume = customer?.estimated_monthly_volume || null;
+
+  // Create campaign record in database
+  const { data: campaign, error: insertError } = await supabase
+    .from("campaigns")
+    .insert({
+      brand_id: brandId,
+      customer_id: customerId,
+      messaging_service_sid: messagingServiceSid,
+      campaign_sid: campaignSid,
+      use_case: useCase,
+      sample_message: sampleMessage,
+      estimated_volume: estimatedVolume,
+      status: campaignStatus || "PENDING",
+    })
+    .select("id")
+    .single();
+
+  if (insertError || !campaign) {
+    throw (
+      insertError || new Error("Failed to create campaign record in database")
+    );
+  }
+
+  return {
+    id: campaign.id,
+    campaignSid,
+    status: campaignStatus,
   };
 }
