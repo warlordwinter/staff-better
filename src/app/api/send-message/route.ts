@@ -137,6 +137,10 @@ export async function POST(request: NextRequest) {
         direction: "outbound",
         status: message.status,
         sent_at: message.dateCreated?.toISOString() || new Date().toISOString(),
+        // Store Twilio SID for status callback tracking
+        // Note: This requires twilio_sid field in messages table
+        // If migration hasn't been applied yet, this field will be ignored
+        twilio_sid: message.sid,
       },
     ]);
 

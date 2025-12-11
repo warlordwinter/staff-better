@@ -26,11 +26,15 @@ export default function ReminderDetailPage() {
     editCustomerName,
     editStartDate,
     editStartTime,
+    editNightBeforeTime,
+    editDayOfTime,
     reminderStatus,
     setEditJobTitle,
     setEditCustomerName,
     setEditStartDate,
     setEditStartTime,
+    setEditNightBeforeTime,
+    setEditDayOfTime,
     setShowEditModal,
     setReminderStatus,
     handleDeleteAssociate,
@@ -46,7 +50,6 @@ export default function ReminderDetailPage() {
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
-        <Navbar />
         <LoadingSpinner />
       </div>
     );
@@ -68,41 +71,24 @@ export default function ReminderDetailPage() {
     );
   }
 
+  const primaryWorkDate =
+    (assignments[0]?.work_date && assignments[0].work_date.trim()) ||
+    (job.start_date && job.start_date.trim()) ||
+    "";
+  const scheduleIncomplete = !primaryWorkDate;
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
       <main className="max-w-6xl mx-auto px-6 py-8">
         {/* Header Section */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <Link
-              href="/reminders"
-              className="text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 19l-7-7 7-7"
-                />
-              </svg>
-            </Link>
-            <h1 className="text-4xl font-bold text-black">
-              {job?.job_title || "Loading..."}
-            </h1>
-          </div>
-          <button
-            onClick={handleAddAssociate}
-            className="px-4 py-2 bg-gradient-to-r from-[#FFBB87] to-[#FE6F00] text-white rounded-lg font-medium inline-flex items-center gap-2 hover:opacity-90 transition-opacity"
+        <div className="flex items-center gap-4 mb-6">
+          <Link
+            href="/reminders"
+            className="text-gray-600 hover:text-gray-900 transition-colors"
           >
             <svg
-              className="w-5 h-5"
+              className="w-6 h-6"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -111,15 +97,36 @@ export default function ReminderDetailPage() {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M12 4v16m8-8H4"
+                d="M15 19l-7-7 7-7"
               />
             </svg>
-            Add Associate
-          </button>
+          </Link>
+          <h1 className="text-4xl font-bold text-black">
+            {job?.job_title || "Loading..."}
+          </h1>
         </div>
 
         {job && (
           <>
+            {scheduleIncomplete && (
+              <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold">
+                    Add a shift date to schedule reminders.
+                  </p>
+                  <p className="text-xs mt-1">
+                    Click “Edit reminder” and set the shift date before
+                    assigning associates.
+                  </p>
+                </div>
+                <button
+                  onClick={handleEditClick}
+                  className="px-3 py-1 text-xs font-semibold bg-amber-600 text-white rounded-md hover:bg-amber-700 transition-colors"
+                >
+                  Edit reminder
+                </button>
+              </div>
+            )}
             <ReminderDetailsCard
               job={job}
               assignments={assignments}
@@ -133,6 +140,31 @@ export default function ReminderDetailPage() {
                 <h2 className="text-xl font-semibold text-black">
                   Assigned Associates ({assignments.length})
                 </h2>
+                <button
+                  onClick={handleAddAssociate}
+                  disabled={scheduleIncomplete}
+                  title={
+                    scheduleIncomplete
+                      ? "Set a shift date before adding associates."
+                      : undefined
+                  }
+                  className="px-4 py-2 bg-gradient-to-r from-[#FFBB87] to-[#FE6F00] text-white rounded-lg font-medium inline-flex items-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                  Add Associate
+                </button>
               </div>
               <AssociatesList
                 assignments={assignments}
@@ -150,10 +182,14 @@ export default function ReminderDetailPage() {
         customerName={editCustomerName}
         startDate={editStartDate}
         startTime={editStartTime}
+        nightBeforeTime={editNightBeforeTime}
+        dayOfTime={editDayOfTime}
         onJobTitleChange={setEditJobTitle}
         onCustomerNameChange={setEditCustomerName}
         onStartDateChange={setEditStartDate}
         onStartTimeChange={setEditStartTime}
+        onNightBeforeTimeChange={setEditNightBeforeTime}
+        onDayOfTimeChange={setEditDayOfTime}
         onSave={handleUpdateReminder}
         onCancel={() => {
           setShowEditModal(false);
@@ -161,6 +197,8 @@ export default function ReminderDetailPage() {
           setEditCustomerName("");
           setEditStartDate("");
           setEditStartTime("");
+          setEditNightBeforeTime("19:00");
+          setEditDayOfTime("06:00");
         }}
       />
 

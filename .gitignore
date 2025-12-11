@@ -52,3 +52,4 @@ node_modules/
 
 # supabase
 .supabase
+infrastructure/lambda/reminder-processor/function.zip

@@ -1,0 +1,20 @@
+{
+  "name": "daily-summary-email-lambda",
+  "version": "1.0.0",
+  "description": "Lambda function to send daily email summaries of job assignments via Amazon SES",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "deploy": "node deploy-lambda.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-ses": "^3.0.0"
+  },
+  "devDependencies": {
+    "archiver": "^7.0.1"
+  },
+  "engines": {
+    "node": ">=20.x"
+  }
+}
+

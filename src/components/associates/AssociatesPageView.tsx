@@ -326,12 +326,8 @@ export default function AssociatesPageView({
   // Show loading spinner while fetching associates data
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col bg-white">
-        <Navbar />
-        <div className="flex-1 flex items-center justify-center">
-          <LoadingSpinner />
-        </div>
-        <Footer />
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <LoadingSpinner />
       </div>
     );
   }
@@ -339,7 +335,7 @@ export default function AssociatesPageView({
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <Navbar />
-      <main className="flex-1 w-full max-w-7xl mx-auto px-6 py-8 mt-24">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-6 py-8">
         {/* Header Section */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">

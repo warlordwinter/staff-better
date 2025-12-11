@@ -49,19 +49,18 @@ export class IncomingMessageService {
         `Processing message from ${fromNumber}: "${messageBody}"`
       );
 
-      const normalizedPhone = this.normalizePhoneNumber(fromNumber);
+      // Don't normalize here - let getAssociateByPhone handle normalization
+      // It uses normalizePhoneForLookup which is consistent with the route handler
       const associate = await this.associateRepository.getAssociateByPhone(
-        normalizedPhone
+        fromNumber
       );
 
       if (!associate) {
-        this.logger.warn(
-          `No associate found for phone number: ${normalizedPhone}`
-        );
+        this.logger.warn(`No associate found for phone number: ${fromNumber}`);
         return {
           success: false,
           action: MessageAction.UNKNOWN,
-          phone_number: normalizedPhone,
+          phone_number: fromNumber,
           message: messageBody,
           error: "Associate not found",
         };
@@ -74,7 +73,7 @@ export class IncomingMessageService {
         return this.handleUnknownMessage(
           associate,
           messageBody,
-          normalizedPhone,
+          fromNumber,
           toNumber,
           companyId
         );
@@ -83,7 +82,7 @@ export class IncomingMessageService {
       return await handler.handle(
         associate,
         messageBody,
-        normalizedPhone,
+        fromNumber,
         toNumber,
         companyId
       );

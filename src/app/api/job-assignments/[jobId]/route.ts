@@ -51,10 +51,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json(data);
   } catch (error) {
     console.error("Failed to create job assignment:", error);
-    const errorMessage = error instanceof Error ? error.message : "Failed to create job assignment";
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to create job assignment";
+    const shouldShowValidation =
+      typeof errorMessage === "string" &&
+      errorMessage.toLowerCase().includes("work date is required");
     return NextResponse.json(
       { error: errorMessage },
-      { status: 500 }
+      { status: shouldShowValidation ? 400 : 500 }
     );
   }
 }
