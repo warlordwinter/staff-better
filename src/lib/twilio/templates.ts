@@ -1,10 +1,12 @@
 import { TwilioTemplate, TwilioTemplateListResult } from "./types";
+import { getCompanyTwilioCredentials } from "./getCompanyTwilioCredentials";
 
 /**
  * Fetch all approved WhatsApp templates from Twilio Content API
  * Uses REST API calls since Content API may not be directly available in SDK
  *
  * @param options - Optional filters for template fetching
+ * @param companyId - Optional company ID to fetch templates for a specific company's Twilio account
  * @returns Promise resolving to list of approved templates
  *
  * @example
@@ -13,19 +15,43 @@ import { TwilioTemplate, TwilioTemplateListResult } from "./types";
  * console.log(`Found ${templates.templates.length} approved templates`);
  * ```
  */
-export async function fetchApprovedTemplates(options?: {
-  includePending?: boolean;
-  contentType?: string;
-}): Promise<TwilioTemplateListResult> {
+export async function fetchApprovedTemplates(
+  options?: {
+    includePending?: boolean;
+    contentType?: string;
+  },
+  companyId?: string
+): Promise<TwilioTemplateListResult> {
   try {
     console.log(
       "📋 [TEMPLATE DEBUG] Fetching templates from Twilio Content API..."
     );
 
-    // Use REST API to fetch content templates
-    // The Content API endpoint is: https://content.twilio.com/v1/Content
-    const accountSid = process.env.TWILIO_ACCOUNT_SID;
-    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    // Get Twilio credentials - try company-specific first, fall back to env vars
+    let accountSid: string | undefined;
+    let authToken: string | undefined;
+
+    if (companyId) {
+      const credentials = await getCompanyTwilioCredentials(companyId);
+      if (credentials) {
+        accountSid = credentials.accountSid;
+        authToken = credentials.authToken;
+        console.log(
+          `📋 [TEMPLATE DEBUG] Using company-specific Twilio account for company ${companyId}`
+        );
+      }
+    }
+
+    // Fall back to environment variables if no company-specific credentials found
+    if (!accountSid || !authToken) {
+      accountSid = process.env.TWILIO_ACCOUNT_SID;
+      authToken = process.env.TWILIO_AUTH_TOKEN;
+      if (companyId) {
+        console.log(
+          `📋 [TEMPLATE DEBUG] Falling back to environment variables for company ${companyId}`
+        );
+      }
+    }
 
     if (!accountSid || !authToken) {
       throw new Error("TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN are required");
@@ -234,11 +260,27 @@ export async function fetchApprovedTemplates(options?: {
  * @returns Promise resolving to template details or null if not found
  */
 export async function fetchTemplateBySid(
-  templateSid: string
+  templateSid: string,
+  companyId?: string
 ): Promise<TwilioTemplate | null> {
   try {
-    const accountSid = process.env.TWILIO_ACCOUNT_SID;
-    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    // Get Twilio credentials - try company-specific first, fall back to env vars
+    let accountSid: string | undefined;
+    let authToken: string | undefined;
+
+    if (companyId) {
+      const credentials = await getCompanyTwilioCredentials(companyId);
+      if (credentials) {
+        accountSid = credentials.accountSid;
+        authToken = credentials.authToken;
+      }
+    }
+
+    // Fall back to environment variables if no company-specific credentials found
+    if (!accountSid || !authToken) {
+      accountSid = process.env.TWILIO_ACCOUNT_SID;
+      authToken = process.env.TWILIO_AUTH_TOKEN;
+    }
 
     if (!accountSid || !authToken) {
       throw new Error("TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN are required");
@@ -365,4 +407,171 @@ function extractContentFromTypes(types: any): string | null {
 
   // Fallback: return stringified version
   return JSON.stringify(types);
+}
+
+/**
+ * Create a new WhatsApp template in Twilio Content API
+ *
+ * @param templateData - Template creation data
+ * @returns Promise resolving to created template SID
+ */
+export async function createTemplate(
+  templateData: {
+    friendlyName: string;
+    body: string;
+    language?: string;
+  },
+  companyId?: string
+): Promise<{ sid: string; status: string }> {
+  try {
+    // Get Twilio credentials - try company-specific first, fall back to env vars
+    let accountSid: string | undefined;
+    let authToken: string | undefined;
+
+    if (companyId) {
+      const credentials = await getCompanyTwilioCredentials(companyId);
+      if (credentials) {
+        accountSid = credentials.accountSid;
+        authToken = credentials.authToken;
+      }
+    }
+
+    // Fall back to environment variables if no company-specific credentials found
+    if (!accountSid || !authToken) {
+      accountSid = process.env.TWILIO_ACCOUNT_SID;
+      authToken = process.env.TWILIO_AUTH_TOKEN;
+    }
+
+    if (!accountSid || !authToken) {
+      throw new Error("TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN are required");
+    }
+
+    console.log("📋 [TEMPLATE DEBUG] Creating template in Twilio:", {
+      friendlyName: templateData.friendlyName,
+      language: templateData.language || "en",
+    });
+
+    // Create content template using REST API
+    const response = await fetch("https://content.twilio.com/v1/Content", {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${Buffer.from(
+          `${accountSid}:${authToken}`
+        ).toString("base64")}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        FriendlyName: templateData.friendlyName,
+        Language: templateData.language || "en",
+        Types: JSON.stringify({
+          "twilio/text": {
+            body: templateData.body,
+          },
+        }),
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("📋 [TEMPLATE DEBUG] Twilio API error:", errorText);
+      throw new Error(
+        `Failed to create template: ${response.status} ${errorText}`
+      );
+    }
+
+    const data = await response.json();
+    console.log("📋 [TEMPLATE DEBUG] Template created successfully:", data.sid);
+
+    return {
+      sid: data.sid,
+      status: data.status || "draft",
+    };
+  } catch (error) {
+    console.error("📋 [TEMPLATE DEBUG] Error creating template:", error);
+    throw error;
+  }
+}
+
+/**
+ * Submit a template for WhatsApp approval
+ *
+ * @param contentSid - The Twilio Content SID
+ * @param category - Template category (MARKETING, UTILITY, AUTHENTICATION)
+ * @returns Promise resolving to approval request SID
+ */
+export async function submitTemplateForApproval(
+  contentSid: string,
+  category: "MARKETING" | "UTILITY" | "AUTHENTICATION",
+  companyId?: string
+): Promise<{ approvalRequestSid: string }> {
+  try {
+    // Get Twilio credentials - try company-specific first, fall back to env vars
+    let accountSid: string | undefined;
+    let authToken: string | undefined;
+
+    if (companyId) {
+      const credentials = await getCompanyTwilioCredentials(companyId);
+      if (credentials) {
+        accountSid = credentials.accountSid;
+        authToken = credentials.authToken;
+      }
+    }
+
+    // Fall back to environment variables if no company-specific credentials found
+    if (!accountSid || !authToken) {
+      accountSid = process.env.TWILIO_ACCOUNT_SID;
+      authToken = process.env.TWILIO_AUTH_TOKEN;
+    }
+
+    if (!accountSid || !authToken) {
+      throw new Error("TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN are required");
+    }
+
+    console.log("📋 [TEMPLATE DEBUG] Submitting template for approval:", {
+      contentSid,
+      category,
+    });
+
+    // Create approval request using REST API
+    const response = await fetch(
+      `https://content.twilio.com/v1/Content/${contentSid}/ApprovalRequests`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${Buffer.from(
+            `${accountSid}:${authToken}`
+          ).toString("base64")}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          Name: contentSid, // Use content SID as name
+          Category: category,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("📋 [TEMPLATE DEBUG] Approval request error:", errorText);
+      throw new Error(
+        `Failed to submit template for approval: ${response.status} ${errorText}`
+      );
+    }
+
+    const data = await response.json();
+    console.log(
+      "📋 [TEMPLATE DEBUG] Approval request created:",
+      data.sid || data.approval_request_sid
+    );
+
+    return {
+      approvalRequestSid: data.sid || data.approval_request_sid || "",
+    };
+  } catch (error) {
+    console.error(
+      "📋 [TEMPLATE DEBUG] Error submitting template for approval:",
+      error
+    );
+    throw error;
+  }
 }

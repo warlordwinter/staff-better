@@ -149,6 +149,14 @@ const Navbar = () => {
                 Groups
               </Link>
               <Link
+                href="/templates"
+                className={`text-white text-lg font-bold transition-colors ${
+                  isActiveLink("/templates") ? "" : "hover:opacity-80"
+                }`}
+              >
+                Templates
+              </Link>
+              <Link
                 href="/associates"
                 className={`text-white text-lg font-bold transition-colors ${
                   isActiveLink("/associates")
@@ -264,6 +272,14 @@ const Navbar = () => {
                 }`}
               >
                 Groups
+              </Link>
+              <Link
+                href="/templates"
+                className={`text-white text-lg font-bold transition-colors ${
+                  isActiveLink("/templates") ? "" : "hover:opacity-80"
+                }`}
+              >
+                Templates
               </Link>
               <Link
                 href="/associates"

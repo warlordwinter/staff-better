@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fetchApprovedTemplates, fetchTemplateBySid } from "@/lib/twilio/templates";
+import {
+  fetchApprovedTemplates,
+  fetchTemplateBySid,
+} from "@/lib/twilio/templates";
+import { requireCompanyId } from "@/lib/auth/getCompanyId";
 
 /**
  * GET /api/twilio/templates
- * Fetch approved Twilio WhatsApp templates
- * 
+ * Fetch approved Twilio WhatsApp templates for the authenticated company
+ *
  * Query parameters:
  * - includePending: boolean - Include pending templates (default: false)
  * - contentType: string - Filter by content type (e.g., "twilio/text")
  * - sid: string - Fetch a specific template by SID
- * 
+ *
  * @example
  * GET /api/twilio/templates
  * GET /api/twilio/templates?includePending=true
@@ -17,6 +21,9 @@ import { fetchApprovedTemplates, fetchTemplateBySid } from "@/lib/twilio/templat
  */
 export async function GET(request: NextRequest) {
   try {
+    // Get company ID for the authenticated user
+    const companyId = await requireCompanyId();
+
     const searchParams = request.nextUrl.searchParams;
     const templateSid = searchParams.get("sid");
     const includePending = searchParams.get("includePending") === "true";
@@ -24,8 +31,8 @@ export async function GET(request: NextRequest) {
 
     // If a specific SID is requested, fetch that template
     if (templateSid) {
-      const template = await fetchTemplateBySid(templateSid);
-      
+      const template = await fetchTemplateBySid(templateSid, companyId);
+
       if (!template) {
         return NextResponse.json(
           { error: "Template not found" },
@@ -42,11 +49,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Otherwise, fetch all approved templates
-    const result = await fetchApprovedTemplates({
-      includePending,
-      contentType,
-    });
+    // Otherwise, fetch all approved templates for this company
+    const result = await fetchApprovedTemplates(
+      {
+        includePending,
+        contentType,
+      },
+      companyId
+    );
 
     if (!result.success) {
       return NextResponse.json(
@@ -78,4 +88,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-
