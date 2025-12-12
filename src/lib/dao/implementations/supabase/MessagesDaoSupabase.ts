@@ -71,7 +71,7 @@ export class MessagesDaoSupabase implements IMessages {
   }
 
   /**
-   * Update message status by Twilio SID
+   * Update message status by Twilio SIDz
    */
   async updateMessageStatus(
     twilioSid: string,

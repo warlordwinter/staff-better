@@ -180,9 +180,11 @@ async function handleDirectMessage(
   }
 
   // Send message via MessageService
+  // For WhatsApp templates, body.message may be undefined, so use empty string as fallback
+  const message = body.message ? body.message.trim() : "";
   const result = await messageService.sendDirectMessage(
     to,
-    body.message.trim(),
+    message,
     conversation_id,
     channel,
     companyId,
@@ -243,45 +245,131 @@ async function handleAssociateMessage(
   }
 
   // Send message via MessageService
-  const result = await messageService.sendMessageToAssociate(
-    associateId,
-    body.message.trim(),
-    channel,
-    companyId,
-    senderNumber,
-    twoWayPhoneNumber,
-    isWhatsAppTemplate,
-    isWhatsAppTemplate
-      ? {
-          contentSid: body.contentSid,
-          contentVariables: body.contentVariables,
-        }
-      : undefined
-  );
+  // For WhatsApp templates, body.message may be undefined, so use empty string as fallback
+  const message = body.message ? body.message.trim() : "";
+
+  // Log template data for debugging
+  if (isWhatsAppTemplate) {
+    console.log("📤 [API] Sending WhatsApp template message:", {
+      associateId,
+      contentSid: body.contentSid,
+      contentVariables: body.contentVariables,
+      channel,
+    });
+  }
+
+  let result;
+  try {
+    result = await messageService.sendMessageToAssociate(
+      associateId,
+      message,
+      channel,
+      companyId,
+      senderNumber,
+      twoWayPhoneNumber,
+      isWhatsAppTemplate,
+      isWhatsAppTemplate
+        ? {
+            contentSid: body.contentSid,
+            contentVariables: body.contentVariables,
+          }
+        : undefined
+    );
+  } catch (error) {
+    console.error("❌ [API] Exception in sendMessageToAssociate:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return NextResponse.json(
+      {
+        error: "Failed to send message",
+        details: errorMessage,
+        code: "EXCEPTION",
+      },
+      { status: 500 }
+    );
+  }
 
   if (!result.success) {
+    const errorCode = result.code ? String(result.code) : null;
+    const errorMessage = result.error || "Unknown error";
+
+    // Handle specific Twilio error codes
     if (
-      result.code === "21610" ||
-      String(result.code) === "21610" ||
-      (typeof result.error === "string" &&
-        result.error.toLowerCase().includes("unsubscribed"))
+      errorCode === "21610" ||
+      (typeof errorMessage === "string" &&
+        errorMessage.toLowerCase().includes("unsubscribed"))
     ) {
       return NextResponse.json(
         {
           error:
             "You cannot message this employee because they have unsubscribed from SMS notifications.",
-          code: result.code || "21610",
+          code: errorCode || "21610",
           userFriendly: true,
         },
         { status: 400 }
       );
     }
 
+    // Handle Twilio error 21656 - Invalid ContentVariables
+    if (errorCode === "21656" || String(errorCode) === "21656") {
+      console.error("❌ [API] Twilio error 21656 - Invalid ContentVariables");
+      console.error("❌ [API] Error details:", errorMessage);
+      console.error("❌ [API] Template data:", {
+        contentSid: body.contentSid,
+        contentVariables: body.contentVariables,
+      });
+
+      return NextResponse.json(
+        {
+          error:
+            "Invalid template variables. Please check that all required variables are filled correctly.",
+          details: errorMessage,
+          code: errorCode,
+          userFriendly: true,
+        },
+        { status: 400 }
+      );
+    }
+
+    // Handle other WhatsApp template errors
+    if (
+      isWhatsAppTemplate &&
+      typeof errorMessage === "string" &&
+      (errorMessage.toLowerCase().includes("template") ||
+        errorMessage.toLowerCase().includes("content") ||
+        errorMessage.toLowerCase().includes("variable"))
+    ) {
+      console.error("❌ [API] WhatsApp template error:", errorMessage);
+      console.error("❌ [API] Error code:", errorCode);
+      console.error("❌ [API] Template data:", {
+        contentSid: body.contentSid,
+        contentVariables: body.contentVariables,
+      });
+
+      return NextResponse.json(
+        {
+          error:
+            "Failed to send WhatsApp template message. Please verify the template and variables are correct.",
+          details: errorMessage,
+          code: errorCode,
+          userFriendly: true,
+        },
+        { status: 400 }
+      );
+    }
+
+    // Generic error response
+    console.error("❌ [API] Message send failed:", {
+      error: errorMessage,
+      code: errorCode,
+      channel,
+      isWhatsAppTemplate,
+    });
+
     return NextResponse.json(
       {
         error: "Failed to send message",
-        details: result.error,
-        code: result.code,
+        details: errorMessage,
+        code: errorCode,
       },
       { status: result.error === "Associate not found" ? 404 : 500 }
     );
@@ -315,9 +403,11 @@ async function handleGroupMessage(
   }
 
   // Send message via MessageService
+  // For WhatsApp templates, body.message may be undefined, so use empty string as fallback
+  const message = body.message ? body.message.trim() : "";
   const result = await messageService.sendMessageToGroup(
     groupId,
-    body.message.trim(),
+    message,
     channel,
     companyId,
     senderNumber,

@@ -204,6 +204,12 @@ export async function sendWhatsAppTemplate(
       throw new Error("WhatsApp 'contentSid' (template SID) is required");
     }
 
+    // NOTE: If error 21656 persists, it might be due to:
+    // 1. Template structure mismatch (variables in different order than expected)
+    // 2. Template not fully approved/ready
+    // 3. Template format requirements we're not meeting
+    // Consider fetching template details to verify structure matches
+
     // Format phone numbers with whatsapp: prefix
     const fromNumber = formatWhatsAppNumber(message.from);
     const toNumber = formatWhatsAppNumber(message.to);
@@ -214,35 +220,131 @@ export async function sendWhatsAppTemplate(
     console.log("📱 [WHATSAPP DEBUG]   CONTENT SID:", message.contentSid);
     if (message.contentVariables) {
       console.log(
-        "📱 [WHATSAPP DEBUG]   VARIABLES:",
+        "📱 [WHATSAPP DEBUG]   VARIABLES (raw):",
         JSON.stringify(message.contentVariables)
       );
+      if (Array.isArray(message.contentVariables)) {
+        console.log(
+          "📱 [WHATSAPP DEBUG]   VARIABLES (array):",
+          message.contentVariables
+        );
+        console.log(
+          "📱 [WHATSAPP DEBUG]   VARIABLE COUNT:",
+          message.contentVariables.length
+        );
+      } else {
+        console.log(
+          "📱 [WHATSAPP DEBUG]   VARIABLE KEYS:",
+          Object.keys(message.contentVariables)
+        );
+        console.log(
+          "📱 [WHATSAPP DEBUG]   VARIABLE VALUES:",
+          Object.values(message.contentVariables)
+        );
+      }
     }
 
-    // Build the content variables array for Twilio
-    // Twilio expects variables in the format: ["value1", "value2", ...]
-    // based on the order of variables in the template
+    // Build the content variables object for Twilio
+    // Twilio expects contentVariables as a JSON stringified object: {"1": "value1", "2": "value2", ...}
+    // The keys correspond to the variable placeholders in the template ({{1}}, {{2}}, etc.)
     let contentVariables: string | undefined;
+
     if (message.contentVariables) {
-      // Sort variables by key (numeric) and create array
-      const sortedKeys = Object.keys(message.contentVariables).sort(
-        (a, b) => parseInt(a) - parseInt(b)
+      let variablesObject: Record<string, string>;
+
+      // Handle both array and object formats
+      if (Array.isArray(message.contentVariables)) {
+        // Convert array to object format
+        // Array indices map to template variable numbers (1-indexed)
+        variablesObject = {};
+        message.contentVariables.forEach((value, index) => {
+          const varNum = String(index + 1); // Convert 0-based index to 1-based variable number
+          if (!value || typeof value !== "string" || !value.trim()) {
+            throw new Error(
+              `Template variable ${varNum} is required but is empty`
+            );
+          }
+          variablesObject[varNum] = value.trim();
+        });
+      } else {
+        // Already an object - use directly
+        variablesObject = {};
+        const sortedKeys = Object.keys(message.contentVariables).sort(
+          (a, b) => parseInt(a) - parseInt(b)
+        );
+
+        sortedKeys.forEach((key) => {
+          const value = message.contentVariables![key];
+          if (!value || typeof value !== "string" || !value.trim()) {
+            throw new Error(
+              `Template variable ${key} is required but is empty`
+            );
+          }
+          variablesObject[key] = value.trim();
+        });
+      }
+
+      // Sanitize values to prevent Twilio error 21656
+      // Replace problematic characters (especially apostrophes)
+      Object.keys(variablesObject).forEach((key) => {
+        variablesObject[key] = variablesObject[key].replace(/'/g, "\u2019");
+      });
+
+      // Validate all values are non-empty
+      const emptyKeys = Object.keys(variablesObject).filter(
+        (key) => !variablesObject[key] || variablesObject[key] === ""
       );
-      const variableArray = sortedKeys.map(
-        (key) => message.contentVariables![key]
+
+      if (emptyKeys.length > 0) {
+        throw new Error(
+          `Template variables ${emptyKeys.join(
+            ", "
+          )} are empty. All variables must be provided.`
+        );
+      }
+
+      // Convert to JSON string for Twilio API
+      // Twilio expects: JSON.stringify({"1": "value1", "2": "value2"})
+      contentVariables = JSON.stringify(variablesObject);
+    } else {
+      console.log(
+        "📱 [WHATSAPP DEBUG] No contentVariables provided - sending template without variables"
       );
-      contentVariables = JSON.stringify(variableArray);
     }
 
-    // Send message via Twilio using template
-    const twilioMessage = await twilioClient.messages.create({
+    // Build the request payload
+    const requestPayload: any = {
       to: toNumber,
       from: fromNumber,
       contentSid: message.contentSid,
-      ...(contentVariables && { contentVariables }),
-    });
+    };
 
-    console.log("📱 [WHATSAPP DEBUG] WhatsApp template message sent successfully:");
+    // Add contentVariables if provided
+    // Twilio REST API expects contentVariables as a JSON stringified object
+    if (contentVariables) {
+      requestPayload.contentVariables = contentVariables;
+      console.log("📱 [WHATSAPP DEBUG] Final request payload:", {
+        to: requestPayload.to,
+        from: requestPayload.from,
+        contentSid: requestPayload.contentSid,
+        contentVariables: requestPayload.contentVariables,
+        contentVariablesType: typeof requestPayload.contentVariables,
+      });
+    } else {
+      console.log("📱 [WHATSAPP DEBUG] Final request payload (no variables):", {
+        to: requestPayload.to,
+        from: requestPayload.from,
+        contentSid: requestPayload.contentSid,
+      });
+    }
+
+    // Send message via Twilio using template
+    console.log("📱 [WHATSAPP DEBUG] Calling Twilio messages.create...");
+    const twilioMessage = await twilioClient.messages.create(requestPayload);
+
+    console.log(
+      "📱 [WHATSAPP DEBUG] WhatsApp template message sent successfully:"
+    );
     console.log("📱 [WHATSAPP DEBUG]   Message SID:", twilioMessage.sid);
     console.log("📱 [WHATSAPP DEBUG]   Status:", twilioMessage.status);
     console.log("📱 [WHATSAPP DEBUG]   From (Twilio):", twilioMessage.from);
@@ -261,18 +363,46 @@ export async function sendWhatsAppTemplate(
       sentAt: new Date(),
     };
   } catch (error: unknown) {
-    const twilioError = error as { message?: string; code?: string };
+    const twilioError = error as {
+      message?: string;
+      code?: string | number;
+      status?: number;
+      moreInfo?: string;
+    };
+
+    // Enhanced error logging for debugging
+    console.error("📱 [WHATSAPP DEBUG] WhatsApp template sending failed:");
+    console.error("📱 [WHATSAPP DEBUG]   Error message:", twilioError.message);
+    console.error("📱 [WHATSAPP DEBUG]   Error code:", twilioError.code);
+    console.error("📱 [WHATSAPP DEBUG]   Status:", twilioError.status);
+    console.error("📱 [WHATSAPP DEBUG]   More info:", twilioError.moreInfo);
+    console.error("📱 [WHATSAPP DEBUG]   Full error:", error);
+
+    // If error 21656, provide more specific guidance
+    if (twilioError.code === 21656 || twilioError.code === "21656") {
+      console.error(
+        "📱 [WHATSAPP DEBUG] ERROR 21656: Invalid ContentVariables"
+      );
+      console.error("📱 [WHATSAPP DEBUG]   This usually means:");
+      console.error(
+        "📱 [WHATSAPP DEBUG]   1. Variables don't match template structure"
+      );
+      console.error(
+        "📱 [WHATSAPP DEBUG]   2. Special characters in variables (especially apostrophes)"
+      );
+      console.error(
+        "📱 [WHATSAPP DEBUG]   3. Array length doesn't match template variable count"
+      );
+      console.error("📱 [WHATSAPP DEBUG]   4. Variables are in wrong order");
+    }
 
     const whatsappError: SMSError = {
       success: false,
       error: twilioError.message || "Unknown error occurred",
-      code: twilioError.code || "UNKNOWN",
+      code: String(twilioError.code || "UNKNOWN"),
       to: message.to,
       sentAt: new Date(),
     };
-
-    // Log the error for debugging
-    console.error("WhatsApp template sending failed:", whatsappError);
 
     return whatsappError;
   }

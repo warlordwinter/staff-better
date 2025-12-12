@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, use } from "react";
+import React, { useState, useEffect, use, useCallback } from "react";
 import Link from "next/link";
 import Navbar from "@/components/ui/navBar";
 import Footer from "@/components/ui/footer";
@@ -240,14 +240,29 @@ export default function GroupPage({ params }: GroupPageProps) {
     setShowMassMessageModal(true);
   };
 
-  const handleSendMessage = async (templateData?: { contentSid: string; contentVariables?: Record<string, string> }) => {
+  const handleSendMessage = async (templateData?: {
+    contentSid: string;
+    contentVariables?: Record<string, string>;
+  }) => {
+    console.log("🚀🚀🚀 GROUP PAGE handleSendMessage CALLED 🚀🚀🚀", {
+      messageType,
+      templateData,
+      messageText,
+      selectedAssociate: selectedAssociate?.id,
+      groupId,
+      templateDataKeys: templateData ? Object.keys(templateData) : null,
+      functionName: "handleSendMessage (GROUP PAGE)",
+    });
+
     // For WhatsApp with template, we don't need messageText
-    if (messageType === "whatsapp" && templateData) {
-      // Template-based WhatsApp message
-    } else if (!messageText.trim()) {
+    // Only validate messageText if we're not using a WhatsApp template
+    const isWhatsAppTemplate = messageType === "whatsapp" && templateData;
+    if (!isWhatsAppTemplate && !messageText.trim()) {
+      console.log("Early return: no message text and not WhatsApp template");
       return;
     }
 
+    console.log("Setting loading state and sending message...");
     setSendLoading(true);
     setSendSuccess(false);
     setSendError(null);
@@ -262,9 +277,10 @@ export default function GroupPage({ params }: GroupPageProps) {
         );
       } else {
         // Send mass message
+        // For WhatsApp templates, messageText may be empty, which is fine
         const result = await GroupsDataService.sendMassMessageToGroup(
           groupId,
-          messageText,
+          messageText || "", // Use empty string if messageText is empty (for templates)
           messageType,
           templateData
         );
@@ -327,6 +343,23 @@ export default function GroupPage({ params }: GroupPageProps) {
     setSelectedAssociate(null);
     setSendError(null);
   };
+
+  // Memoize the send handler to ensure stable reference
+  const memoizedHandleSend = useCallback(
+    (templateData?: {
+      contentSid: string;
+      contentVariables?: Record<string, string>;
+    }) => {
+      console.log(
+        "🔵🔵🔵 GROUP PAGE Wrapper function called with:",
+        templateData
+      );
+      console.log("🔵🔵🔵 GROUP PAGE About to call handleSendMessage");
+      console.log("🔵🔵🔵 GROUP PAGE groupId:", groupId);
+      return handleSendMessage(templateData);
+    },
+    [groupId, messageType, messageText, selectedAssociate]
+  );
 
   // Show loading spinner while checking authentication
   if (authLoading) {
@@ -394,19 +427,22 @@ export default function GroupPage({ params }: GroupPageProps) {
       </main>
 
       {/* Modals */}
-      <MassMessageModal
-        isOpen={showMassMessageModal}
-        groupName={group?.group_name}
-        associateCount={associates.length}
-        messageText={messageText}
-        messageType={messageType}
-        onMessageTextChange={setMessageText}
-        onMessageTypeChange={setMessageType}
-        onSend={handleSendMessage}
-        sendLoading={sendLoading}
-        sendSuccess={sendSuccess}
-        onCancel={handleCancelMessage}
-      />
+      {showMassMessageModal && (
+        <MassMessageModal
+          key={`group-page-mass-message-modal-${groupId}`}
+          isOpen={showMassMessageModal}
+          groupName={group?.group_name}
+          associateCount={associates.length}
+          messageText={messageText}
+          messageType={messageType}
+          onMessageTextChange={setMessageText}
+          onMessageTypeChange={setMessageType}
+          onSend={memoizedHandleSend}
+          sendLoading={sendLoading}
+          sendSuccess={sendSuccess}
+          onCancel={handleCancelMessage}
+        />
+      )}
 
       <IndividualMessageModal
         isOpen={showIndividualMessageModal}

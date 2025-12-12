@@ -168,9 +168,52 @@ export default function MassMessageModal({
 
   if (!isOpen) return null;
 
+  // Calculate disabled state
+  const isDisabled =
+    sendLoading ||
+    sendSuccess ||
+    (messageType === "whatsapp" && useTemplate
+      ? !selectedTemplate ||
+        (selectedTemplate.variables.length > 0 &&
+          !selectedTemplate.variables.every((v) =>
+            templateVariables[v]?.trim()
+          ))
+      : !messageText.trim());
+
+  const modalSource = groupName ? "groups-page" : "associates-page";
+  // Groups page modal should have higher z-index to ensure it's on top
+  const zIndex = groupName ? "z-[100]" : "z-50";
+
+  // Only render if we're on the correct page
+  // Groups page modal should only render when groupName is provided
+  // Associates page modal should only render when groupName is NOT provided
+  if (
+    groupName &&
+    typeof window !== "undefined" &&
+    !window.location.pathname.startsWith("/groups")
+  ) {
+    console.warn(
+      "⚠️ Groups page modal rendered but not on groups page - hiding"
+    );
+    return null;
+  }
+  if (
+    !groupName &&
+    typeof window !== "undefined" &&
+    !window.location.pathname.startsWith("/associates")
+  ) {
+    console.warn(
+      "⚠️ Associates page modal rendered but not on associates page - hiding"
+    );
+    return null;
+  }
+
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
+    <div
+      className={`fixed inset-0 flex items-center justify-center ${zIndex} pointer-events-none`}
+    >
       <div
+        data-modal-source={modalSource}
         className="bg-white rounded-lg p-6 w-96 max-w-md mx-4 shadow-2xl border border-gray-200 pointer-events-auto"
         onClick={(e) => e.stopPropagation()}
       >
@@ -471,40 +514,49 @@ export default function MassMessageModal({
             Cancel
           </button>
           <button
-            onClick={() => {
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+
               if (
                 messageType === "whatsapp" &&
                 useTemplate &&
                 selectedTemplate
               ) {
-                // Send with template data
-                const vars: Record<string, string> = {};
+                // Build contentVariables object for Twilio
+                // Twilio expects: {"1": "value1", "2": "value2", ...}
+                const contentVariablesObject: Record<string, string> = {};
+
                 selectedTemplate.variables.forEach((varNum) => {
-                  if (templateVariables[varNum]) {
-                    vars[varNum] = templateVariables[varNum];
+                  const value = templateVariables[varNum];
+                  if (!value || typeof value !== "string" || !value.trim()) {
+                    throw new Error(
+                      `Template variable ${varNum} is required but is empty`
+                    );
                   }
+                  contentVariablesObject[varNum] = value.trim();
                 });
-                onSend({
+
+                const templatePayload = {
                   contentSid: selectedTemplate.sid,
-                  contentVariables:
-                    Object.keys(vars).length > 0 ? vars : undefined,
-                });
+                  contentVariables: contentVariablesObject,
+                };
+
+                if (!onSend) {
+                  return;
+                }
+
+                onSend(templatePayload);
               } else {
                 // Send without template (regular message)
+                if (!onSend) {
+                  return;
+                }
                 onSend();
               }
             }}
-            disabled={
-              sendLoading ||
-              sendSuccess ||
-              (messageType === "whatsapp" && useTemplate
-                ? !selectedTemplate ||
-                  (selectedTemplate.variables.length > 0 &&
-                    !selectedTemplate.variables.every((v) =>
-                      templateVariables[v]?.trim()
-                    ))
-                : !messageText.trim())
-            }
+            type="button"
+            disabled={isDisabled}
             className="px-6 py-2 bg-orange-500 text-white rounded-lg font-medium hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {sendLoading ? "Sending..." : "Send Message"}

@@ -200,6 +200,7 @@ interface AssociatesPageViewProps {
   associates: AssociateGroup[];
   loading: boolean;
   messageText: string;
+  messageType?: "sms" | "whatsapp";
   selectedAssociate: AssociateGroup | null;
   showMassMessageModal: boolean;
   showIndividualMessageModal: boolean;
@@ -216,7 +217,11 @@ interface AssociatesPageViewProps {
   isSubmitting: boolean;
   // Actions
   onMessageTextChange: (text: string) => void;
-  onSendMessage: () => void;
+  onMessageTypeChange?: (type: "sms" | "whatsapp") => void;
+  onSendMessage: (templateData?: {
+    contentSid: string;
+    contentVariables?: Record<string, string>;
+  }) => Promise<void>;
   onCancelMessage: () => void;
   onAddNew: () => void;
   onCancelAddNew: () => void;
@@ -237,6 +242,7 @@ export default function AssociatesPageView({
   associates,
   loading,
   messageText,
+  messageType,
   selectedAssociate,
   showMassMessageModal,
   showIndividualMessageModal,
@@ -252,6 +258,7 @@ export default function AssociatesPageView({
   sendError,
   isSubmitting,
   onMessageTextChange,
+  onMessageTypeChange,
   onSendMessage,
   onCancelMessage,
   onAddNew,
@@ -496,15 +503,22 @@ export default function AssociatesPageView({
         onCancel={onCancelMessage}
       />
 
-      <MassMessageModal
-        isOpen={showMassMessageModal}
-        messageText={messageText}
-        onMessageTextChange={onMessageTextChange}
-        onSend={onSendMessage}
-        sendLoading={sendLoading}
-        sendSuccess={sendSuccess}
-        onCancel={onCancelMessage}
-      />
+      {/* Only render modal if we're actually on the associates page */}
+      {typeof window !== "undefined" &&
+        window.location.pathname.startsWith("/associates") && (
+          <MassMessageModal
+            key="associates-page-mass-message-modal"
+            isOpen={showMassMessageModal}
+            messageText={messageText}
+            messageType={messageType}
+            onMessageTextChange={onMessageTextChange}
+            onMessageTypeChange={onMessageTypeChange}
+            onSend={onSendMessage}
+            sendLoading={sendLoading}
+            sendSuccess={sendSuccess}
+            onCancel={onCancelMessage}
+          />
+        )}
 
       {/* Add New Associate Modal */}
       {showAddNewModal && (

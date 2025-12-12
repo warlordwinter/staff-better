@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { AssociateGroup } from "@/model/interfaces/AssociateGroup";
 import { AssociateFormData } from "@/components/shared/AssociateForm";
 import { useAssociates } from "./useAssociates";
@@ -11,6 +12,7 @@ export interface UseAssociatesPageReturn {
   associates: AssociateGroup[];
   loading: boolean;
   messageText: string;
+  messageType: "sms" | "whatsapp";
   selectedAssociate: AssociateGroup | null;
   showMassMessageModal: boolean;
   showIndividualMessageModal: boolean;
@@ -29,6 +31,7 @@ export interface UseAssociatesPageReturn {
 
   // Actions
   setMessageText: (text: string) => void;
+  setMessageType: (type: "sms" | "whatsapp") => void;
   setShowMassMessageModal: (show: boolean) => void;
   setShowIndividualMessageModal: (show: boolean) => void;
   setShowAddNewModal: (show: boolean) => void;
@@ -41,7 +44,7 @@ export interface UseAssociatesPageReturn {
   loadAssociates: () => Promise<void>;
   saveAssociate: (updatedAssociate: AssociateGroup) => Promise<void>;
   deleteAssociate: (associateId: string) => Promise<void>;
-  sendMessage: () => Promise<void>;
+  sendMessage: (templateData?: { contentSid: string; contentVariables?: Record<string, string> }) => Promise<void>;
   cancelMessage: () => void;
   addNew: () => void;
   cancelAddNew: () => void;
@@ -67,6 +70,9 @@ export function useAssociatesPage(
   const messaging = useAssociateMessaging((message, type) => {
     toast.showToastMessage(message, type);
   });
+  
+  // Message type state (SMS or WhatsApp)
+  const [messageType, setMessageType] = useState<"sms" | "whatsapp">("sms");
 
   // Form management
   const form = useAssociateForm((message) => {
@@ -77,10 +83,16 @@ export function useAssociatesPage(
   const csvUpload = useAssociateCSVUpload();
 
   // Wrapper for sendMessage that uses associates list
-  const sendMessage = async () => {
-    await messaging.sendMessage(associates.associates, () => {
-      // This callback is already handled in useAssociateMessaging
-    });
+  // Now accepts template data for WhatsApp templates
+  const sendMessage = async (
+    templateData?: { contentSid: string; contentVariables?: Record<string, string> }
+  ) => {
+    await messaging.sendMessage(
+      templateData || associates.associates,
+      undefined, // onUnsubscribed callback
+      messageType,
+      associates.associates // Always pass associates list for template data case
+    );
   };
 
   // Wrapper for submitNewAssociate that uses createAssociate
@@ -113,6 +125,7 @@ export function useAssociatesPage(
     sendLoading: messaging.sendLoading,
     sendSuccess: messaging.sendSuccess,
     sendError: messaging.sendError,
+    messageType,
 
     // State from form
     showAddNewModal: form.showAddNewModal,
@@ -139,6 +152,7 @@ export function useAssociatesPage(
     setShowMassMessageModal: messaging.setShowMassMessageModal,
     setShowIndividualMessageModal: messaging.setShowIndividualMessageModal,
     setSelectedAssociate: messaging.setSelectedAssociate,
+    setMessageType,
     sendMessage,
     cancelMessage: messaging.cancelMessage,
     messageAssociate: messaging.messageAssociate,

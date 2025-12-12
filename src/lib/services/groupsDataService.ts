@@ -320,19 +320,36 @@ export class GroupsDataService {
    */
   static async sendMessageToAssociate(
     associateId: string,
-    message: string
+    message: string,
+    channel: "sms" | "whatsapp" = "sms",
+    templateData?: {
+      contentSid: string;
+      contentVariables?: Record<string, string>;
+    }
   ): Promise<boolean> {
+    const body: any = {
+      type: "associate",
+      id: associateId,
+      channel,
+    };
+
+    if (channel === "whatsapp" && templateData) {
+      // Use template for WhatsApp
+      body.contentSid = templateData.contentSid;
+      if (templateData.contentVariables) {
+        body.contentVariables = templateData.contentVariables;
+      }
+    } else {
+      // Use regular message
+      body.message = message;
+    }
+
     const response = await fetch(`/api/send-message`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        type: "associate",
-        id: associateId,
-        message,
-        channel: "sms",
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -367,7 +384,10 @@ export class GroupsDataService {
     groupId: string,
     message: string,
     channel: "sms" | "whatsapp" = "sms",
-    templateData?: { contentSid: string; contentVariables?: Record<string, string> }
+    templateData?: {
+      contentSid: string;
+      contentVariables?: Record<string, string>;
+    }
   ): Promise<{
     success: boolean;
     unsubscribed_members?: Array<{
@@ -381,7 +401,7 @@ export class GroupsDataService {
       id: groupId,
       channel,
     };
-    
+
     if (channel === "whatsapp" && templateData) {
       // Use template for WhatsApp
       body.contentSid = templateData.contentSid;

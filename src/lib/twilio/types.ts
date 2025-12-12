@@ -122,5 +122,5 @@ export interface WhatsAppTemplateMessage {
   to: string;
   from: string;
   contentSid: string; // The template SID from Twilio Content API
-  contentVariables?: Record<string, string>; // Variable values for template (e.g., {"1": "John", "2": "12345"})
+  contentVariables?: Record<string, string> | string[]; // Variable values for template - can be object {"1": "John", "2": "12345"} or array ["John", "12345"]
 }
