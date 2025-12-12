@@ -1,6 +1,6 @@
 // API route for Number provisioning
 import { NextRequest, NextResponse } from 'next/server';
-import { NumberProvisioningService } from '@/lib/isv/services/NumberProvisioningService';
+import { serviceContainer } from '@/lib/services/ServiceContainer';
 import { requireAuthWithSetup } from '@/lib/auth/utils';
 
 /**
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const numberService = new NumberProvisioningService();
+    const numberService = serviceContainer.getNumberProvisioningService();
     const number = await numberService.provisionNumber(customer_id, {
       countryCode: country_code,
       areaCode: area_code,
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const numberService = new NumberProvisioningService();
+    const numberService = serviceContainer.getNumberProvisioningService();
     const numbers = await numberService.listCustomerNumbers(customerId);
 
     return NextResponse.json(numbers, { status: 200 });

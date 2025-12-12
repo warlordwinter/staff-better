@@ -4,6 +4,7 @@ import { Associate } from "@/model/interfaces/Associate";
 
 export interface IAssociateRepository {
   getAssociateByPhone(phoneNumber: string): Promise<Associate | null>;
+  getAssociateCompanyId(associateId: string): Promise<string | null>;
   optOutAssociate(associateId: string): Promise<void>;
   optInAssociate(associateId: string): Promise<void>;
 }

@@ -3,11 +3,15 @@ import { SubaccountService } from './SubaccountService';
 import { TemplateDao } from '../dao/TemplateDao';
 import { ISVCustomerDao } from '../dao/ISVCustomerDao';
 import { Template } from '../types';
+import { IWhatsAppTemplateService } from '../../twilio/adapters/IWhatsAppTemplateService';
 
 export class WhatsAppOnboardingService {
-  private subaccountService = new SubaccountService();
-  private templateDao = new TemplateDao();
-  private customerDao = new ISVCustomerDao();
+  constructor(
+    private readonly templateService: IWhatsAppTemplateService,
+    private readonly subaccountService: SubaccountService,
+    private readonly templateDao: TemplateDao,
+    private readonly customerDao: ISVCustomerDao
+  ) {}
 
   /**
    * Initiate WhatsApp Business Account (WABA) linking
@@ -65,16 +69,11 @@ export class WhatsAppOnboardingService {
     const twilioClient = await this.subaccountService.getCustomerTwilioClient(customerId);
 
     try {
-      // Submit template via Twilio Content API
-      // Note: Actual API may vary
-      const template = await twilioClient.content.v1.contents.create({
-        friendlyName: templateData.name,
+      // Submit template via adapter
+      const template = await this.templateService.submitTemplate(twilioClient, {
+        name: templateData.name,
+        body: templateData.body,
         language: templateData.language || 'en',
-        types: {
-          'twilio/text': {
-            body: templateData.body,
-          },
-        },
       });
 
       // Store in database
@@ -85,7 +84,7 @@ export class WhatsAppOnboardingService {
         category: templateData.category,
         language: templateData.language || 'en',
         twilio_template_id: template.sid,
-        status: 'pending',
+        status: template.status as Template['status'],
       });
 
       return dbTemplate;
@@ -111,11 +110,13 @@ export class WhatsAppOnboardingService {
     const twilioClient = await this.subaccountService.getCustomerTwilioClient(template.customer_id);
 
     try {
-      // Fetch latest status from Twilio
-      const twilioTemplate = await twilioClient.content.v1.contents(template.twilio_template_id).fetch();
+      // Fetch latest status from Twilio via adapter
+      const { status } = await this.templateService.getTemplateStatus(
+        twilioClient,
+        template.twilio_template_id!
+      );
       
       // Update database with latest status
-      const status = twilioTemplate.approvalRequests?.[0]?.status || 'pending';
       const updated = await this.templateDao.update(templateId, {
         status: status as Template['status'],
       });

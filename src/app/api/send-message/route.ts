@@ -1,19 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import {
   requireCompanyId,
   requireCompanyPhoneNumber,
   requireCompanyWhatsAppNumber,
 } from "@/lib/auth/getCompanyId";
-import { sendTwoWaySMS, formatPhoneNumber } from "@/lib/twilio/sms";
-import {
-  sendWhatsAppBusiness,
-  sendWhatsAppBusinessTemplate,
-} from "@/lib/twilio/whatsapp";
-import { GroupsDaoSupabase } from "@/lib/dao/implementations/supabase/GroupsDaoSupabase";
-import { TwilioMessageService } from "@/lib/services/implementations/TwilioMessageService";
-
-const groupsDao = new GroupsDaoSupabase();
+import { serviceContainer } from "@/lib/services/ServiceContainer";
 
 /**
  * POST /api/send-message
@@ -105,6 +96,9 @@ export async function POST(request: NextRequest) {
       twoWayPhoneNumber = senderNumber; // For SMS opt-out messages
     }
 
+    // Get MessageService from container
+    const messageService = serviceContainer.getMessageService();
+
     // Handle different message types
     if (type === "direct") {
       return await handleDirectMessage(
@@ -112,7 +106,8 @@ export async function POST(request: NextRequest) {
         companyId,
         senderNumber,
         channel,
-        isWhatsAppTemplate
+        isWhatsAppTemplate,
+        messageService
       );
     } else if (type === "associate") {
       return await handleAssociateMessage(
@@ -121,7 +116,8 @@ export async function POST(request: NextRequest) {
         senderNumber,
         twoWayPhoneNumber,
         channel,
-        isWhatsAppTemplate
+        isWhatsAppTemplate,
+        messageService
       );
     } else if (type === "group") {
       return await handleGroupMessage(
@@ -130,7 +126,8 @@ export async function POST(request: NextRequest) {
         senderNumber,
         twoWayPhoneNumber,
         channel,
-        isWhatsAppTemplate
+        isWhatsAppTemplate,
+        messageService
       );
     }
 
@@ -162,7 +159,8 @@ async function handleDirectMessage(
   companyId: string,
   senderNumber: string,
   channel: "sms" | "whatsapp",
-  isWhatsAppTemplate: boolean
+  isWhatsAppTemplate: boolean,
+  messageService: any
 ) {
   const { conversation_id, to } = body;
 
@@ -181,43 +179,25 @@ async function handleDirectMessage(
     );
   }
 
-  // Send message
-  let result;
-  const formattedPhone = formatPhoneNumber(to);
-
-  if (channel === "whatsapp") {
-    if (isWhatsAppTemplate) {
-      result = await sendWhatsAppBusinessTemplate(
-        {
-          to: formattedPhone,
+  // Send message via MessageService
+  const result = await messageService.sendDirectMessage(
+    to,
+    body.message.trim(),
+    conversation_id,
+    channel,
+    companyId,
+    senderNumber,
+    isWhatsAppTemplate,
+    isWhatsAppTemplate
+      ? {
           contentSid: body.contentSid,
           contentVariables: body.contentVariables,
-        },
-        senderNumber
-      );
-    } else {
-      result = await sendWhatsAppBusiness(
-        {
-          to: formattedPhone,
-          body: body.message.trim(),
-        },
-        senderNumber
-      );
-    }
-  } else {
-    const messageService = new TwilioMessageService();
-    result = await messageService.sendSMS({
-      to: formattedPhone,
-      body: body.message.trim(),
-      from: senderNumber,
-    });
-  }
+        }
+      : undefined
+  );
 
   if (!result.success) {
-    const errorCode = "code" in result ? result.code : null;
-    const errorMessage = "error" in result ? result.error : "Unknown error";
-
-    if (errorCode === "21610" || String(errorCode) === "21610") {
+    if (result.code === "21610" || String(result.code) === "21610") {
       return NextResponse.json(
         { error: "Recipient has opted out of SMS messages" },
         { status: 400 }
@@ -227,42 +207,16 @@ async function handleDirectMessage(
     return NextResponse.json(
       {
         error: "Failed to send message",
-        details: errorMessage,
-        code: errorCode,
+        details: result.error,
+        code: result.code,
       },
       { status: 500 }
     );
   }
 
-  // Save to database
-  const supabaseAdmin = createAdminClient();
-  const messageBody = isWhatsAppTemplate
-    ? `[Template: ${body.contentSid}]`
-    : body.message.trim();
-
-  const { error: insertError } = await supabaseAdmin.from("messages").insert([
-    {
-      conversation_id,
-      sender_type: "company",
-      body: messageBody,
-      direction: "outbound",
-      status:
-        result.success && "messageId" in result && result.messageId
-          ? "queued"
-          : null,
-      sent_at: new Date().toISOString(),
-      twilio_sid: "messageId" in result ? result.messageId : null,
-    },
-  ]);
-
-  if (insertError) {
-    console.error("Error saving message to database:", insertError);
-    // Continue - message was sent successfully
-  }
-
   return NextResponse.json({
     success: true,
-    message_id: "messageId" in result ? result.messageId : null,
+    message_id: result.messageId,
     to: to,
   });
 }
@@ -276,7 +230,8 @@ async function handleAssociateMessage(
   senderNumber: string,
   twoWayPhoneNumber: string | undefined,
   channel: "sms" | "whatsapp",
-  isWhatsAppTemplate: boolean
+  isWhatsAppTemplate: boolean,
+  messageService: any
 ) {
   const { id: associateId } = body;
 
@@ -287,82 +242,35 @@ async function handleAssociateMessage(
     );
   }
 
-  // Get the associate details
-  const supabase = await (await import("@/lib/supabase/server")).createClient();
-
-  const { data: associate, error: associateError } = await supabase
-    .from("associates")
-    .select("id, first_name, last_name, phone_number, sms_opt_out")
-    .eq("id", associateId)
-    .single();
-
-  if (associateError || !associate) {
-    return NextResponse.json({ error: "Associate not found" }, { status: 404 });
-  }
-
-  // Check if associate has opted out
-  if (associate.sms_opt_out) {
-    return NextResponse.json(
-      { error: "Associate has opted out of SMS messages" },
-      { status: 400 }
-    );
-  }
-
-  // Check if phone number exists
-  if (!associate.phone_number) {
-    return NextResponse.json(
-      { error: "Associate does not have a phone number" },
-      { status: 400 }
-    );
-  }
-
-  // Send message
-  const formattedPhone = formatPhoneNumber(associate.phone_number);
-  let result;
-
-  if (channel === "whatsapp") {
-    if (isWhatsAppTemplate) {
-      result = await sendWhatsAppBusinessTemplate(
-        {
-          to: formattedPhone,
+  // Send message via MessageService
+  const result = await messageService.sendMessageToAssociate(
+    associateId,
+    body.message.trim(),
+    channel,
+    companyId,
+    senderNumber,
+    twoWayPhoneNumber,
+    isWhatsAppTemplate,
+    isWhatsAppTemplate
+      ? {
           contentSid: body.contentSid,
           contentVariables: body.contentVariables,
-        },
-        senderNumber
-      );
-    } else {
-      result = await sendWhatsAppBusiness(
-        {
-          to: formattedPhone,
-          body: body.message.trim(),
-        },
-        senderNumber
-      );
-    }
-  } else {
-    const messageService = new TwilioMessageService();
-    result = await messageService.sendSMS({
-      to: formattedPhone,
-      body: body.message.trim(),
-      from: senderNumber,
-    });
-  }
+        }
+      : undefined
+  );
 
   if (!result.success) {
-    const errorCode = "code" in result ? result.code : null;
-    const errorMessage = "error" in result ? result.error : "Unknown error";
-
     if (
-      errorCode === "21610" ||
-      String(errorCode) === "21610" ||
-      (typeof errorMessage === "string" &&
-        errorMessage.toLowerCase().includes("unsubscribed"))
+      result.code === "21610" ||
+      String(result.code) === "21610" ||
+      (typeof result.error === "string" &&
+        result.error.toLowerCase().includes("unsubscribed"))
     ) {
       return NextResponse.json(
         {
           error:
             "You cannot message this employee because they have unsubscribed from SMS notifications.",
-          code: errorCode || "21610",
+          code: result.code || "21610",
           userFriendly: true,
         },
         { status: 400 }
@@ -372,101 +280,16 @@ async function handleAssociateMessage(
     return NextResponse.json(
       {
         error: "Failed to send message",
-        details: errorMessage,
-        code: errorCode,
+        details: result.error,
+        code: result.code,
       },
-      { status: 500 }
+      { status: result.error === "Associate not found" ? 404 : 500 }
     );
-  }
-
-  // Send opt-out message if this is the first direct message (only for SMS)
-  if (channel === "sms" && twoWayPhoneNumber) {
-    try {
-      const { sendSMSOptOutIfNeeded } = await import("@/lib/utils/optOutUtils");
-      await sendSMSOptOutIfNeeded(
-        associate.id,
-        associate.phone_number,
-        companyId,
-        twoWayPhoneNumber
-      );
-    } catch (optOutError) {
-      console.error(
-        `Failed to send opt-out message for direct message to associate ${associate.id}:`,
-        optOutError
-      );
-    }
-  }
-
-  // Find or create conversation and save message to database
-  try {
-    const supabaseAdmin = createAdminClient();
-
-    // Find or create conversation
-    const { data: existingConversations } = await supabaseAdmin
-      .from("conversations")
-      .select("id")
-      .eq("associate_id", associateId)
-      .eq("company_id", companyId)
-      .limit(1);
-
-    let conversationId: string | undefined;
-    if (existingConversations && existingConversations.length > 0) {
-      conversationId = existingConversations[0].id;
-    } else {
-      // Create new conversation
-      const { data: newConversation, error: createError } = await supabaseAdmin
-        .from("conversations")
-        .insert([
-          {
-            associate_id: associateId,
-            company_id: companyId,
-          },
-        ])
-        .select()
-        .single();
-
-      if (createError || !newConversation) {
-        console.error("Error creating conversation:", createError);
-      } else {
-        conversationId = newConversation.id;
-      }
-    }
-
-    // Save message to database if we have a conversation_id
-    if (conversationId) {
-      const messageBody = isWhatsAppTemplate
-        ? `[Template: ${body.contentSid}]`
-        : body.message.trim();
-
-      const { error: insertError } = await supabaseAdmin
-        .from("messages")
-        .insert([
-          {
-            conversation_id: conversationId,
-            sender_type: "company",
-            body: messageBody,
-            direction: "outbound",
-            status:
-              result.success && "messageId" in result && result.messageId
-                ? "queued"
-                : null,
-            sent_at: new Date().toISOString(),
-            twilio_sid: "messageId" in result ? result.messageId : null,
-          },
-        ]);
-
-      if (insertError) {
-        console.error("Error saving message to database:", insertError);
-      }
-    }
-  } catch (dbError) {
-    console.error("Error saving message to database:", dbError);
   }
 
   return NextResponse.json({
     success: true,
-    message_id: "messageId" in result ? result.messageId : null,
-    to: associate.phone_number,
+    message_id: result.messageId,
   });
 }
 
@@ -479,7 +302,8 @@ async function handleGroupMessage(
   senderNumber: string,
   twoWayPhoneNumber: string | undefined,
   channel: "sms" | "whatsapp",
-  isWhatsAppTemplate: boolean
+  isWhatsAppTemplate: boolean,
+  messageService: any
 ) {
   const { id: groupId } = body;
 
@@ -490,256 +314,42 @@ async function handleGroupMessage(
     );
   }
 
-  // Verify the group belongs to the company
-  const group = await groupsDao.getGroupById(groupId, companyId);
-  if (!group) {
-    return NextResponse.json({ error: "Group not found" }, { status: 404 });
-  }
-
-  // Get all group members
-  const members = await groupsDao.getGroupMembers(groupId, companyId);
-
-  if (members.length === 0) {
-    return NextResponse.json(
-      { error: "No members in this group" },
-      { status: 400 }
-    );
-  }
-
-  // Filter out members who have opted out of SMS
-  const eligibleMembers = members.filter(
-    (member) => !member.sms_opt_out && member.phone_number
+  // Send message via MessageService
+  const result = await messageService.sendMessageToGroup(
+    groupId,
+    body.message.trim(),
+    channel,
+    companyId,
+    senderNumber,
+    twoWayPhoneNumber,
+    isWhatsAppTemplate,
+    isWhatsAppTemplate
+      ? {
+          contentSid: body.contentSid,
+          contentVariables: body.contentVariables,
+        }
+      : undefined
   );
 
-  // Track unsubscribed members (opted out or missing phone)
-  const unsubscribedMembers = members.filter(
-    (member) => member.sms_opt_out || !member.phone_number
-  );
-
-  if (eligibleMembers.length === 0) {
+  if (!result.success) {
     return NextResponse.json(
       {
-        error:
-          "No eligible members to message (all opted out or missing phone numbers)",
-        total_members: members.length,
-        eligible_members: 0,
-        unsubscribed_members: unsubscribedMembers.map((m) => ({
-          id: m.id,
-          first_name: m.first_name,
-          last_name: m.last_name,
-        })),
+        error: "Failed to send group message",
+        total_members: result.total_members,
+        eligible_members: result.eligible_members,
+        unsubscribed_members: result.unsubscribed_members,
       },
       { status: 400 }
     );
   }
 
-  // Send messages to each eligible member
-  const results = [];
-  const errors = [];
-  const twilioUnsubscribedMembers: Array<{
-    id: string;
-    first_name: string;
-    last_name: string;
-  }> = [];
-
-  for (const member of eligibleMembers) {
-    try {
-      const formattedPhone = formatPhoneNumber(member.phone_number);
-      let result;
-
-      if (channel === "whatsapp") {
-        if (isWhatsAppTemplate) {
-          result = await sendWhatsAppBusinessTemplate(
-            {
-              to: formattedPhone,
-              contentSid: body.contentSid,
-              contentVariables: body.contentVariables,
-            },
-            senderNumber
-          );
-        } else {
-          result = await sendWhatsAppBusiness(
-            {
-              to: formattedPhone,
-              body: body.message.trim(),
-            },
-            senderNumber
-          );
-        }
-      } else {
-        result = await sendTwoWaySMS(
-          {
-            to: formattedPhone,
-            body: body.message.trim(),
-          },
-          senderNumber
-        );
-      }
-
-      results.push({
-        member_id: member.id,
-        phone: member.phone_number,
-        success: result.success,
-      });
-
-      if (!result.success) {
-        // Check if error is due to unsubscription (Twilio error code 21610)
-        const errorCode = "code" in result ? result.code : null;
-        if (errorCode === "21610") {
-          twilioUnsubscribedMembers.push({
-            id: member.id,
-            first_name: member.first_name,
-            last_name: member.last_name,
-          });
-        }
-
-        errors.push({
-          member_id: member.id,
-          phone: member.phone_number,
-          error: "error" in result ? result.error : "Unknown error",
-        });
-      } else {
-        // Send opt-out message if this is the first group message for this member (only for SMS)
-        if (channel === "sms" && twoWayPhoneNumber) {
-          try {
-            const { sendSMSOptOutIfNeeded } = await import(
-              "@/lib/utils/optOutUtils"
-            );
-            await sendSMSOptOutIfNeeded(
-              member.id,
-              member.phone_number,
-              companyId,
-              twoWayPhoneNumber
-            );
-          } catch (optOutError) {
-            console.error(
-              `Failed to send opt-out message for group message to member ${member.id}:`,
-              optOutError
-            );
-          }
-        }
-
-        // Save message to database if message was sent successfully
-        try {
-          const supabaseAdmin = createAdminClient();
-          // Find or create conversation
-          const { data: existingConversations } = await supabaseAdmin
-            .from("conversations")
-            .select("id")
-            .eq("associate_id", member.id)
-            .eq("company_id", companyId)
-            .limit(1);
-
-          let conversationId: string | undefined;
-          if (existingConversations && existingConversations.length > 0) {
-            conversationId = existingConversations[0].id;
-          } else {
-            // Create new conversation
-            const { data: newConversation, error: createError } =
-              await supabaseAdmin
-                .from("conversations")
-                .insert([
-                  {
-                    associate_id: member.id,
-                    company_id: companyId,
-                  },
-                ])
-                .select()
-                .single();
-
-            if (createError || !newConversation) {
-              console.error(
-                `Error creating conversation for associate ${member.id}:`,
-                createError
-              );
-            } else {
-              conversationId = newConversation.id;
-            }
-          }
-
-          // Save message to database if we have a conversation_id
-          if (conversationId) {
-            const messageBody = isWhatsAppTemplate
-              ? `[Template: ${body.contentSid}]`
-              : body.message.trim();
-
-            const { error: insertError } = await supabaseAdmin
-              .from("messages")
-              .insert([
-                {
-                  conversation_id: conversationId,
-                  sender_type: "company",
-                  body: messageBody,
-                  direction: "outbound",
-                  status:
-                    result.success && "messageId" in result && result.messageId
-                      ? "queued"
-                      : null,
-                  sent_at: new Date().toISOString(),
-                  twilio_sid: "messageId" in result ? result.messageId : null,
-                },
-              ]);
-
-            if (insertError) {
-              console.error(
-                `Error saving message to database for associate ${member.id}:`,
-                insertError
-              );
-            }
-          }
-        } catch (dbError) {
-          console.error(
-            `Error saving message to database for associate ${member.id}:`,
-            dbError
-          );
-        }
-      }
-
-      // Small delay between messages to avoid rate limiting
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    } catch (error) {
-      console.error(`Error sending message to ${member.phone_number}:`, error);
-      errors.push({
-        member_id: member.id,
-        phone: member.phone_number,
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
-    }
-  }
-
-  const successCount = results.filter((r) => r.success).length;
-
-  // Combine database unsubscribed members with Twilio unsubscribed members
-  const unsubscribedMap = new Map<
-    string,
-    { id: string; first_name: string; last_name: string }
-  >();
-
-  unsubscribedMembers.forEach((m) => {
-    unsubscribedMap.set(m.id, {
-      id: m.id,
-      first_name: m.first_name,
-      last_name: m.last_name,
-    });
-  });
-
-  twilioUnsubscribedMembers.forEach((m) => {
-    unsubscribedMap.set(m.id, {
-      id: m.id,
-      first_name: m.first_name,
-      last_name: m.last_name,
-    });
-  });
-
-  const allUnsubscribedMembers = Array.from(unsubscribedMap.values());
-
   return NextResponse.json({
     success: true,
-    total_members: members.length,
-    eligible_members: eligibleMembers.length,
-    messages_sent: successCount,
-    messages_failed: errors.length,
-    errors: errors.length > 0 ? errors : undefined,
-    unsubscribed_members: allUnsubscribedMembers,
+    total_members: result.total_members,
+    eligible_members: result.eligible_members,
+    messages_sent: result.messages_sent,
+    messages_failed: result.messages_failed,
+    errors: result.errors,
+    unsubscribed_members: result.unsubscribed_members,
   });
 }

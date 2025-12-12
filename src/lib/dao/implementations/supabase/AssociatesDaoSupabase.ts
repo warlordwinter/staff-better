@@ -391,6 +391,30 @@ export class AssociatesDaoSupabase implements IAssociates {
     return data as Associate;
   }
 
+  /**
+   * Get associate by ID
+   */
+  async getAssociateById(id: string): Promise<Associate | null> {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+      .from("associates")
+      .select("id, first_name, last_name, phone_number, email_address")
+      .eq("id", id)
+      .single();
+
+    if (error) {
+      if (error.code === "PGRST116") {
+        // No rows returned
+        return null;
+      }
+      console.error("Supabase fetch error:", error);
+      throw new Error("Failed to fetch associate");
+    }
+
+    return data;
+  }
+
   async optOutAssociate(associateId: string): Promise<void> {
     const supabase = await createClient();
 
