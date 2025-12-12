@@ -74,7 +74,9 @@ export class MessagesDataService {
       const hasWhatsAppMessage = (conv.messages || []).some((msg: any) => {
         const body = msg.body || "";
         // Check if message body contains template indicator or WhatsApp pattern
-        return body.includes("[Template:") || body.toLowerCase().includes("whatsapp");
+        return (
+          body.includes("[Template:") || body.toLowerCase().includes("whatsapp")
+        );
       });
 
       // Transform messages from database format to UI format
@@ -89,15 +91,17 @@ export class MessagesDataService {
         const body = msg.body || "";
         // Determine channel for individual message
         // Check for template indicator or WhatsApp patterns
-        const messageChannel: "sms" | "whatsapp" = 
-          body.includes("[Template:") || 
+        const messageChannel: "sms" | "whatsapp" =
+          body.includes("[Template:") ||
           body.toLowerCase().includes("whatsapp") ||
-          (msg.sender_type && msg.sender_type.toLowerCase().includes("whatsapp"))
+          (msg.sender_type &&
+            msg.sender_type.toLowerCase().includes("whatsapp"))
             ? "whatsapp"
             : "sms";
 
         // Clean up template indicators from display text
-        const displayText = body.replace(/\[Template: [^\]]+\]\s*/g, "").trim() || body;
+        const displayText =
+          body.replace(/\[Template: [^\]]+\]\s*/g, "").trim() || body;
 
         return {
           id: msg.id,
@@ -114,9 +118,11 @@ export class MessagesDataService {
         acc[ch] = (acc[ch] || 0) + 1;
         return acc;
       }, {} as Record<string, number>);
-      
-      const conversationChannel: "sms" | "whatsapp" = 
-        (channelCounts.whatsapp || 0) > (channelCounts.sms || 0) ? "whatsapp" : "sms";
+
+      const conversationChannel: "sms" | "whatsapp" =
+        (channelCounts.whatsapp || 0) > (channelCounts.sms || 0)
+          ? "whatsapp"
+          : "sms";
 
       // Get last message info
       const lastMessage =
@@ -144,19 +150,25 @@ export class MessagesDataService {
     associateId: string,
     message: string
   ): Promise<SendMessageResponse> {
-    const response = await fetch(`/api/associates/${associateId}/message`, {
+    const response = await fetch(`/api/send-message`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ message: message.trim() }),
+      body: JSON.stringify({
+        type: "associate",
+        id: associateId,
+        message: message.trim(),
+        channel: "sms",
+      }),
     });
 
     const data: SendMessageResponse = await response.json();
 
     if (!response.ok) {
       // Check if it's a user-friendly error message
-      const errorMessage = data.error || data.details || "Failed to send message";
+      const errorMessage =
+        data.error || data.details || "Failed to send message";
       throw new Error(errorMessage);
     }
 

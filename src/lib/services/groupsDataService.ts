@@ -322,12 +322,17 @@ export class GroupsDataService {
     associateId: string,
     message: string
   ): Promise<boolean> {
-    const response = await fetch(`/api/associates/${associateId}/message`, {
+    const response = await fetch(`/api/send-message`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({
+        type: "associate",
+        id: associateId,
+        message,
+        channel: "sms",
+      }),
     });
 
     if (!response.ok) {
@@ -371,7 +376,11 @@ export class GroupsDataService {
       last_name: string;
     }>;
   }> {
-    const body: any = { channel };
+    const body: any = {
+      type: "group",
+      id: groupId,
+      channel,
+    };
     
     if (channel === "whatsapp" && templateData) {
       // Use template for WhatsApp
@@ -384,7 +393,7 @@ export class GroupsDataService {
       body.message = message;
     }
 
-    const response = await fetch(`/api/groups/${groupId}/message`, {
+    const response = await fetch(`/api/send-message`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
