@@ -18,10 +18,13 @@ interface MassMessageModalProps {
   groupName?: string;
   associateCount?: number;
   messageText: string;
-  messageType: MessageType;
+  messageType?: MessageType;
   onMessageTextChange: (text: string) => void;
-  onMessageTypeChange: (type: MessageType) => void;
-  onSend: (templateData?: { contentSid: string; contentVariables?: Record<string, string> }) => void;
+  onMessageTypeChange?: (type: MessageType) => void;
+  onSend: (templateData?: {
+    contentSid: string;
+    contentVariables?: Record<string, string>;
+  }) => void;
   onCancel: () => void;
   sendLoading?: boolean;
   sendSuccess?: boolean;
@@ -32,7 +35,7 @@ export default function MassMessageModal({
   groupName,
   associateCount,
   messageText,
-  messageType,
+  messageType: externalMessageType,
   onMessageTextChange,
   onMessageTypeChange,
   onSend,
@@ -40,15 +43,36 @@ export default function MassMessageModal({
   sendLoading = false,
   sendSuccess = false,
 }: MassMessageModalProps) {
+  // Use internal state if messageType is not provided externally
+  const [internalMessageType, setInternalMessageType] =
+    useState<MessageType>("sms");
+  const messageType = externalMessageType ?? internalMessageType;
+
+  const handleMessageTypeChange = (type: MessageType) => {
+    if (onMessageTypeChange) {
+      onMessageTypeChange(type);
+    } else {
+      setInternalMessageType(type);
+    }
+  };
+
   const [templates, setTemplates] = useState<TwilioTemplate[]>([]);
-  const [selectedTemplate, setSelectedTemplate] = useState<TwilioTemplate | null>(null);
-  const [templateVariables, setTemplateVariables] = useState<Record<string, string>>({});
+  const [selectedTemplate, setSelectedTemplate] =
+    useState<TwilioTemplate | null>(null);
+  const [templateVariables, setTemplateVariables] = useState<
+    Record<string, string>
+  >({});
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [useTemplate, setUseTemplate] = useState(false);
 
   // Fetch templates when WhatsApp is selected
   useEffect(() => {
-    if (isOpen && messageType === "whatsapp" && templates.length === 0) {
+    if (
+      isOpen &&
+      messageType === "whatsapp" &&
+      templates.length === 0 &&
+      !loadingTemplates
+    ) {
       fetchTemplates();
     }
   }, [isOpen, messageType]);
@@ -62,6 +86,16 @@ export default function MassMessageModal({
     }
   }, [messageType]);
 
+  // Reset internal messageType when modal closes
+  useEffect(() => {
+    if (!isOpen && !externalMessageType) {
+      setInternalMessageType("sms");
+      setSelectedTemplate(null);
+      setTemplateVariables({});
+      setUseTemplate(false);
+    }
+  }, [isOpen, externalMessageType]);
+
   const fetchTemplates = async () => {
     setLoadingTemplates(true);
     try {
@@ -70,18 +104,23 @@ export default function MassMessageModal({
       if (response.ok) {
         const data = await response.json();
         console.log("📋 Template fetch response:", data);
-        
+
         if (data.success && data.templates) {
           // Filter to only approved templates
           const approvedTemplates = data.templates.filter(
             (t: TwilioTemplate) => t.status === "approved"
           );
-          
-          console.log(`📋 Found ${approvedTemplates.length} approved templates out of ${data.templates.length} total`);
-          
+
+          console.log(
+            `📋 Found ${approvedTemplates.length} approved templates out of ${data.templates.length} total`
+          );
+
           // If no approved templates, try including pending ones to help debug
           if (approvedTemplates.length === 0 && data.templates.length > 0) {
-            console.log("📋 No approved templates found. Including pending templates for debugging:", data.templates);
+            console.log(
+              "📋 No approved templates found. Including pending templates for debugging:",
+              data.templates
+            );
             // Show all templates for now so user can see what's available
             setTemplates(data.templates);
           } else {
@@ -172,7 +211,13 @@ export default function MassMessageModal({
           <div className="flex gap-3">
             <button
               type="button"
-              onClick={() => onMessageTypeChange("sms")}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (messageType !== "sms" && !sendLoading && !sendSuccess) {
+                  handleMessageTypeChange("sms");
+                }
+              }}
               disabled={sendLoading || sendSuccess}
               className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-all ${
                 messageType === "sms"
@@ -209,7 +254,17 @@ export default function MassMessageModal({
             </button>
             <button
               type="button"
-              onClick={() => onMessageTypeChange("whatsapp")}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (
+                  messageType !== "whatsapp" &&
+                  !sendLoading &&
+                  !sendSuccess
+                ) {
+                  handleMessageTypeChange("whatsapp");
+                }
+              }}
               disabled={sendLoading || sendSuccess}
               className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-all ${
                 messageType === "whatsapp"
@@ -251,11 +306,13 @@ export default function MassMessageModal({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               WhatsApp Template
             </label>
-            
+
             {loadingTemplates ? (
               <div className="flex items-center justify-center py-4">
                 <div className="w-6 h-6 rounded-full border-2 border-blue-600 border-t-transparent animate-spin" />
-                <span className="ml-2 text-sm text-gray-600">Loading templates...</span>
+                <span className="ml-2 text-sm text-gray-600">
+                  Loading templates...
+                </span>
               </div>
             ) : templates.length === 0 ? (
               <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md text-sm text-yellow-800">
@@ -274,7 +331,9 @@ export default function MassMessageModal({
                     <select
                       value={selectedTemplate?.sid || ""}
                       onChange={(e) => {
-                        const template = templates.find((t) => t.sid === e.target.value);
+                        const template = templates.find(
+                          (t) => t.sid === e.target.value
+                        );
                         if (template) {
                           handleTemplateSelect(template);
                         }
@@ -282,10 +341,15 @@ export default function MassMessageModal({
                       disabled={sendSuccess || sendLoading}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50"
                     >
-                      <option value="">Select a template (or use custom message below)...</option>
+                      <option value="">
+                        Select a template (or use custom message below)...
+                      </option>
                       {templates.map((template) => (
                         <option key={template.sid} value={template.sid}>
-                          {template.friendlyName} {template.status !== "approved" ? `(${template.status})` : ""}
+                          {template.friendlyName}{" "}
+                          {template.status !== "approved"
+                            ? `(${template.status})`
+                            : ""}
                         </option>
                       ))}
                     </select>
@@ -327,7 +391,10 @@ export default function MassMessageModal({
                               type="text"
                               value={templateVariables[varNum] || ""}
                               onChange={(e) =>
-                                handleTemplateVariableChange(varNum, e.target.value)
+                                handleTemplateVariableChange(
+                                  varNum,
+                                  e.target.value
+                                )
                               }
                               disabled={sendSuccess || sendLoading}
                               placeholder={`Variable ${varNum}`}
@@ -345,7 +412,8 @@ export default function MassMessageModal({
         )}
 
         {/* Message Input - Show for SMS or when not using template for WhatsApp */}
-        {(messageType === "sms" || (messageType === "whatsapp" && !useTemplate)) && (
+        {(messageType === "sms" ||
+          (messageType === "whatsapp" && !useTemplate)) && (
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Message
@@ -404,7 +472,11 @@ export default function MassMessageModal({
           </button>
           <button
             onClick={() => {
-              if (messageType === "whatsapp" && useTemplate && selectedTemplate) {
+              if (
+                messageType === "whatsapp" &&
+                useTemplate &&
+                selectedTemplate
+              ) {
                 // Send with template data
                 const vars: Record<string, string> = {};
                 selectedTemplate.variables.forEach((varNum) => {
@@ -414,7 +486,8 @@ export default function MassMessageModal({
                 });
                 onSend({
                   contentSid: selectedTemplate.sid,
-                  contentVariables: Object.keys(vars).length > 0 ? vars : undefined,
+                  contentVariables:
+                    Object.keys(vars).length > 0 ? vars : undefined,
                 });
               } else {
                 // Send without template (regular message)
@@ -427,8 +500,8 @@ export default function MassMessageModal({
               (messageType === "whatsapp" && useTemplate
                 ? !selectedTemplate ||
                   (selectedTemplate.variables.length > 0 &&
-                    !selectedTemplate.variables.every(
-                      (v) => templateVariables[v]?.trim()
+                    !selectedTemplate.variables.every((v) =>
+                      templateVariables[v]?.trim()
                     ))
                 : !messageText.trim())
             }

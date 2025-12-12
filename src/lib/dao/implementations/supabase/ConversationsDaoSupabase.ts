@@ -1,5 +1,5 @@
 // Conversations DAO implementation for Supabase
-import { createAdminClient } from "../../../supabase/admin";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { IConversations, Conversation } from "../../interfaces/IConversations";
 
 export class ConversationsDaoSupabase implements IConversations {

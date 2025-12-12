@@ -1,6 +1,6 @@
 import { Associate } from "@/model/interfaces/Associate";
 import { createClient } from "../../../supabase/server";
-import { createAdminClient } from "../../../supabase/admin";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   formatPhoneToE164,
   normalizePhoneForLookup,

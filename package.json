@@ -12,7 +12,8 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:ci": "jest --coverage --watchAll=false",
-    "types:generate": "npx supabase gen types typescript --project-id tjotqmnwxapflhdaxtrh > src/lib/database.types.ts"
+    "types:generate": "supabase gen types typescript --linked > src/lib/database.types.ts",
+    "types:generate:remote": "supabase gen types typescript --project-id tjotqmnwxapflhdaxtrh > src/lib/database.types.ts"
   },
   "dependencies": {
     "@aws-sdk/client-scheduler": "^3.700.0",
@@ -53,6 +54,7 @@
     "tailwindcss": "^4",
     "ts-jest": "^29.4.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5"
+    "typescript": "^5",
+    "supabase": "^2.0.0"
   }
 }

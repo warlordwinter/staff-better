@@ -13,7 +13,7 @@ export class AssociateRepositorySupabase implements IAssociateRepository {
 
   async getAssociateCompanyId(associateId: string): Promise<string | null> {
     // Use admin client to get company_id
-    const { createAdminClient } = await import("../../../supabase/admin");
+    const { createAdminClient } = await import("../../supabase/admin");
     const supabaseAdmin = createAdminClient();
     const { data } = await supabaseAdmin
       .from("associates")

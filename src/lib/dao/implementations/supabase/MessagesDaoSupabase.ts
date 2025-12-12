@@ -1,6 +1,10 @@
 // Messages DAO implementation for Supabase
-import { createAdminClient } from "../../../supabase/admin";
-import { IMessages, Message, CreateMessageData } from "../../interfaces/IMessages";
+import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  IMessages,
+  Message,
+  CreateMessageData,
+} from "../../interfaces/IMessages";
 
 export class MessagesDaoSupabase implements IMessages {
   /**
@@ -15,8 +19,12 @@ export class MessagesDaoSupabase implements IMessages {
       body: messageData.body,
       direction: messageData.direction,
       status: messageData.status,
-      twilio_sid: messageData.twilio_sid,
     };
+
+    // Only include twilio_sid if provided (handles case where column might not exist yet)
+    if (messageData.twilio_sid) {
+      insertData.twilio_sid = messageData.twilio_sid;
+    }
 
     if (messageData.sent_at) {
       insertData.sent_at = messageData.sent_at;
@@ -30,7 +38,33 @@ export class MessagesDaoSupabase implements IMessages {
 
     if (error) {
       console.error("Error creating message:", error);
-      throw new Error("Failed to create message");
+
+      // If twilio_sid column is missing, try again without it
+      if (error.code === "PGRST204" && error.message?.includes("twilio_sid")) {
+        console.warn(
+          "twilio_sid column not found, retrying insert without it. " +
+            "Run migration: supabase/migrations/002_add_twilio_sid_to_messages.sql"
+        );
+
+        // Remove twilio_sid and try again
+        const { twilio_sid, ...insertDataWithoutSid } = insertData;
+        const retryResult = await supabaseAdmin
+          .from("messages")
+          .insert([insertDataWithoutSid])
+          .select()
+          .single();
+
+        if (retryResult.error) {
+          console.error("Error creating message (retry):", retryResult.error);
+          throw new Error(
+            `Failed to create message: ${retryResult.error.message}`
+          );
+        }
+
+        return retryResult.data;
+      }
+
+      throw new Error(`Failed to create message: ${error.message}`);
     }
 
     return data;
@@ -85,4 +119,3 @@ export class MessagesDaoSupabase implements IMessages {
     return data || [];
   }
 }
-
