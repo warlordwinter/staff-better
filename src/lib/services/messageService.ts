@@ -146,9 +146,19 @@ export class MessageService {
         companyId
       );
 
-      const messageBody = isWhatsAppTemplate && templateData
-        ? `[Template: ${templateData.contentSid}]`
-        : message.trim();
+      // Build message body - include template variables if provided
+      let messageBody: string;
+      if (isWhatsAppTemplate && templateData) {
+        const templatePart = `[Template: ${templateData.contentSid}]`;
+        if (templateData.contentVariables && Object.keys(templateData.contentVariables).length > 0) {
+          const variablesJson = JSON.stringify(templateData.contentVariables);
+          messageBody = `${templatePart}[Variables: ${variablesJson}]`;
+        } else {
+          messageBody = templatePart;
+        }
+      } else {
+        messageBody = message.trim();
+      }
 
       await this.messagesDao.createMessage({
         conversation_id: conversationId,
@@ -316,9 +326,19 @@ export class MessageService {
                 companyId
               );
 
-            const messageBody = isWhatsAppTemplate && templateData
-              ? `[Template: ${templateData.contentSid}]`
-              : message.trim();
+            // Build message body - include template variables if provided
+            let messageBody: string;
+            if (isWhatsAppTemplate && templateData) {
+              const templatePart = `[Template: ${templateData.contentSid}]`;
+              if (templateData.contentVariables && Object.keys(templateData.contentVariables).length > 0) {
+                const variablesJson = JSON.stringify(templateData.contentVariables);
+                messageBody = `${templatePart}[Variables: ${variablesJson}]`;
+              } else {
+                messageBody = templatePart;
+              }
+            } else {
+              messageBody = message.trim();
+            }
 
             await this.messagesDao.createMessage({
               conversation_id: conversationId,
@@ -448,9 +468,19 @@ export class MessageService {
 
     // Save to database
     try {
-      const messageBody = isWhatsAppTemplate && templateData
-        ? `[Template: ${templateData.contentSid}]`
-        : message.trim();
+      // Build message body - include template variables if provided
+      let messageBody: string;
+      if (isWhatsAppTemplate && templateData) {
+        const templatePart = `[Template: ${templateData.contentSid}]`;
+        if (templateData.contentVariables && Object.keys(templateData.contentVariables).length > 0) {
+          const variablesJson = JSON.stringify(templateData.contentVariables);
+          messageBody = `${templatePart}[Variables: ${variablesJson}]`;
+        } else {
+          messageBody = templatePart;
+        }
+      } else {
+        messageBody = message.trim();
+      }
 
       await this.messagesDao.createMessage({
         conversation_id: conversationId,

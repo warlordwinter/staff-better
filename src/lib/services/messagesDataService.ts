@@ -24,6 +24,9 @@ export interface Message {
   sender: "incoming" | "outgoing";
   timestamp: string;
   channel?: "sms" | "whatsapp"; // Channel type for this message
+  templateName?: string; // Template friendly name if this is a template message
+  templateContent?: string; // Template content if this is a template message
+  templateSid?: string; // Template SID if this is a template message
 }
 
 interface SendMessageResponse {
@@ -99,9 +102,18 @@ export class MessagesDataService {
             ? "whatsapp"
             : "sms";
 
-        // Clean up template indicators from display text
-        const displayText =
-          body.replace(/\[Template: [^\]]+\]\s*/g, "").trim() || body;
+        // Handle template messages - use template name/content if available
+        const isTemplateMessage = !!msg.template_sid || body.includes("[Template:");
+        let displayText: string;
+        
+        if (isTemplateMessage && msg.template_name) {
+          // Show template content if available, otherwise show template name
+          // The template name will be shown separately in the UI header
+          displayText = msg.template_content || msg.template_name;
+        } else {
+          // Clean up template indicators from display text for regular messages
+          displayText = body.replace(/\[Template: [^\]]+\]\s*/g, "").trim() || body;
+        }
 
         return {
           id: msg.id,
@@ -109,6 +121,9 @@ export class MessagesDataService {
           sender: msg.direction === "inbound" ? "incoming" : "outgoing",
           timestamp,
           channel: messageChannel,
+          templateName: msg.template_name,
+          templateContent: msg.template_content,
+          templateSid: msg.template_sid,
         };
       });
 
@@ -127,6 +142,16 @@ export class MessagesDataService {
       // Get last message info
       const lastMessage =
         messages.length > 0 ? messages[messages.length - 1] : null;
+      
+      // Format last message preview - show template name if it's a template
+      let lastMessagePreview = "";
+      if (lastMessage) {
+        if (lastMessage.templateName) {
+          lastMessagePreview = lastMessage.templateName;
+        } else {
+          lastMessagePreview = lastMessage.text || "";
+        }
+      }
 
       return {
         id: conv.conversation_id,
@@ -134,7 +159,7 @@ export class MessagesDataService {
         name,
         initials: getInitials(firstName, lastName),
         phoneNumber: conv.phone_number,
-        lastMessage: lastMessage?.text || "",
+        lastMessage: lastMessagePreview,
         timestamp: lastMessage?.timestamp || "",
         unread: false, // TODO: implement unread tracking
         messages,

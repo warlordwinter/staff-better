@@ -207,8 +207,88 @@ export function useMessages(
               ? "whatsapp"
               : "sms";
 
-          // Clean up template indicators from display text
-          const displayText = body.replace(/\[Template: [^\]]+\]\s*/g, "").trim() || body;
+          // Extract template SID if this is a template message
+          const templateSidMatch = body.match(/\[Template:\s*([^\]]+)\]/);
+          const templateSid = templateSidMatch ? templateSidMatch[1].trim() : null;
+
+          // Extract template variables if present
+          const variablesMatch = body.match(/\[Variables:\s*({[^}]+})\]/);
+          let templateVariables: Record<string, string> | null = null;
+          if (variablesMatch) {
+            try {
+              templateVariables = JSON.parse(variablesMatch[1]);
+            } catch (error) {
+              console.error("Failed to parse template variables:", error);
+            }
+          }
+
+          // Helper function to substitute variables in template content
+          const substituteVariables = (content: string, vars: Record<string, string> | null): string => {
+            if (!vars || Object.keys(vars).length === 0) return content;
+            let substituted = content;
+            const sortedKeys = Object.keys(vars).sort((a, b) => parseInt(a) - parseInt(b));
+            for (const key of sortedKeys) {
+              const placeholder = `{{${key}}}`;
+              const value = vars[key];
+              substituted = substituted.replace(new RegExp(placeholder.replace(/[{}]/g, '\\$&'), 'g'), value);
+            }
+            return substituted;
+          };
+
+          // Handle template messages - fetch template details asynchronously
+          let displayText: string = body.replace(/\[Template: [^\]]+\]\s*/g, "").replace(/\[Variables: [^\]]+\]\s*/g, "").trim() || body;
+          let templateName: string | undefined;
+          let templateContent: string | undefined;
+
+          // If this is a template message, fetch template details
+          if (templateSid) {
+            // Fetch template details asynchronously
+            fetch(`/api/templates/${templateSid}`)
+              .then((res) => res.json())
+              .then((templateData) => {
+                if (templateData.friendlyName) {
+                  // Substitute variables in template content if available
+                  let finalContent = templateData.content || "";
+                  if (finalContent && templateVariables) {
+                    finalContent = substituteVariables(finalContent, templateVariables);
+                  }
+                  
+                  // Update the message with template details
+                  setConversations((prev) => {
+                    return prev.map((conv) => {
+                      if (conv.id === newMessage.conversation_id) {
+                        return {
+                          ...conv,
+                          messages: conv.messages.map((msg) => {
+                            if (msg.id === newMessage.id) {
+                              // Show template content with substituted variables if available, otherwise show template name
+                              // The template name will be shown separately in the UI header
+                              const templateDisplayText = finalContent || templateData.friendlyName;
+                              return {
+                                ...msg,
+                                text: templateDisplayText,
+                                templateName: templateData.friendlyName,
+                                templateContent: finalContent,
+                                templateSid: templateSid,
+                              };
+                            }
+                            return msg;
+                          }),
+                        };
+                      }
+                      return conv;
+                    });
+                  });
+                }
+              })
+              .catch((error) => {
+                console.error("Failed to fetch template details:", error);
+                // Keep the original display text if fetch fails
+              });
+            
+            // Show placeholder while fetching
+            displayText = `[Template: ${templateSid}]`;
+          }
 
           const uiMessage: Message = {
             id: newMessage.id,
@@ -217,6 +297,9 @@ export function useMessages(
               newMessage.direction === "inbound" ? "incoming" : "outgoing",
             timestamp: formattedTimestamp,
             channel: messageChannel,
+            templateSid: templateSid || undefined,
+            templateName,
+            templateContent,
           };
 
           // Add message to conversation
