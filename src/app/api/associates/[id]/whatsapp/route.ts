@@ -161,19 +161,20 @@ export async function POST(
           await import("@/lib/supabase/admin")
         ).createAdminClient();
 
-        // Find or create conversation
+        // Find or create conversation for WhatsApp channel
         const { data: existingConversations } = await supabaseAdmin
           .from("conversations")
           .select("id")
           .eq("associate_id", associateId)
           .eq("company_id", companyId)
+          .eq("channel", "whatsapp")
           .limit(1);
 
         let conversationId: string | undefined;
         if (existingConversations && existingConversations.length > 0) {
           conversationId = existingConversations[0].id;
         } else {
-          // Create new conversation
+          // Create new conversation for WhatsApp
           const { data: newConversation, error: createError } =
             await supabaseAdmin
               .from("conversations")
@@ -181,6 +182,7 @@ export async function POST(
                 {
                   associate_id: associateId,
                   company_id: companyId,
+                  channel: "whatsapp",
                 },
               ])
               .select()

@@ -71,6 +71,13 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Detect channel: WhatsApp messages have "whatsapp:" prefix in From or To
+    const isWhatsApp =
+      From.toLowerCase().startsWith("whatsapp:") ||
+      To.toLowerCase().startsWith("whatsapp:");
+    const channel: "sms" | "whatsapp" = isWhatsApp ? "whatsapp" : "sms";
+    console.log(`📱 Detected channel: ${channel} (From: ${From}, To: ${To})`);
+
     const supabaseAdmin = createAdminClient();
 
     // Normalize phone number for lookup
@@ -80,13 +87,13 @@ export async function POST(request: NextRequest) {
     );
 
     // Try normalized phone number first
-    // Use .limit(1) instead of .single() to handle duplicate phone numbers
+    // Use .limit(10) to get all potential matches, then filter
     const { data: associates, error: initialAssociateError } =
       await supabaseAdmin
         .from("associates")
         .select("id, company_id, phone_number")
         .eq("phone_number", normalizedFrom)
-        .limit(2); // Get up to 2 to detect duplicates
+        .limit(10); // Get all potential matches
 
     let associateError = initialAssociateError;
     let associate = null;
@@ -97,15 +104,31 @@ export async function POST(request: NextRequest) {
     } else if (associates && associates.length > 0) {
       if (associates.length > 1) {
         console.warn(
-          `⚠️ WARNING: Found ${associates.length} associates with phone number ${normalizedFrom}. Using the first one.`
+          `⚠️ WARNING: Found ${associates.length} associates with phone number ${normalizedFrom}.`
         );
         console.warn(
           "⚠️ Duplicate associates:",
           associates.map((a) => ({ id: a.id, company_id: a.company_id }))
         );
       }
-      // Take the first associate
-      associate = associates[0];
+
+      // Prefer associates with a company_id when there are multiple matches
+      const associatesWithCompany = associates.filter((a) => a.company_id);
+      if (associatesWithCompany.length > 0) {
+        // Use the first associate with a company_id
+        associate = associatesWithCompany[0];
+        if (associates.length > 1) {
+          console.log(
+            `✅ Selected associate with company_id from ${associates.length} matches`
+          );
+        }
+      } else {
+        // If no associates have a company_id, use the first one (will fail later with better error)
+        associate = associates[0];
+        console.warn(
+          `⚠️ All ${associates.length} associates have null company_id. This will prevent saving the message.`
+        );
+      }
     }
 
     // If no match and numbers are different, try original format
@@ -115,22 +138,37 @@ export async function POST(request: NextRequest) {
         .from("associates")
         .select("id, company_id, phone_number")
         .eq("phone_number", From)
-        .limit(2);
+        .limit(10);
 
       if (result.error) {
         associateError = result.error;
       } else if (result.data && result.data.length > 0) {
         if (result.data.length > 1) {
           console.warn(
-            `⚠️ WARNING: Found ${result.data.length} associates with phone number ${From}. Using the first one.`
+            `⚠️ WARNING: Found ${result.data.length} associates with phone number ${From}.`
           );
         }
-        associate = result.data[0];
+
+        // Prefer associates with a company_id when there are multiple matches
+        const associatesWithCompany = result.data.filter((a) => a.company_id);
+        if (associatesWithCompany.length > 0) {
+          associate = associatesWithCompany[0];
+          if (result.data.length > 1) {
+            console.log(
+              `✅ Selected associate with company_id from ${result.data.length} matches`
+            );
+          }
+        } else {
+          associate = result.data[0];
+          console.warn(
+            `⚠️ All ${result.data.length} associates have null company_id. This will prevent saving the message.`
+          );
+        }
         associateError = null;
       }
     }
 
-    if (associateError || !associate || !associate.company_id) {
+    if (associateError || !associate) {
       console.error(
         "❌ Error finding associate for conversation:",
         associateError
@@ -141,6 +179,29 @@ export async function POST(request: NextRequest) {
         "(also tried original:",
         From,
         ")"
+      );
+      // Still return valid TwiML to avoid Twilio retries
+      const response = new twiml.MessagingResponse();
+      return new NextResponse(response.toString(), {
+        status: 200,
+        headers: { "Content-Type": "text/xml" },
+      });
+    }
+
+    if (!associate.company_id) {
+      console.error(
+        "❌ Associate found but has no company_id - cannot save message"
+      );
+      console.error(
+        "❌ Associate ID:",
+        associate.id,
+        "Phone:",
+        normalizedFrom,
+        "| Original:",
+        From
+      );
+      console.error(
+        "💡 SOLUTION: Update the associate's company_id in the database. The associate needs to be assigned to a company."
       );
       // Still return valid TwiML to avoid Twilio retries
       const response = new twiml.MessagingResponse();
@@ -186,28 +247,96 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Find or create conversation using associate_id and company_id
+    // Find or create conversation using associate_id, company_id, and channel
+    // This ensures SMS and WhatsApp conversations are kept separate
     console.log(
-      `🔍 Looking for conversation: associate_id=${associate.id}, company_id=${associate.company_id}`
+      `🔍 Looking for conversation: associate_id=${associate.id}, company_id=${associate.company_id}, channel=${channel}`
     );
-    const { data: conversations, error: conversationError } =
-      await supabaseAdmin
-        .from("conversations")
-        .select("*")
-        .eq("associate_id", associate.id)
-        .eq("company_id", associate.company_id)
-        .limit(1);
 
-    let conversation_id: string;
+    // First, try to find conversation with exact channel match
+    let { data: conversations, error: conversationError } = await supabaseAdmin
+      .from("conversations")
+      .select("*")
+      .eq("associate_id", associate.id)
+      .eq("company_id", associate.company_id)
+      .eq("channel", channel)
+      .limit(1);
+
+    let conversation_id: string | undefined;
+
+    // If no conversation found with exact channel match, check for NULL channel (legacy conversations)
+    // This handles conversations created before the migration
+    if (!conversationError && (!conversations || conversations.length === 0)) {
+      console.log(
+        `⚠️ No conversation found with channel=${channel}, checking for legacy conversations (NULL channel)...`
+      );
+      const { data: legacyConversations, error: legacyError } =
+        await supabaseAdmin
+          .from("conversations")
+          .select("*")
+          .eq("associate_id", associate.id)
+          .eq("company_id", associate.company_id)
+          .is("channel", null)
+          .order("updated_at", { ascending: false, nullsFirst: false })
+          .order("created_at", { ascending: false, nullsFirst: false });
+
+      if (
+        !legacyError &&
+        legacyConversations &&
+        legacyConversations.length > 0
+      ) {
+        // If there's exactly one legacy conversation, we can safely update it
+        // If there are multiple, we should create a new one to avoid misclassifying
+        if (legacyConversations.length === 1) {
+          const legacyConversation = legacyConversations[0];
+          console.log(
+            `🔄 Found single legacy conversation (NULL channel), updating to channel=${channel}...`
+          );
+          const { data: updatedConversation, error: updateError } =
+            await supabaseAdmin
+              .from("conversations")
+              .update({ channel: channel })
+              .eq("id", legacyConversation.id)
+              .select()
+              .single();
+
+          if (updateError || !updatedConversation) {
+            console.error(
+              "❌ Error updating legacy conversation:",
+              updateError
+            );
+            // Fall through to create new conversation
+          } else {
+            conversation_id = updatedConversation.id;
+            console.log(
+              `✅ Updated legacy conversation to channel=${channel}:`,
+              conversation_id
+            );
+          }
+        } else {
+          // Multiple legacy conversations - create a new one to avoid misclassifying
+          console.warn(
+            `⚠️ Found ${legacyConversations.length} legacy conversations with NULL channel. Creating a new conversation for channel=${channel} to avoid misclassification.`
+          );
+          // Will fall through to create new conversation
+        }
+      }
+    }
 
     if (conversationError) {
       console.error("❌ Error fetching conversations:", conversationError);
       // Create new conversation if fetch failed
-      console.log("📝 Creating new conversation (fetch failed)...");
+      console.log(
+        `📝 Creating new conversation (fetch failed) for channel: ${channel}...`
+      );
       const { data: newConversation, error: createError } = await supabaseAdmin
         .from("conversations")
         .insert([
-          { associate_id: associate.id, company_id: associate.company_id },
+          {
+            associate_id: associate.id,
+            company_id: associate.company_id,
+            channel: channel,
+          },
         ])
         .select()
         .single();
@@ -225,16 +354,22 @@ export async function POST(request: NextRequest) {
       conversation_id = newConversation.id;
       console.log("✅ Created new conversation:", conversation_id);
     } else if (conversations && conversations.length > 0) {
-      // Conversation exists
+      // Conversation exists with exact channel match
       conversation_id = conversations[0].id;
       console.log("✅ Found existing conversation:", conversation_id);
-    } else {
-      // No conversation found, create a new one
-      console.log("📝 Creating new conversation (none found)...");
+    } else if (!conversation_id) {
+      // No conversation found (neither exact match nor legacy), create a new one
+      console.log(
+        `📝 Creating new conversation (none found) for channel: ${channel}...`
+      );
       const { data: newConversation, error: createError } = await supabaseAdmin
         .from("conversations")
         .insert([
-          { associate_id: associate.id, company_id: associate.company_id },
+          {
+            associate_id: associate.id,
+            company_id: associate.company_id,
+            channel: channel,
+          },
         ])
         .select()
         .single();

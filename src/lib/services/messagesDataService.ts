@@ -127,17 +127,23 @@ export class MessagesDataService {
         };
       });
 
-      // Determine conversation channel (use most common channel from messages, or default to SMS)
-      const channelCounts = messages.reduce((acc, msg) => {
-        const ch = msg.channel || "sms";
-        acc[ch] = (acc[ch] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
+      // Use the channel from the conversation (set by the API based on the conversation's channel field)
+      // Fall back to determining from messages if channel is not provided (for backwards compatibility)
+      let conversationChannel: "sms" | "whatsapp" = conv.channel || "sms";
+      
+      // If channel is not provided in API response, determine from messages (legacy behavior)
+      if (!conv.channel) {
+        const channelCounts = messages.reduce((acc, msg) => {
+          const ch = msg.channel || "sms";
+          acc[ch] = (acc[ch] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
 
-      const conversationChannel: "sms" | "whatsapp" =
-        (channelCounts.whatsapp || 0) > (channelCounts.sms || 0)
-          ? "whatsapp"
-          : "sms";
+        conversationChannel =
+          (channelCounts.whatsapp || 0) > (channelCounts.sms || 0)
+            ? "whatsapp"
+            : "sms";
+      }
 
       // Get last message info
       const lastMessage =

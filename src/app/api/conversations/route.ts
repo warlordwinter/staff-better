@@ -17,14 +17,18 @@ function extractTemplateSid(body: string | null): string | null {
  * Extract template variables from message body
  * Format: [Variables: {"1":"value1","2":"value2"}]
  */
-function extractTemplateVariables(body: string | null): Record<string, string> | null {
+function extractTemplateVariables(
+  body: string | null
+): Record<string, string> | null {
   if (!body) return null;
   const match = body.match(/\[Variables:\s*({[^}]+})\]/);
   if (!match) return null;
-  
+
   try {
     const variables = JSON.parse(match[1]);
-    return typeof variables === 'object' && variables !== null ? variables : null;
+    return typeof variables === "object" && variables !== null
+      ? variables
+      : null;
   } catch (error) {
     console.error("Failed to parse template variables:", error);
     return null;
@@ -41,17 +45,22 @@ function substituteTemplateVariables(
 ): string | null {
   if (!content) return null;
   if (!variables || Object.keys(variables).length === 0) return content;
-  
+
   let substituted = content;
   // Replace variables in order (1, 2, 3, ...)
-  const sortedKeys = Object.keys(variables).sort((a, b) => parseInt(a) - parseInt(b));
-  
+  const sortedKeys = Object.keys(variables).sort(
+    (a, b) => parseInt(a) - parseInt(b)
+  );
+
   for (const key of sortedKeys) {
     const placeholder = `{{${key}}}`;
     const value = variables[key];
-    substituted = substituted.replace(new RegExp(placeholder.replace(/[{}]/g, '\\$&'), 'g'), value);
+    substituted = substituted.replace(
+      new RegExp(placeholder.replace(/[{}]/g, "\\$&"), "g"),
+      value
+    );
   }
-  
+
   return substituted;
 }
 
@@ -69,7 +78,7 @@ export async function GET() {
     // Fetch conversations for this company
     const { data: conversations, error: conversationsError } = await supabase
       .from("conversations")
-      .select("id, associate_id, created_at, updated_at")
+      .select("id, associate_id, channel, created_at, updated_at")
       .eq("company_id", companyId)
       .order("updated_at", { ascending: false, nullsFirst: false });
 
@@ -142,7 +151,10 @@ export async function GET() {
     }
 
     // Fetch template details for all unique template SIDs
-    const templateCache = new Map<string, { friendlyName: string; content: string | null }>();
+    const templateCache = new Map<
+      string,
+      { friendlyName: string; content: string | null }
+    >();
     if (templateSids.size > 0) {
       const templatePromises = Array.from(templateSids).map(async (sid) => {
         try {
@@ -188,15 +200,22 @@ export async function GET() {
               associate.last_name || ""
             }`.trim() || "Unknown",
           phone_number: associate.phone_number,
+          channel: conv.channel || "sms", // Use conversation's channel field, default to SMS
           messages: conversationMessages.map((msg) => {
             const templateSid = extractTemplateSid(msg.body);
             const templateVariables = extractTemplateVariables(msg.body);
-            const templateInfo = templateSid ? templateCache.get(templateSid) : null;
-            
+            const templateInfo = templateSid
+              ? templateCache.get(templateSid)
+              : null;
+
             // Substitute variables in template content if available
             let templateContent = templateInfo?.content || undefined;
             if (templateContent && templateVariables) {
-              templateContent = substituteTemplateVariables(templateContent, templateVariables) || undefined;
+              templateContent =
+                substituteTemplateVariables(
+                  templateContent,
+                  templateVariables
+                ) || undefined;
             }
 
             return {

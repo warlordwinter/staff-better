@@ -6,20 +6,23 @@ export class ConversationsDaoSupabase implements IConversations {
   /**
    * Find or create a conversation for an associate and company
    * Returns the conversation ID
+   * @param channel - Optional channel type ('sms' or 'whatsapp'). Defaults to 'sms' if not provided.
    */
   async findOrCreateConversation(
     associateId: string,
-    companyId: string
+    companyId: string,
+    channel: "sms" | "whatsapp" = "sms"
   ): Promise<string> {
     const supabaseAdmin = createAdminClient();
 
-    // Try to find existing conversation
+    // Try to find existing conversation with matching channel
     const { data: existingConversations, error: findError } =
       await supabaseAdmin
         .from("conversations")
         .select("id")
         .eq("associate_id", associateId)
         .eq("company_id", companyId)
+        .eq("channel", channel)
         .limit(1);
 
     if (findError) {
@@ -32,13 +35,14 @@ export class ConversationsDaoSupabase implements IConversations {
       return existingConversations[0].id;
     }
 
-    // Create new conversation
+    // Create new conversation with channel
     const { data: newConversation, error: createError } = await supabaseAdmin
       .from("conversations")
       .insert([
         {
           associate_id: associateId,
           company_id: companyId,
+          channel: channel,
         },
       ])
       .select()

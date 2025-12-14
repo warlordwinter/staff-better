@@ -4,7 +4,7 @@ import { createTemplate, submitTemplateForApproval } from "@/lib/twilio/template
 import { createClient } from "@/lib/supabase/server";
 
 /**
- * POST /api/templates/[id]/submit
+ * POST /api/templates/submit/[id]
  * Submit a template for WhatsApp approval
  */
 export async function POST(

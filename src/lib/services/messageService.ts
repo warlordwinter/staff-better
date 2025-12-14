@@ -5,7 +5,11 @@ import { IAssociates } from "../dao/interfaces/IAssociates";
 import { IGroups } from "../dao/interfaces/IGroups";
 import { IConversations } from "../dao/interfaces/IConversations";
 import { IMessages } from "../dao/interfaces/IMessages";
-import { SMSResult, WhatsAppResult, WhatsAppTemplateMessage } from "../twilio/types";
+import {
+  SMSResult,
+  WhatsAppResult,
+  WhatsAppTemplateMessage,
+} from "../twilio/types";
 import { sendSMSOptOutIfNeeded } from "../utils/optOutUtils";
 
 export interface SendMessageResult {
@@ -141,16 +145,21 @@ export class MessageService {
 
     // Find or create conversation and save message
     try {
-      const conversationId = await this.conversationsDao.findOrCreateConversation(
-        associateId,
-        companyId
-      );
+      const conversationId =
+        await this.conversationsDao.findOrCreateConversation(
+          associateId,
+          companyId,
+          channel
+        );
 
       // Build message body - include template variables if provided
       let messageBody: string;
       if (isWhatsAppTemplate && templateData) {
         const templatePart = `[Template: ${templateData.contentSid}]`;
-        if (templateData.contentVariables && Object.keys(templateData.contentVariables).length > 0) {
+        if (
+          templateData.contentVariables &&
+          Object.keys(templateData.contentVariables).length > 0
+        ) {
           const variablesJson = JSON.stringify(templateData.contentVariables);
           messageBody = `${templatePart}[Variables: ${variablesJson}]`;
         } else {
@@ -166,7 +175,8 @@ export class MessageService {
         body: messageBody,
         direction: "outbound",
         status: result.success && "messageId" in result ? "queued" : null,
-        twilio_sid: result.success && "messageId" in result ? result.messageId : null,
+        twilio_sid:
+          result.success && "messageId" in result ? result.messageId : null,
         sent_at: new Date().toISOString(),
       });
     } catch (dbError) {
@@ -176,7 +186,8 @@ export class MessageService {
 
     return {
       success: true,
-      messageId: result.success && "messageId" in result ? result.messageId : undefined,
+      messageId:
+        result.success && "messageId" in result ? result.messageId : undefined,
     };
   }
 
@@ -227,15 +238,20 @@ export class MessageService {
         messages_failed: 0,
         unsubscribed_members: unsubscribedMembers.map((m) => ({
           id: m.id,
-          first_name: m.first_name,
-          last_name: m.last_name,
+          first_name: m.first_name || "",
+          last_name: m.last_name || "",
         })),
       };
     }
 
     // Send messages to each eligible member
-    const results: Array<{ member_id: string; phone: string; success: boolean }> = [];
-    const errors: Array<{ member_id: string; phone: string; error: string }> = [];
+    const results: Array<{
+      member_id: string;
+      phone: string;
+      success: boolean;
+    }> = [];
+    const errors: Array<{ member_id: string; phone: string; error: string }> =
+      [];
     const twilioUnsubscribedMembers: Array<{
       id: string;
       first_name: string;
@@ -290,8 +306,8 @@ export class MessageService {
           if (errorCode === "21610") {
             twilioUnsubscribedMembers.push({
               id: member.id,
-              first_name: member.first_name,
-              last_name: member.last_name,
+              first_name: member.first_name || "",
+              last_name: member.last_name || "",
             });
           }
 
@@ -323,15 +339,21 @@ export class MessageService {
             const conversationId =
               await this.conversationsDao.findOrCreateConversation(
                 member.id,
-                companyId
+                companyId,
+                channel
               );
 
             // Build message body - include template variables if provided
             let messageBody: string;
             if (isWhatsAppTemplate && templateData) {
               const templatePart = `[Template: ${templateData.contentSid}]`;
-              if (templateData.contentVariables && Object.keys(templateData.contentVariables).length > 0) {
-                const variablesJson = JSON.stringify(templateData.contentVariables);
+              if (
+                templateData.contentVariables &&
+                Object.keys(templateData.contentVariables).length > 0
+              ) {
+                const variablesJson = JSON.stringify(
+                  templateData.contentVariables
+                );
                 messageBody = `${templatePart}[Variables: ${variablesJson}]`;
               } else {
                 messageBody = templatePart;
@@ -346,7 +368,10 @@ export class MessageService {
               body: messageBody,
               direction: "outbound",
               status: result.success && "messageId" in result ? "queued" : null,
-              twilio_sid: result.success && "messageId" in result ? result.messageId : null,
+              twilio_sid:
+                result.success && "messageId" in result
+                  ? result.messageId
+                  : null,
               sent_at: new Date().toISOString(),
             });
           } catch (dbError) {
@@ -360,7 +385,10 @@ export class MessageService {
         // Small delay between messages to avoid rate limiting
         await new Promise((resolve) => setTimeout(resolve, 100));
       } catch (error) {
-        console.error(`Error sending message to ${member.phone_number}:`, error);
+        console.error(
+          `Error sending message to ${member.phone_number}:`,
+          error
+        );
         errors.push({
           member_id: member.id,
           phone: member.phone_number,
@@ -380,8 +408,8 @@ export class MessageService {
     unsubscribedMembers.forEach((m) => {
       unsubscribedMap.set(m.id, {
         id: m.id,
-        first_name: m.first_name,
-        last_name: m.last_name,
+        first_name: m.first_name || "",
+        last_name: m.last_name || "",
       });
     });
 
@@ -472,7 +500,10 @@ export class MessageService {
       let messageBody: string;
       if (isWhatsAppTemplate && templateData) {
         const templatePart = `[Template: ${templateData.contentSid}]`;
-        if (templateData.contentVariables && Object.keys(templateData.contentVariables).length > 0) {
+        if (
+          templateData.contentVariables &&
+          Object.keys(templateData.contentVariables).length > 0
+        ) {
           const variablesJson = JSON.stringify(templateData.contentVariables);
           messageBody = `${templatePart}[Variables: ${variablesJson}]`;
         } else {
@@ -488,7 +519,8 @@ export class MessageService {
         body: messageBody,
         direction: "outbound",
         status: result.success && "messageId" in result ? "queued" : null,
-        twilio_sid: result.success && "messageId" in result ? result.messageId : null,
+        twilio_sid:
+          result.success && "messageId" in result ? result.messageId : null,
         sent_at: new Date().toISOString(),
       });
     } catch (dbError) {
@@ -498,8 +530,8 @@ export class MessageService {
 
     return {
       success: true,
-      messageId: result.success && "messageId" in result ? result.messageId : undefined,
+      messageId:
+        result.success && "messageId" in result ? result.messageId : undefined,
     };
   }
 }
-

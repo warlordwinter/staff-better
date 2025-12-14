@@ -233,6 +233,7 @@ export type Database = {
         Row: {
           associate_id: string
           company_id: string
+          channel: "sms" | "whatsapp" | null
           created_at: string | null
           id: string
           updated_at: string | null
@@ -240,6 +241,7 @@ export type Database = {
         Insert: {
           associate_id: string
           company_id: string
+          channel?: "sms" | "whatsapp" | null
           created_at?: string | null
           id?: string
           updated_at?: string | null
@@ -247,6 +249,7 @@ export type Database = {
         Update: {
           associate_id?: string
           company_id?: string
+          channel?: "sms" | "whatsapp" | null
           created_at?: string | null
           id?: string
           updated_at?: string | null
