@@ -8,6 +8,7 @@ import MessageList from "@/components/ui/messageList";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useAuthCheck } from "@/hooks/useAuthCheck";
 import { useMessages } from "@/hooks/useMessages";
+import ComposeMessageModal from "@/components/messages/ComposeMessageModal";
 
 type ChannelFilter = "all" | "sms" | "whatsapp";
 
@@ -30,6 +31,9 @@ export default function MessagesPage() {
 
   const [channelFilter, setChannelFilter] = useState<ChannelFilter>("all");
   const { showToast } = useToast();
+  const [showComposeModal, setShowComposeModal] = useState(false);
+  const [composeSendLoading, setComposeSendLoading] = useState(false);
+  const [composeSendSuccess, setComposeSendSuccess] = useState(false);
 
   // Filter conversations based on selected channel
   const filteredConversations = useMemo(() => {
@@ -66,6 +70,82 @@ export default function MessagesPage() {
     selectedConversation,
     setSelectedConversation,
   ]);
+
+  // Handle sending messages from compose modal
+  const handleComposeSend = async (data: {
+    associateIds: string[];
+    messageType: "sms" | "whatsapp";
+    message?: string;
+    templateData?: {
+      contentSid: string;
+      contentVariables?: Record<string, string>;
+    };
+  }) => {
+    setComposeSendLoading(true);
+    setComposeSendSuccess(false);
+
+    try {
+      const results = await Promise.allSettled(
+        data.associateIds.map((associateId) =>
+          fetch("/api/send-message", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              type: "associate",
+              id: associateId,
+              channel: data.messageType,
+              message: data.message || "",
+              contentSid: data.templateData?.contentSid,
+              contentVariables: data.templateData?.contentVariables,
+            }),
+          }).then((res) => {
+            if (!res.ok) {
+              return res.json().then((err) => {
+                throw new Error(err.error || "Failed to send message");
+              });
+            }
+            return res.json();
+          })
+        )
+      );
+
+      const successful = results.filter((r) => r.status === "fulfilled").length;
+      const failed = results.filter((r) => r.status === "rejected").length;
+
+      if (successful > 0) {
+        setComposeSendSuccess(true);
+        showToast(
+          `Successfully sent ${successful} message${
+            successful !== 1 ? "s" : ""
+          }${failed > 0 ? ` (${failed} failed)` : ""}`,
+          "success"
+        );
+        // Close modal after a short delay
+        setTimeout(() => {
+          setShowComposeModal(false);
+          setComposeSendSuccess(false);
+        }, 1500);
+      } else {
+        const firstError = results.find(
+          (r) => r.status === "rejected"
+        ) as PromiseRejectedResult;
+        throw new Error(
+          firstError?.reason?.message || "Failed to send all messages"
+        );
+      }
+    } catch (error) {
+      console.error("Error sending messages:", error);
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to send messages. Please try again.";
+      showToast(errorMessage, "error");
+    } finally {
+      setComposeSendLoading(false);
+    }
+  };
 
   // Show loading spinner while checking authentication or loading data
   if (authLoading || !mounted || loading) {
@@ -203,6 +283,29 @@ export default function MessagesPage() {
               ))
             )}
           </div>
+
+          {/* Compose Button - Bottom Left */}
+          <div className="p-4 border-t border-gray-200 flex-shrink-0">
+            <button
+              onClick={() => setShowComposeModal(true)}
+              className="w-full px-4 py-2 bg-orange-500 text-white rounded-lg font-medium hover:bg-orange-600 transition-colors flex items-center justify-center gap-2"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 4v16m8-8H4"
+                />
+              </svg>
+              Compose
+            </button>
+          </div>
         </div>
 
         {/* Right Pane - Chat Window */}
@@ -316,6 +419,18 @@ export default function MessagesPage() {
         </div>
       </main>
       <Footer />
+
+      {/* Compose Message Modal */}
+      <ComposeMessageModal
+        isOpen={showComposeModal}
+        onSend={handleComposeSend}
+        onCancel={() => {
+          setShowComposeModal(false);
+          setComposeSendSuccess(false);
+        }}
+        sendLoading={composeSendLoading}
+        sendSuccess={composeSendSuccess}
+      />
     </div>
   );
 }
