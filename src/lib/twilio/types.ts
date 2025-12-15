@@ -82,3 +82,45 @@ export interface TwilioConfig {
   phoneNumber: string;
   webhookUrl?: string;
 }
+
+// WhatsApp message structure
+export interface WhatsAppMessage {
+  to: string; // Phone number in E.164 format (e.g., +1234567890)
+  body: string; // Message content
+  from: string; // WhatsApp sender number in E.164 format (e.g., +14155238886 for sandbox)
+}
+
+// WhatsApp result (reuses SMSResult structure)
+export type WhatsAppResult = SMSResult;
+
+// Twilio Content Template types
+export interface TwilioTemplate {
+  sid: string;
+  friendlyName: string;
+  accountSid: string;
+  dateCreated: Date | null;
+  dateUpdated: Date | null;
+  url: string;
+  status: "approved" | "pending" | "rejected" | "draft";
+  approvalRequestSid: string | null;
+  contentType: string | null; // e.g., "twilio/text", "twilio/media"
+  variables: string[]; // Array of variable numbers like ["1", "2", "3"]
+  content: string | null; // The actual template content/message body
+}
+
+// Template list result
+export interface TwilioTemplateListResult {
+  success: boolean;
+  templates: TwilioTemplate[];
+  total: number;
+  error?: string;
+  errors?: string[];
+}
+
+// WhatsApp message with template support
+export interface WhatsAppTemplateMessage {
+  to: string;
+  from: string;
+  contentSid: string; // The template SID from Twilio Content API
+  contentVariables?: Record<string, string> | string[]; // Variable values for template - can be object {"1": "John", "2": "12345"} or array ["John", "12345"]
+}

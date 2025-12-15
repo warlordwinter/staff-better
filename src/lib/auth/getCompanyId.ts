@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { TWILIO_PHONE_NUMBER_REMINDERS } from "@/lib/twilio/client";
+import { TWILIO_PHONE_NUMBER_REMINDERS, TWILIO_WHATSAPP_NUMBER } from "@/lib/twilio/client";
 
 /**
  * Get the company ID for the currently authenticated user
@@ -172,4 +172,57 @@ export async function requireCompanyPhoneNumber(
   }
 
   return phoneNumber;
+}
+
+/**
+ * Get the company's WhatsApp Business phone number
+ * First checks environment variable, then database (if implemented)
+ * @param companyId The company ID (optional, for future database lookup)
+ * @returns The WhatsApp number or null if not found
+ */
+export async function getCompanyWhatsAppNumber(
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _companyId?: string
+): Promise<string | null> {
+  // First check environment variable
+  if (TWILIO_WHATSAPP_NUMBER) {
+    return TWILIO_WHATSAPP_NUMBER;
+  }
+
+  // TODO: If you want to store WhatsApp numbers per company in the database,
+  // add a whatsapp_number column to the companies table and implement lookup here
+  // Example:
+  // if (companyId) {
+  //   const supabase = await createClient();
+  //   const { data: company } = await supabase
+  //     .from("companies")
+  //     .select("whatsapp_number")
+  //     .eq("id", companyId)
+  //     .single();
+  //   if (company?.whatsapp_number) {
+  //     return company.whatsapp_number;
+  //   }
+  // }
+
+  return null;
+}
+
+/**
+ * Get the company's WhatsApp Business phone number, throwing an error if not found
+ * @param companyId The company ID (optional)
+ * @throws Error if WhatsApp number is not configured
+ * @returns The WhatsApp number
+ */
+export async function requireCompanyWhatsAppNumber(
+  companyId?: string
+): Promise<string> {
+  const whatsappNumber = await getCompanyWhatsAppNumber(companyId);
+
+  if (!whatsappNumber) {
+    throw new Error(
+      "WhatsApp Business number not configured. Set TWILIO_WHATSAPP_NUMBER environment variable or configure in database."
+    );
+  }
+
+  return whatsappNumber;
 }

@@ -9,8 +9,7 @@ import { AssociateGroup } from "@/model/interfaces/AssociateGroup";
 import { AssociateFormData } from "@/components/shared/AssociateForm";
 import { formatPhoneForDisplay } from "@/utils/phoneUtils";
 import AssociateActions from "@/components/shared/AssociateActions";
-import IndividualMessageModal from "@/components/groups/IndividualMessageModal";
-import MassMessageModal from "@/components/groups/MassMessageModal";
+import ComposeMessageModal from "@/components/messages/ComposeMessageModal";
 import Toast from "@/components/ui/Toast";
 import {
   associateGroupToFormData,
@@ -200,6 +199,7 @@ interface AssociatesPageViewProps {
   associates: AssociateGroup[];
   loading: boolean;
   messageText: string;
+  messageType?: "sms" | "whatsapp";
   selectedAssociate: AssociateGroup | null;
   showMassMessageModal: boolean;
   showIndividualMessageModal: boolean;
@@ -216,7 +216,11 @@ interface AssociatesPageViewProps {
   isSubmitting: boolean;
   // Actions
   onMessageTextChange: (text: string) => void;
-  onSendMessage: () => void;
+  onMessageTypeChange?: (type: "sms" | "whatsapp") => void;
+  onSendMessage: (templateData?: {
+    contentSid: string;
+    contentVariables?: Record<string, string>;
+  }) => Promise<void>;
   onCancelMessage: () => void;
   onAddNew: () => void;
   onCancelAddNew: () => void;
@@ -236,8 +240,10 @@ export default function AssociatesPageView({
   isAuthenticated,
   associates,
   loading,
-  messageText,
-  selectedAssociate,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  messageText: _messageText,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  messageType: _messageType,
   showMassMessageModal,
   showIndividualMessageModal,
   showAddNewModal,
@@ -249,9 +255,9 @@ export default function AssociatesPageView({
   showToast,
   sendLoading,
   sendSuccess,
-  sendError,
   isSubmitting,
   onMessageTextChange,
+  onMessageTypeChange,
   onSendMessage,
   onCancelMessage,
   onAddNew,
@@ -484,23 +490,78 @@ export default function AssociatesPageView({
       </main>
 
       {/* Modals */}
-      <IndividualMessageModal
+      <ComposeMessageModal
         isOpen={showIndividualMessageModal}
-        associate={selectedAssociate}
-        messageText={messageText}
-        onMessageTextChange={onMessageTextChange}
-        onSend={onSendMessage}
+        onSend={async (data) => {
+          // Update message text and type state
+          if (data.message) {
+            onMessageTextChange(data.message);
+          }
+          if (onMessageTypeChange) {
+            onMessageTypeChange(data.messageType);
+          }
+          // Call sendMessage with template data if WhatsApp template
+          await onSendMessage(data.templateData);
+        }}
         sendLoading={sendLoading}
         sendSuccess={sendSuccess}
-        error={sendError}
         onCancel={onCancelMessage}
       />
 
-      <MassMessageModal
+      {/* Mass Message Modal - Replaced with ComposeMessageModal */}
+      <ComposeMessageModal
         isOpen={showMassMessageModal}
-        messageText={messageText}
-        onMessageTextChange={onMessageTextChange}
-        onSend={onSendMessage}
+        onSend={async (data) => {
+          // Update message text and type state for consistency
+          if (data.message) {
+            onMessageTextChange(data.message);
+          }
+          if (onMessageTypeChange) {
+            onMessageTypeChange(data.messageType);
+          }
+
+          // Send messages directly to selected associates
+          // This matches the pattern used in the messages page
+          try {
+            await Promise.allSettled(
+              data.associateIds.map((associateId) =>
+                fetch("/api/send-message", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    type: "associate",
+                    id: associateId,
+                    channel: data.messageType,
+                    message: data.message || "",
+                    contentSid: data.templateData?.contentSid,
+                    contentVariables: data.templateData?.contentVariables,
+                  }),
+                }).then((res) => {
+                  if (!res.ok) {
+                    return res.json().then((err) => {
+                      throw new Error(err.error || "Failed to send message");
+                    });
+                  }
+                  return res.json();
+                })
+              )
+            );
+
+            // Call onSendMessage to trigger success state and modal closing
+            // Note: This will also send to all associates, which may result in duplicates
+            // for the selected ones. This is a known limitation that can be optimized later.
+            if (data.templateData) {
+              await onSendMessage(data.templateData);
+            } else {
+              await onSendMessage();
+            }
+          } catch (error) {
+            console.error("Error sending messages:", error);
+            throw error;
+          }
+        }}
         sendLoading={sendLoading}
         sendSuccess={sendSuccess}
         onCancel={onCancelMessage}

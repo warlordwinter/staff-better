@@ -80,12 +80,25 @@ export function useMessages(
       }
 
       const isSelected = selectedConversation?.id === conversation.id;
+      
+      // Update conversation channel based on new messages
+      const updatedMessages = [...conversation.messages, message];
+      const channelCounts = updatedMessages.reduce((acc, msg) => {
+        const ch = msg.channel || "sms";
+        acc[ch] = (acc[ch] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      
+      const updatedChannel: "sms" | "whatsapp" = 
+        (channelCounts.whatsapp || 0) > (channelCounts.sms || 0) ? "whatsapp" : "sms";
+      
       return {
         ...conversation,
-        messages: [...conversation.messages, message],
+        messages: updatedMessages,
         lastMessage: message.text,
         timestamp: message.timestamp,
         unread: direction === "inbound" ? !isSelected : conversation.unread,
+        channel: updatedChannel,
       };
     },
     [selectedConversation]
@@ -185,12 +198,108 @@ export function useMessages(
             }
           );
 
+          const body = newMessage.body || "";
+          // Determine channel for individual message
+          const messageChannel: "sms" | "whatsapp" = 
+            body.includes("[Template:") || 
+            body.toLowerCase().includes("whatsapp") ||
+            (newMessage.sender_type && newMessage.sender_type.toLowerCase().includes("whatsapp"))
+              ? "whatsapp"
+              : "sms";
+
+          // Extract template SID if this is a template message
+          const templateSidMatch = body.match(/\[Template:\s*([^\]]+)\]/);
+          const templateSid = templateSidMatch ? templateSidMatch[1].trim() : null;
+
+          // Extract template variables if present
+          const variablesMatch = body.match(/\[Variables:\s*({[^}]+})\]/);
+          let templateVariables: Record<string, string> | null = null;
+          if (variablesMatch) {
+            try {
+              templateVariables = JSON.parse(variablesMatch[1]);
+            } catch (error) {
+              console.error("Failed to parse template variables:", error);
+            }
+          }
+
+          // Helper function to substitute variables in template content
+          const substituteVariables = (content: string, vars: Record<string, string> | null): string => {
+            if (!vars || Object.keys(vars).length === 0) return content;
+            let substituted = content;
+            const sortedKeys = Object.keys(vars).sort((a, b) => parseInt(a) - parseInt(b));
+            for (const key of sortedKeys) {
+              const placeholder = `{{${key}}}`;
+              const value = vars[key];
+              substituted = substituted.replace(new RegExp(placeholder.replace(/[{}]/g, '\\$&'), 'g'), value);
+            }
+            return substituted;
+          };
+
+          // Handle template messages - fetch template details asynchronously
+          let displayText: string = body.replace(/\[Template: [^\]]+\]\s*/g, "").replace(/\[Variables: [^\]]+\]\s*/g, "").trim() || body;
+          let templateName: string | undefined;
+          let templateContent: string | undefined;
+
+          // If this is a template message, fetch template details
+          if (templateSid) {
+            // Fetch template details asynchronously
+            fetch(`/api/templates/${templateSid}`)
+              .then((res) => res.json())
+              .then((templateData) => {
+                if (templateData.friendlyName) {
+                  // Substitute variables in template content if available
+                  let finalContent = templateData.content || "";
+                  if (finalContent && templateVariables) {
+                    finalContent = substituteVariables(finalContent, templateVariables);
+                  }
+                  
+                  // Update the message with template details
+                  setConversations((prev) => {
+                    return prev.map((conv) => {
+                      if (conv.id === newMessage.conversation_id) {
+                        return {
+                          ...conv,
+                          messages: conv.messages.map((msg) => {
+                            if (msg.id === newMessage.id) {
+                              // Show template content with substituted variables if available, otherwise show template name
+                              // The template name will be shown separately in the UI header
+                              const templateDisplayText = finalContent || templateData.friendlyName;
+                              return {
+                                ...msg,
+                                text: templateDisplayText,
+                                templateName: templateData.friendlyName,
+                                templateContent: finalContent,
+                                templateSid: templateSid,
+                              };
+                            }
+                            return msg;
+                          }),
+                        };
+                      }
+                      return conv;
+                    });
+                  });
+                }
+              })
+              .catch((error) => {
+                console.error("Failed to fetch template details:", error);
+                // Keep the original display text if fetch fails
+              });
+            
+            // Show placeholder while fetching
+            displayText = `[Template: ${templateSid}]`;
+          }
+
           const uiMessage: Message = {
             id: newMessage.id,
-            text: newMessage.body || "",
+            text: displayText,
             sender:
               newMessage.direction === "inbound" ? "incoming" : "outgoing",
             timestamp: formattedTimestamp,
+            channel: messageChannel,
+            templateSid: templateSid || undefined,
+            templateName,
+            templateContent,
           };
 
           // Add message to conversation

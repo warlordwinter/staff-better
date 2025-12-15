@@ -13,8 +13,7 @@ import { GroupsDataService } from "@/lib/services/groupsDataService";
 // Import new components
 import GroupHeader from "@/components/groups/GroupHeader";
 import GroupAssociateTable from "@/components/groups/GroupAssociateTable";
-import MassMessageModal from "@/components/groups/MassMessageModal";
-import IndividualMessageModal from "@/components/groups/IndividualMessageModal";
+import ComposeMessageModal from "@/components/messages/ComposeMessageModal";
 import AddExistingModal from "@/components/groups/AddExistingModal";
 import Toast from "@/components/ui/Toast";
 
@@ -37,6 +36,7 @@ export default function GroupPage({ params }: GroupPageProps) {
   const [selectedAssociate, setSelectedAssociate] =
     useState<AssociateGroup | null>(null);
   const [messageText, setMessageText] = useState("");
+  const [messageType, setMessageType] = useState<"sms" | "whatsapp">("sms");
   const [availableAssociates, setAvailableAssociates] = useState<
     AssociateGroup[]
   >([]);
@@ -46,7 +46,6 @@ export default function GroupPage({ params }: GroupPageProps) {
   const [loadingAssociates, setLoadingAssociates] = useState(false);
   const [sendSuccess, setSendSuccess] = useState(false);
   const [sendLoading, setSendLoading] = useState(false);
-  const [sendError, setSendError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState("");
   const [toastType, setToastType] = useState<"error" | "success" | "info">(
     "info"
@@ -235,15 +234,35 @@ export default function GroupPage({ params }: GroupPageProps) {
 
   const handleMassMessage = () => {
     setMessageText("");
+    setMessageType("sms"); // Reset to SMS by default
     setShowMassMessageModal(true);
   };
 
-  const handleSendMessage = async () => {
-    if (!messageText.trim()) return;
+  const handleSendMessage = async (templateData?: {
+    contentSid: string;
+    contentVariables?: Record<string, string>;
+  }) => {
+    console.log("🚀🚀🚀 GROUP PAGE handleSendMessage CALLED 🚀🚀🚀", {
+      messageType,
+      templateData,
+      messageText,
+      selectedAssociate: selectedAssociate?.id,
+      groupId,
+      templateDataKeys: templateData ? Object.keys(templateData) : null,
+      functionName: "handleSendMessage (GROUP PAGE)",
+    });
 
+    // For WhatsApp with template, we don't need messageText
+    // Only validate messageText if we're not using a WhatsApp template
+    const isWhatsAppTemplate = messageType === "whatsapp" && templateData;
+    if (!isWhatsAppTemplate && !messageText.trim()) {
+      console.log("Early return: no message text and not WhatsApp template");
+      return;
+    }
+
+    console.log("Setting loading state and sending message...");
     setSendLoading(true);
     setSendSuccess(false);
-    setSendError(null);
     setShowToast(false);
 
     try {
@@ -255,9 +274,12 @@ export default function GroupPage({ params }: GroupPageProps) {
         );
       } else {
         // Send mass message
+        // For WhatsApp templates, messageText may be empty, which is fine
         const result = await GroupsDataService.sendMassMessageToGroup(
           groupId,
-          messageText
+          messageText || "", // Use empty string if messageText is empty (for templates)
+          messageType,
+          templateData
         );
 
         // Show toast if there are unsubscribed members
@@ -296,7 +318,6 @@ export default function GroupPage({ params }: GroupPageProps) {
         setShowMassMessageModal(false);
         setShowIndividualMessageModal(false);
         setSelectedAssociate(null);
-        setSendError(null);
       }, 1000);
     } catch (error) {
       console.error("Error sending message:", error);
@@ -304,7 +325,9 @@ export default function GroupPage({ params }: GroupPageProps) {
         error instanceof Error
           ? error.message
           : "Failed to send message. Please try again.";
-      setSendError(errorMessage);
+      setToastMessage(errorMessage);
+      setToastType("error");
+      setShowToast(true);
     } finally {
       setSendLoading(false);
     }
@@ -312,10 +335,10 @@ export default function GroupPage({ params }: GroupPageProps) {
 
   const handleCancelMessage = () => {
     setMessageText("");
+    setMessageType("sms");
     setShowMassMessageModal(false);
     setShowIndividualMessageModal(false);
     setSelectedAssociate(null);
-    setSendError(null);
   };
 
   // Show loading spinner while checking authentication
@@ -384,25 +407,127 @@ export default function GroupPage({ params }: GroupPageProps) {
       </main>
 
       {/* Modals */}
-      <MassMessageModal
+      {/* Mass Message Modal - Replaced with ComposeMessageModal */}
+      <ComposeMessageModal
         isOpen={showMassMessageModal}
-        messageText={messageText}
-        onMessageTextChange={setMessageText}
-        onSend={handleSendMessage}
+        onSend={async (data) => {
+          // Update message text and type state for consistency
+          if (data.message) {
+            setMessageText(data.message);
+          }
+          setMessageType(data.messageType);
+
+          // For groups page, we want to send to all group members
+          // So we'll send to the selected associates from the modal
+          // If they selected all group members, it will work as expected
+          // Otherwise, they can select specific ones
+
+          // Send messages directly to selected associates
+          try {
+            const results = await Promise.allSettled(
+              data.associateIds.map((associateId) =>
+                fetch("/api/send-message", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    type: "associate",
+                    id: associateId,
+                    channel: data.messageType,
+                    message: data.message || "",
+                    contentSid: data.templateData?.contentSid,
+                    contentVariables: data.templateData?.contentVariables,
+                  }),
+                }).then((res) => {
+                  if (!res.ok) {
+                    return res.json().then((err) => {
+                      throw new Error(err.error || "Failed to send message");
+                    });
+                  }
+                  return res.json();
+                })
+              )
+            );
+
+            // Check for unsubscribed members
+            const unsubscribedAssociates: Array<{
+              firstName: string;
+              lastName: string;
+            }> = [];
+
+            results.forEach((result, index) => {
+              if (result.status === "rejected") {
+                const associate = associates.find(
+                  (a) => a.id === data.associateIds[index]
+                );
+                if (associate) {
+                  const errorMessage =
+                    result.reason?.message || String(result.reason);
+                  if (
+                    errorMessage.toLowerCase().includes("unsubscribed") ||
+                    errorMessage.toLowerCase().includes("opted out")
+                  ) {
+                    unsubscribedAssociates.push({
+                      firstName: associate.firstName,
+                      lastName: associate.lastName,
+                    });
+                  }
+                }
+              }
+            });
+
+            // Show toast if there are unsubscribed members
+            if (unsubscribedAssociates.length > 0) {
+              const names = unsubscribedAssociates.map(
+                (a) => `${a.firstName} ${a.lastName}`
+              );
+              let message = "The message was sent to everyone except ";
+
+              if (names.length === 1) {
+                message += `${names[0]}`;
+              } else if (names.length === 2) {
+                message += `${names[0]} and ${names[1]}`;
+              } else {
+                const namesCopy = [...names];
+                const last = namesCopy.pop();
+                message += `${namesCopy.join(", ")}, and ${last}`;
+              }
+
+              message += " all of which have unsubscribed";
+              setToastMessage(message);
+              setToastType("info");
+              setShowToast(true);
+            }
+
+            // Call handleSendMessage to trigger success state and modal closing
+            // This will also handle the state updates
+            if (data.templateData) {
+              await handleSendMessage(data.templateData);
+            } else {
+              await handleSendMessage();
+            }
+          } catch (error) {
+            console.error("Error sending messages:", error);
+            throw error;
+          }
+        }}
         sendLoading={sendLoading}
         sendSuccess={sendSuccess}
         onCancel={handleCancelMessage}
       />
 
-      <IndividualMessageModal
+      <ComposeMessageModal
         isOpen={showIndividualMessageModal}
-        associate={selectedAssociate}
-        messageText={messageText}
-        onMessageTextChange={setMessageText}
-        onSend={handleSendMessage}
+        onSend={async (data) => {
+          // Update message text and type state
+          setMessageText(data.message || "");
+          setMessageType(data.messageType);
+          // Call handleSendMessage with template data if WhatsApp template
+          await handleSendMessage(data.templateData);
+        }}
         sendLoading={sendLoading}
         sendSuccess={sendSuccess}
-        error={sendError}
         onCancel={handleCancelMessage}
       />
 

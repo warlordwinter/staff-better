@@ -14,7 +14,17 @@ export interface UseAssociateMessagingReturn {
   setShowMassMessageModal: (show: boolean) => void;
   setShowIndividualMessageModal: (show: boolean) => void;
   setSelectedAssociate: (associate: AssociateGroup | null) => void;
-  sendMessage: (associates: AssociateGroup[], onUnsubscribed?: (names: string[]) => void) => Promise<void>;
+  sendMessage: (
+    associatesOrTemplateData?:
+      | AssociateGroup[]
+      | {
+          contentSid: string;
+          contentVariables?: Record<string, string>;
+        },
+    onUnsubscribed?: (names: string[]) => void,
+    channel?: "sms" | "whatsapp",
+    allAssociates?: AssociateGroup[]
+  ) => Promise<void>;
   cancelMessage: () => void;
   messageAssociate: (associate: AssociateGroup) => void;
   messageAll: () => void;
@@ -47,11 +57,33 @@ export function useAssociateMessaging(
   };
 
   // Handle send message
+  // Can be called with template data (from modal) or associates array (legacy)
   const sendMessage = async (
-    associates: AssociateGroup[],
-    onUnsubscribed?: (names: string[]) => void
+    associatesOrTemplateData?:
+      | AssociateGroup[]
+      | {
+          contentSid: string;
+          contentVariables?: Record<string, string>;
+        },
+    onUnsubscribed?: (names: string[]) => void,
+    channel?: "sms" | "whatsapp",
+    allAssociates?: AssociateGroup[]
   ) => {
-    if (!messageText.trim()) {
+    // Check if first argument is template data (has contentSid)
+    const isTemplateData =
+      associatesOrTemplateData &&
+      typeof associatesOrTemplateData === "object" &&
+      !Array.isArray(associatesOrTemplateData) &&
+      "contentSid" in associatesOrTemplateData;
+
+    // If template data, use the provided associates list
+    const associates = isTemplateData
+      ? allAssociates || []
+      : (associatesOrTemplateData as AssociateGroup[]) || [];
+
+    // For templates, messageText might be empty
+    const isWhatsAppTemplate = channel === "whatsapp" && isTemplateData;
+    if (!isWhatsAppTemplate && !messageText.trim()) {
       return;
     }
 
@@ -60,11 +92,20 @@ export function useAssociateMessaging(
     setSendError(null);
 
     try {
+      const templateData = isTemplateData
+        ? (associatesOrTemplateData as {
+            contentSid: string;
+            contentVariables?: Record<string, string>;
+          })
+        : undefined;
+
       if (selectedAssociate) {
         // Send to individual associate
         await GroupsDataService.sendMessageToAssociate(
           selectedAssociate.id,
-          messageText.trim()
+          messageText.trim(),
+          channel || "sms",
+          templateData
         );
       } else {
         // Send to all associates
@@ -76,7 +117,9 @@ export function useAssociateMessaging(
         const promises = associates.map((associate) =>
           GroupsDataService.sendMessageToAssociate(
             associate.id,
-            messageText.trim()
+            messageText.trim(),
+            channel || "sms",
+            templateData
           ).catch((error) => {
             console.error(
               `Failed to send message to ${associate.firstName} ${associate.lastName}:`,
@@ -206,4 +249,3 @@ export function useAssociateMessaging(
     messageAll,
   };
 }
-

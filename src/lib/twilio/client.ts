@@ -23,5 +23,10 @@ export const twilioClient = twilio(
 export const TWILIO_PHONE_NUMBER_REMINDERS =
   process.env.TWILIO_PHONE_NUMBER_REMINDERS;
 
+// WhatsApp Business phone number (optional - for WhatsApp messaging)
+// If not set, you'll need to provide it when sending WhatsApp messages
+export const TWILIO_WHATSAPP_NUMBER =
+  process.env.TWILIO_WHATSAPP_NUMBER || null;
+
 // Note: Two-way phone number is stored in company.phone_number in the database
 // and should be retrieved per company when sending two-way messages

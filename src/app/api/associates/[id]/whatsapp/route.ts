@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   requireCompanyId,
-  requireCompanyPhoneNumber,
+  requireCompanyWhatsAppNumber,
 } from "@/lib/auth/getCompanyId";
 import { TwilioMessageService } from "@/lib/services/implementations/TwilioMessageService";
 
 /**
- * POST /api/associates/[id]/message
- * Send a message to an individual associate
+ * POST /api/associates/[id]/whatsapp
+ * Send a WhatsApp message to an individual associate
  */
 export async function POST(
   request: NextRequest,
@@ -15,34 +15,14 @@ export async function POST(
 ) {
   try {
     // Verify user is authenticated and has a company
-    console.log("📞 [PHONE DEBUG] Starting message send process...");
+    console.log(
+      "📱 [WHATSAPP DEBUG] Starting WhatsApp message send process..."
+    );
     const companyId = await requireCompanyId();
-    console.log("📞 [PHONE DEBUG] Company ID:", companyId);
+    console.log("📱 [WHATSAPP DEBUG] Company ID:", companyId);
 
-    const twoWayPhoneNumber = await requireCompanyPhoneNumber(companyId);
-    console.log(
-      "📞 [PHONE DEBUG] Company two-way phone number from database:",
-      twoWayPhoneNumber
-    );
-
-    // Import reminder number for comparison
-    const { TWILIO_PHONE_NUMBER_REMINDERS } = await import(
-      "@/lib/twilio/client"
-    );
-    console.log(
-      "📞 [PHONE DEBUG] Reminder phone number (for comparison):",
-      TWILIO_PHONE_NUMBER_REMINDERS
-    );
-    console.log(
-      "📞 [PHONE DEBUG] Using company two-way number? ",
-      twoWayPhoneNumber !== TWILIO_PHONE_NUMBER_REMINDERS
-    );
-    console.log(
-      "📞 [PHONE DEBUG] Numbers match? ",
-      twoWayPhoneNumber === TWILIO_PHONE_NUMBER_REMINDERS
-        ? "⚠️ WARNING: Using reminder number!"
-        : "✓ Using two-way number"
-    );
+    const whatsappNumber = await requireCompanyWhatsAppNumber(companyId);
+    console.log("📱 [WHATSAPP DEBUG] Company WhatsApp number:", whatsappNumber);
 
     const { id: associateId } = await params;
     const body = await request.json();
@@ -60,8 +40,6 @@ export async function POST(
     }
 
     // Get the associate details
-    // Note: We need to get the associate to check their phone and opt-out status
-    // For now, we'll use a simple select query
     const supabase = await (
       await import("@/lib/supabase/server")
     ).createClient();
@@ -79,10 +57,10 @@ export async function POST(
       );
     }
 
-    // Check if associate has opted out
+    // Check if associate has opted out (using SMS opt-out for now, could add WhatsApp-specific opt-out later)
     if (associate.sms_opt_out) {
       return NextResponse.json(
-        { error: "Associate has opted out of SMS messages" },
+        { error: "Associate has opted out of messages" },
         { status: 400 }
       );
     }
@@ -95,28 +73,30 @@ export async function POST(
       );
     }
 
-    // Send the SMS using TwilioMessageService
+    // Send the WhatsApp message using TwilioMessageService
     try {
       const messageService = new TwilioMessageService();
       const formattedPhone = messageService.formatPhoneNumber(
         associate.phone_number
       );
 
-      console.log("📞 [PHONE DEBUG] About to send SMS with:");
-      console.log("📞 [PHONE DEBUG]   FROM:", twoWayPhoneNumber);
-      console.log("📞 [PHONE DEBUG]   TO:", formattedPhone);
+      console.log("📱 [WHATSAPP DEBUG] About to send WhatsApp message with:");
+      console.log("📱 [WHATSAPP DEBUG]   FROM:", whatsappNumber);
+      console.log("📱 [WHATSAPP DEBUG]   TO:", formattedPhone);
       console.log(
-        "📞 [PHONE DEBUG]   BODY:",
+        "📱 [WHATSAPP DEBUG]   BODY:",
         body.message.trim().substring(0, 50) + "..."
       );
 
-      const result = await messageService.sendSMS({
-        to: formattedPhone,
-        body: body.message.trim(),
-        from: twoWayPhoneNumber,
-      });
+      const result = await messageService.sendWhatsAppBusiness(
+        {
+          to: formattedPhone,
+          body: body.message.trim(),
+        },
+        whatsappNumber
+      );
 
-      console.log("📞 [PHONE DEBUG] SMS sent result:", {
+      console.log("📱 [WHATSAPP DEBUG] WhatsApp message sent result:", {
         success: result.success,
         messageId: result.success ? result.messageId : "N/A",
         from: result.success ? result.from : "N/A",
@@ -129,7 +109,6 @@ export async function POST(
         const errorMessage = "error" in result ? result.error : "Unknown error";
 
         // Twilio error code 21610 = "Attempt to send to unsubscribed recipient"
-        // Check for both string and number format
         if (
           errorCode === "21610" ||
           String(errorCode) === "21610" ||
@@ -139,8 +118,27 @@ export async function POST(
           return NextResponse.json(
             {
               error:
-                "You cannot message this employee because they have unsubscribed from SMS notifications.",
+                "You cannot message this employee because they have unsubscribed from WhatsApp notifications.",
               code: errorCode || "21610",
+              userFriendly: true,
+            },
+            { status: 400 }
+          );
+        }
+
+        // Check for WhatsApp-specific errors (e.g., outside 24-hour window without template)
+        if (
+          typeof errorMessage === "string" &&
+          (errorMessage.toLowerCase().includes("template") ||
+            errorMessage.toLowerCase().includes("24 hour") ||
+            errorMessage.toLowerCase().includes("session"))
+        ) {
+          return NextResponse.json(
+            {
+              error:
+                "Cannot send WhatsApp message. You may need to use an approved template for messages outside the 24-hour window.",
+              details: errorMessage,
+              code: errorCode,
               userFriendly: true,
             },
             { status: 400 }
@@ -149,30 +147,11 @@ export async function POST(
 
         return NextResponse.json(
           {
-            error: "Failed to send message",
+            error: "Failed to send WhatsApp message",
             details: errorMessage,
             code: errorCode,
           },
           { status: 500 }
-        );
-      }
-
-      // Send opt-out message if this is the first direct message (after sending the message)
-      try {
-        const { sendSMSOptOutIfNeeded } = await import(
-          "@/lib/utils/optOutUtils"
-        );
-        await sendSMSOptOutIfNeeded(
-          associate.id,
-          associate.phone_number,
-          companyId,
-          twoWayPhoneNumber
-        );
-      } catch (optOutError) {
-        // Log error but don't fail the message send
-        console.error(
-          `Failed to send opt-out message for direct message to associate ${associate.id}:`,
-          optOutError
         );
       }
 
@@ -182,19 +161,20 @@ export async function POST(
           await import("@/lib/supabase/admin")
         ).createAdminClient();
 
-        // Find or create conversation
+        // Find or create conversation for WhatsApp channel
         const { data: existingConversations } = await supabaseAdmin
           .from("conversations")
           .select("id")
           .eq("associate_id", associateId)
           .eq("company_id", companyId)
+          .eq("channel", "whatsapp")
           .limit(1);
 
         let conversationId: string | undefined;
         if (existingConversations && existingConversations.length > 0) {
           conversationId = existingConversations[0].id;
         } else {
-          // Create new conversation
+          // Create new conversation for WhatsApp
           const { data: newConversation, error: createError } =
             await supabaseAdmin
               .from("conversations")
@@ -202,6 +182,7 @@ export async function POST(
                 {
                   associate_id: associateId,
                   company_id: companyId,
+                  channel: "whatsapp",
                 },
               ])
               .select()
@@ -209,7 +190,7 @@ export async function POST(
 
           if (createError || !newConversation) {
             console.error("Error creating conversation:", createError);
-            // Continue without saving message - SMS was sent successfully
+            // Continue without saving message - WhatsApp was sent successfully
           } else {
             conversationId = newConversation.id;
           }
@@ -232,39 +213,54 @@ export async function POST(
 
           if (insertError) {
             console.error("Error saving message to database:", insertError);
-            // Continue - SMS was sent successfully
+            // Continue - WhatsApp was sent successfully
           }
         }
       } catch (dbError) {
         console.error("Error saving message to database:", dbError);
-        // Continue - SMS was sent successfully
+        // Continue - WhatsApp was sent successfully
       }
 
       return NextResponse.json({
         success: true,
         message_id: result.messageId,
         to: associate.phone_number,
+        channel: "whatsapp",
       });
-    } catch (smsError) {
-      console.error("Error sending SMS:", smsError);
+    } catch (whatsappError) {
+      console.error("Error sending WhatsApp message:", whatsappError);
       return NextResponse.json(
         {
-          error: "Failed to send message",
+          error: "Failed to send WhatsApp message",
           details:
-            smsError instanceof Error ? smsError.message : "Unknown error",
+            whatsappError instanceof Error
+              ? whatsappError.message
+              : "Unknown error",
         },
         { status: 500 }
       );
     }
   } catch (error: unknown) {
-    console.error("Failed to send message to associate:", error);
+    console.error("Failed to send WhatsApp message to associate:", error);
     const errorMessage =
-      error instanceof Error ? error.message : "Failed to send message";
+      error instanceof Error
+        ? error.message
+        : "Failed to send WhatsApp message";
 
     if (errorMessage.includes("Company not found")) {
       return NextResponse.json(
         { error: "Not authenticated or company not found" },
         { status: 401 }
+      );
+    }
+
+    if (errorMessage.includes("WhatsApp Business number not configured")) {
+      return NextResponse.json(
+        {
+          error:
+            "WhatsApp Business number not configured. Please set TWILIO_WHATSAPP_NUMBER environment variable.",
+        },
+        { status: 500 }
       );
     }
 

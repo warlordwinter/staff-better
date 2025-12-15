@@ -56,7 +56,10 @@ const Navbar = () => {
     <nav className="w-full px-5 py-3 bg-gradient-to-r from-[#ffb877] to-[#ff8a42] min-h-[72px] flex-shrink-0 overflow-hidden">
       <div className="flex justify-between items-center w-full">
         {/* Logo + Brand */}
-        <Link href="/home" className="flex items-center gap-5 cursor-pointer flex-shrink-0">
+        <Link
+          href="/home"
+          className="flex items-center gap-5 cursor-pointer flex-shrink-0"
+        >
           <Image height={50} width={50} alt="Logo" src="/icons/logo.svg" />
           <span className="text-white text-2xl sm:text-3xl font-bold font-inter whitespace-nowrap">
             Staff Better
@@ -146,6 +149,14 @@ const Navbar = () => {
                 Groups
               </Link>
               <Link
+                href="/templates"
+                className={`text-white text-lg font-bold transition-colors ${
+                  isActiveLink("/templates") ? "" : "hover:opacity-80"
+                }`}
+              >
+                Templates
+              </Link>
+              <Link
                 href="/associates"
                 className={`text-white text-lg font-bold transition-colors ${
                   isActiveLink("/associates")
@@ -161,7 +172,9 @@ const Navbar = () => {
                     ref={profileButtonRef}
                     onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
                     className={`flex items-center gap-2 text-white hover:opacity-80 transition-opacity ${
-                      profileDropdownOpen ? "outline outline-2 outline-white outline-offset-2 rounded-full" : ""
+                      profileDropdownOpen
+                        ? "outline outline-2 outline-white outline-offset-2 rounded-full"
+                        : ""
                     }`}
                   >
                     <Image
@@ -261,6 +274,14 @@ const Navbar = () => {
                 Groups
               </Link>
               <Link
+                href="/templates"
+                className={`text-white text-lg font-bold transition-colors ${
+                  isActiveLink("/templates") ? "" : "hover:opacity-80"
+                }`}
+              >
+                Templates
+              </Link>
+              <Link
                 href="/associates"
                 className={`text-white text-lg font-bold transition-colors ${
                   isActiveLink("/associates")
@@ -269,6 +290,14 @@ const Navbar = () => {
                 }`}
               >
                 Associates
+              </Link>
+              <Link
+                href="/settings"
+                className={`text-white text-lg font-bold transition-colors ${
+                  isActiveLink("/settings") ? "" : "hover:opacity-80"
+                }`}
+              >
+                Settings
               </Link>
               <div className="flex items-center gap-3">
                 <button

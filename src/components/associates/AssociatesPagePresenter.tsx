@@ -23,6 +23,7 @@ export default function AssociatesPagePresenter() {
       associates={model.associates}
       loading={model.loading}
       messageText={model.messageText}
+      messageType={model.messageType}
       selectedAssociate={model.selectedAssociate}
       showMassMessageModal={model.showMassMessageModal}
       showIndividualMessageModal={model.showIndividualMessageModal}
@@ -40,6 +41,7 @@ export default function AssociatesPagePresenter() {
       isUploading={model.isUploading}
       // Actions
       onMessageTextChange={model.setMessageText}
+      onMessageTypeChange={model.setMessageType}
       onSendMessage={model.sendMessage}
       onCancelMessage={model.cancelMessage}
       onAddNew={model.addNew}

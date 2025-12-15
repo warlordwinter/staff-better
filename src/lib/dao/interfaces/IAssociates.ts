@@ -25,6 +25,7 @@ export interface IAssociates {
   ): Promise<Associate[]>;
   deleteAssociate(id: string): Promise<{ success: boolean }>;
   getAssociateByPhone(phoneNumber: string): Promise<Associate | null>;
+  getAssociateById(id: string): Promise<Associate | null>;
   optOutAssociate(associateId: string): Promise<void>;
   optInAssociate(associateId: string): Promise<void>;
 }

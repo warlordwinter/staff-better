@@ -4,6 +4,7 @@ import {
   IReminderRepository,
   IMessageService,
   ILogger,
+  IAssociateRepository,
 } from "./interfaces/index";
 import { ReminderAssignment, ReminderResult, ReminderType } from "./types";
 import { SMSResult } from "../twilio/types";
@@ -15,7 +16,8 @@ export class ReminderService {
   constructor(
     private readonly reminderRepository: IReminderRepository,
     private readonly messageService: IMessageService,
-    private readonly logger: ILogger
+    private readonly logger: ILogger,
+    private readonly associateRepository: IAssociateRepository
   ) {}
 
   /**
@@ -86,23 +88,19 @@ export class ReminderService {
       // Send opt-out message if this is the first reminder (after sending the reminder)
       if (smsResult.success) {
         try {
-          // Fetch company_id from associate
-          const { createAdminClient } = await import("@/lib/supabase/admin");
-          const supabaseAdmin = createAdminClient();
-          const { data: associate } = await supabaseAdmin
-            .from("associates")
-            .select("company_id")
-            .eq("id", assignment.associate_id)
-            .single();
+          // Get company_id via repository
+          const companyId = await this.associateRepository.getAssociateCompanyId(
+            assignment.associate_id
+          );
 
-          if (associate?.company_id) {
+          if (companyId) {
             const { sendReminderOptOutIfNeeded } = await import(
               "@/lib/utils/optOutUtils"
             );
             await sendReminderOptOutIfNeeded(
               assignment.associate_id,
               assignment.phone_number,
-              associate.company_id
+              companyId
             );
           }
         } catch (optOutError) {

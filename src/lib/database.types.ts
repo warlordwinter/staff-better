@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       associates: {
@@ -208,6 +233,7 @@ export type Database = {
         Row: {
           associate_id: string
           company_id: string
+          channel: "sms" | "whatsapp" | null
           created_at: string | null
           id: string
           updated_at: string | null
@@ -215,6 +241,7 @@ export type Database = {
         Insert: {
           associate_id: string
           company_id: string
+          channel?: "sms" | "whatsapp" | null
           created_at?: string | null
           id?: string
           updated_at?: string | null
@@ -222,6 +249,7 @@ export type Database = {
         Update: {
           associate_id?: string
           company_id?: string
+          channel?: "sms" | "whatsapp" | null
           created_at?: string | null
           id?: string
           updated_at?: string | null
@@ -322,9 +350,17 @@ export type Database = {
           legal_name: string
           meta_admin_email: string | null
           meta_business_manager_id: string | null
+          migration_completed_at: string | null
+          migration_status:
+            | Database["public"]["Enums"]["migration_status_type"]
+            | null
           name: string
           opt_in_description: string | null
           phone_number_preference: string | null
+          primary_account_brand_sid: string | null
+          primary_account_campaign_sid: string | null
+          primary_account_customer_profile_sid: string | null
+          primary_account_messaging_service_sid: string | null
           status: string | null
           tax_id: string | null
           updated_at: string | null
@@ -344,9 +380,17 @@ export type Database = {
           legal_name: string
           meta_admin_email?: string | null
           meta_business_manager_id?: string | null
+          migration_completed_at?: string | null
+          migration_status?:
+            | Database["public"]["Enums"]["migration_status_type"]
+            | null
           name: string
           opt_in_description?: string | null
           phone_number_preference?: string | null
+          primary_account_brand_sid?: string | null
+          primary_account_campaign_sid?: string | null
+          primary_account_customer_profile_sid?: string | null
+          primary_account_messaging_service_sid?: string | null
           status?: string | null
           tax_id?: string | null
           updated_at?: string | null
@@ -366,9 +410,17 @@ export type Database = {
           legal_name?: string
           meta_admin_email?: string | null
           meta_business_manager_id?: string | null
+          migration_completed_at?: string | null
+          migration_status?:
+            | Database["public"]["Enums"]["migration_status_type"]
+            | null
           name?: string
           opt_in_description?: string | null
           phone_number_preference?: string | null
+          primary_account_brand_sid?: string | null
+          primary_account_campaign_sid?: string | null
+          primary_account_customer_profile_sid?: string | null
+          primary_account_messaging_service_sid?: string | null
           status?: string | null
           tax_id?: string | null
           updated_at?: string | null
@@ -559,27 +611,33 @@ export type Database = {
         Row: {
           company_id: string
           customer_name: string
+          day_of_time: string | null
           id: string
           job_status: Database["public"]["Enums"]["job_status_enum"] | null
           job_title: string | null
+          night_before_time: string | null
           start_date: string | null
           start_time: string | null
         }
         Insert: {
           company_id: string
           customer_name: string
+          day_of_time?: string | null
           id?: string
           job_status?: Database["public"]["Enums"]["job_status_enum"] | null
           job_title?: string | null
+          night_before_time?: string | null
           start_date?: string | null
           start_time?: string | null
         }
         Update: {
           company_id?: string
           customer_name?: string
+          day_of_time?: string | null
           id?: string
           job_status?: Database["public"]["Enums"]["job_status_enum"] | null
           job_title?: string | null
+          night_before_time?: string | null
           start_date?: string | null
           start_time?: string | null
         }
@@ -803,31 +861,40 @@ export type Database = {
       }
       twilio_subaccounts: {
         Row: {
+          api_key_secret_encrypted: string | null
+          api_key_sid: string | null
           auth_token_encrypted: string
           created_at: string | null
           customer_id: string
           friendly_name: string | null
           id: string
+          messaging_service_sid: string | null
           status: string | null
           subaccount_sid: string
           updated_at: string | null
         }
         Insert: {
+          api_key_secret_encrypted?: string | null
+          api_key_sid?: string | null
           auth_token_encrypted: string
           created_at?: string | null
           customer_id: string
           friendly_name?: string | null
           id?: string
+          messaging_service_sid?: string | null
           status?: string | null
           subaccount_sid: string
           updated_at?: string | null
         }
         Update: {
+          api_key_secret_encrypted?: string | null
+          api_key_sid?: string | null
           auth_token_encrypted?: string
           created_at?: string | null
           customer_id?: string
           friendly_name?: string | null
           id?: string
+          messaging_service_sid?: string | null
           status?: string | null
           subaccount_sid?: string
           updated_at?: string | null
@@ -866,7 +933,7 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "fk_user_profiles_company_id"
+            foreignKeyName: "user_profiles_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
@@ -927,10 +994,18 @@ export type Database = {
     }
     Enums: {
       confirmation_status_enum:
-        | "CONFIRMED"
         | "UNCONFIRMED"
+        | "SOFT_CONFIRMED"
+        | "LIKELY_CONFIRMED"
+        | "CONFIRMED"
         | "DECLINED"
       job_status_enum: "ACTIVE" | "PAST" | "UPCOMING"
+      migration_status_type:
+        | "pending"
+        | "approved"
+        | "migrating"
+        | "completed"
+        | "failed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1056,14 +1131,26 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       confirmation_status_enum: [
-        "CONFIRMED",
         "UNCONFIRMED",
+        "SOFT_CONFIRMED",
+        "LIKELY_CONFIRMED",
+        "CONFIRMED",
         "DECLINED",
       ],
       job_status_enum: ["ACTIVE", "PAST", "UPCOMING"],
+      migration_status_type: [
+        "pending",
+        "approved",
+        "migrating",
+        "completed",
+        "failed",
+      ],
     },
   },
 } as const

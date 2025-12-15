@@ -1,6 +1,6 @@
 // Abstract interface for message services
 
-import { SMSMessage, SMSResult } from "../../twilio/types";
+import { SMSMessage, SMSResult, WhatsAppMessage, WhatsAppResult, WhatsAppTemplateMessage } from "../../twilio/types";
 
 export interface IMessageService {
   sendSMS(message: SMSMessage): Promise<SMSResult>;
@@ -10,4 +10,14 @@ export interface IMessageService {
     twoWayPhoneNumber: string
   ): Promise<SMSResult>;
   formatPhoneNumber(phoneNumber: string): string;
+  // WhatsApp methods
+  sendWhatsApp(message: WhatsAppMessage): Promise<WhatsAppResult>;
+  sendWhatsAppBusiness(
+    message: Omit<WhatsAppMessage, "from">,
+    whatsappBusinessNumber: string
+  ): Promise<WhatsAppResult>;
+  sendWhatsAppBusinessTemplate(
+    message: Omit<WhatsAppTemplateMessage, "from">,
+    whatsappBusinessNumber: string
+  ): Promise<WhatsAppResult>;
 }

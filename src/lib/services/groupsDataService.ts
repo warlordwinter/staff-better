@@ -320,14 +320,36 @@ export class GroupsDataService {
    */
   static async sendMessageToAssociate(
     associateId: string,
-    message: string
+    message: string,
+    channel: "sms" | "whatsapp" = "sms",
+    templateData?: {
+      contentSid: string;
+      contentVariables?: Record<string, string>;
+    }
   ): Promise<boolean> {
-    const response = await fetch(`/api/associates/${associateId}/message`, {
+    const body: any = {
+      type: "associate",
+      id: associateId,
+      channel,
+    };
+
+    if (channel === "whatsapp" && templateData) {
+      // Use template for WhatsApp
+      body.contentSid = templateData.contentSid;
+      if (templateData.contentVariables) {
+        body.contentVariables = templateData.contentVariables;
+      }
+    } else {
+      // Use regular message
+      body.message = message;
+    }
+
+    const response = await fetch(`/api/send-message`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -360,7 +382,12 @@ export class GroupsDataService {
    */
   static async sendMassMessageToGroup(
     groupId: string,
-    message: string
+    message: string,
+    channel: "sms" | "whatsapp" = "sms",
+    templateData?: {
+      contentSid: string;
+      contentVariables?: Record<string, string>;
+    }
   ): Promise<{
     success: boolean;
     unsubscribed_members?: Array<{
@@ -369,12 +396,29 @@ export class GroupsDataService {
       last_name: string;
     }>;
   }> {
-    const response = await fetch(`/api/groups/${groupId}/message`, {
+    const body: any = {
+      type: "group",
+      id: groupId,
+      channel,
+    };
+
+    if (channel === "whatsapp" && templateData) {
+      // Use template for WhatsApp
+      body.contentSid = templateData.contentSid;
+      if (templateData.contentVariables) {
+        body.contentVariables = templateData.contentVariables;
+      }
+    } else {
+      // Use regular message
+      body.message = message;
+    }
+
+    const response = await fetch(`/api/send-message`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {

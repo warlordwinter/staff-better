@@ -1,180 +1,445 @@
 import { NextRequest, NextResponse } from "next/server";
-import { twilioClient } from "@/lib/twilio/client";
-import { createAdminClient } from "@/lib/supabase/admin";
 import {
   requireCompanyId,
   requireCompanyPhoneNumber,
+  requireCompanyWhatsAppNumber,
 } from "@/lib/auth/getCompanyId";
+import { serviceContainer } from "@/lib/services/ServiceContainer";
 
 /**
  * POST /api/send-message
  *
- * Sends an SMS message via Twilio and saves it to the messages table.
+ * Unified endpoint for sending messages via SMS or WhatsApp.
+ * Supports three message types:
+ * 1. "associate" - Send to a single associate by ID
+ * 2. "group" - Send to all members of a group by group ID
+ * 3. "direct" - Send directly to a phone number (requires conversation_id)
  *
  * Request body:
- * - conversation_id: string (UUID of the conversation)
- * - to: string (recipient phone number)
- * - body: string (message text)
- * - sender: string (sender identifier)
+ * - type: "associate" | "group" | "direct" (required)
+ * - id: string (required for "associate" or "group" type)
+ * - to: string (required for "direct" type - recipient phone number)
+ * - conversation_id: string (required for "direct" type)
+ * - message: string (required for regular messages)
+ * - channel: "sms" | "whatsapp" (optional, defaults to "sms")
+ * - contentSid: string (required for WhatsApp template messages)
+ * - contentVariables: object (optional, for WhatsApp template variables)
  *
  * Response:
- * - 200: { sid: string } (Twilio message SID)
- * - 400: { error: string } (validation error)
- * - 405: Method not allowed
- * - 500: { error: string } (server error)
+ * - 200: Success response with message details
+ * - 400: Validation error
+ * - 404: Resource not found
+ * - 500: Server error
  */
 export async function POST(request: NextRequest) {
-  if (request.method !== "POST") {
-    return NextResponse.json({ error: "Method not allowed" }, { status: 405 });
-  }
-
   try {
-    // Get company ID and phone number for two-way communication
-    console.log("📞 [PHONE DEBUG] Starting send-message process...");
     const companyId = await requireCompanyId();
-    console.log("📞 [PHONE DEBUG] Company ID:", companyId);
-
-    const twoWayPhoneNumber = await requireCompanyPhoneNumber(companyId);
-    console.log(
-      "📞 [PHONE DEBUG] Company two-way phone number from database:",
-      twoWayPhoneNumber
-    );
-
-    // Import reminder number for comparison
-    const { TWILIO_PHONE_NUMBER_REMINDERS } = await import(
-      "@/lib/twilio/client"
-    );
-    console.log(
-      "📞 [PHONE DEBUG] Reminder phone number (for comparison):",
-      TWILIO_PHONE_NUMBER_REMINDERS
-    );
-    console.log(
-      "📞 [PHONE DEBUG] Using company two-way number? ",
-      twoWayPhoneNumber !== TWILIO_PHONE_NUMBER_REMINDERS
-    );
-    console.log(
-      "📞 [PHONE DEBUG] Numbers match? ",
-      twoWayPhoneNumber === TWILIO_PHONE_NUMBER_REMINDERS
-        ? "⚠️ WARNING: Using reminder number!"
-        : "✓ Using two-way number"
-    );
-
     const body = await request.json();
-    const { conversation_id, to, body: messageBody, sender } = body;
 
-    // Validate required fields
-    if (!conversation_id || typeof conversation_id !== "string") {
-      return NextResponse.json(
-        { error: "conversation_id is required and must be a string" },
-        { status: 400 }
-      );
-    }
-
-    if (!to || typeof to !== "string") {
+    // Validate type
+    const type = body.type;
+    if (!type || !["associate", "group", "direct"].includes(type)) {
       return NextResponse.json(
         {
-          error: "to (recipient phone number) is required and must be a string",
+          error:
+            'type is required and must be one of: "associate", "group", "direct"',
         },
         { status: 400 }
       );
     }
 
+    // Get channel (default to SMS for backwards compatibility)
+    const channel = body.channel === "whatsapp" ? "whatsapp" : "sms";
+
+    // Validate message or template
+    const isWhatsAppTemplate = channel === "whatsapp" && body.contentSid;
+
+    if (isWhatsAppTemplate) {
+      // Template-based WhatsApp message - contentSid is required
+      if (!body.contentSid || typeof body.contentSid !== "string") {
+        return NextResponse.json(
+          { error: "contentSid is required for WhatsApp template messages" },
+          { status: 400 }
+        );
+      }
+    } else {
+      // Regular message - message body is required
+      if (
+        !body.message ||
+        typeof body.message !== "string" ||
+        !body.message.trim()
+      ) {
+        return NextResponse.json(
+          { error: "message is required and must be a non-empty string" },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Get appropriate phone number based on channel
+    let senderNumber: string;
+    let twoWayPhoneNumber: string | undefined;
+    if (channel === "whatsapp") {
+      try {
+        senderNumber = await requireCompanyWhatsAppNumber(companyId);
+      } catch {
+        return NextResponse.json(
+          {
+            error:
+              "WhatsApp Business number is not configured. Please set TWILIO_WHATSAPP_NUMBER environment variable.",
+          },
+          { status: 400 }
+        );
+      }
+    } else {
+      senderNumber = await requireCompanyPhoneNumber(companyId);
+      twoWayPhoneNumber = senderNumber; // For SMS opt-out messages
+    }
+
+    // Get MessageService from container
+    const messageService = serviceContainer.getMessageService();
+
+    // Handle different message types
+    if (type === "direct") {
+      return await handleDirectMessage(
+        body,
+        companyId,
+        senderNumber,
+        channel,
+        isWhatsAppTemplate,
+        messageService
+      );
+    } else if (type === "associate") {
+      return await handleAssociateMessage(
+        body,
+        companyId,
+        senderNumber,
+        twoWayPhoneNumber,
+        channel,
+        isWhatsAppTemplate,
+        messageService
+      );
+    } else if (type === "group") {
+      return await handleGroupMessage(
+        body,
+        companyId,
+        senderNumber,
+        twoWayPhoneNumber,
+        channel,
+        isWhatsAppTemplate,
+        messageService
+      );
+    }
+
+    return NextResponse.json(
+      { error: "Invalid message type" },
+      { status: 400 }
+    );
+  } catch (error: unknown) {
+    console.error("Failed to send message:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to send message";
+
+    if (errorMessage.includes("Company not found")) {
+      return NextResponse.json(
+        { error: "Not authenticated or company not found" },
+        { status: 401 }
+      );
+    }
+
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
+  }
+}
+
+/**
+ * Handle direct message (existing send-message functionality)
+ */
+async function handleDirectMessage(
+  body: any,
+  companyId: string,
+  senderNumber: string,
+  channel: "sms" | "whatsapp",
+  isWhatsAppTemplate: boolean,
+  messageService: any
+) {
+  const { conversation_id, to } = body;
+
+  // Validate required fields for direct messages
+  if (!conversation_id || typeof conversation_id !== "string") {
+    return NextResponse.json(
+      { error: "conversation_id is required and must be a string" },
+      { status: 400 }
+    );
+  }
+
+  if (!to || typeof to !== "string") {
+    return NextResponse.json(
+      { error: "to (recipient phone number) is required and must be a string" },
+      { status: 400 }
+    );
+  }
+
+  // Send message via MessageService
+  // For WhatsApp templates, body.message may be undefined, so use empty string as fallback
+  const message = body.message ? body.message.trim() : "";
+  const result = await messageService.sendDirectMessage(
+    to,
+    message,
+    conversation_id,
+    channel,
+    companyId,
+    senderNumber,
+    isWhatsAppTemplate,
+    isWhatsAppTemplate
+      ? {
+          contentSid: body.contentSid,
+          contentVariables: body.contentVariables,
+        }
+      : undefined
+  );
+
+  if (!result.success) {
+    if (result.code === "21610" || String(result.code) === "21610") {
+      return NextResponse.json(
+        { error: "Recipient has opted out of SMS messages" },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        error: "Failed to send message",
+        details: result.error,
+        code: result.code,
+      },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json({
+    success: true,
+    message_id: result.messageId,
+    to: to,
+  });
+}
+
+/**
+ * Handle associate message (single recipient)
+ */
+async function handleAssociateMessage(
+  body: any,
+  companyId: string,
+  senderNumber: string,
+  twoWayPhoneNumber: string | undefined,
+  channel: "sms" | "whatsapp",
+  isWhatsAppTemplate: boolean,
+  messageService: any
+) {
+  const { id: associateId } = body;
+
+  if (!associateId || typeof associateId !== "string") {
+    return NextResponse.json(
+      { error: "id is required and must be a string for associate type" },
+      { status: 400 }
+    );
+  }
+
+  // Send message via MessageService
+  // For WhatsApp templates, body.message may be undefined, so use empty string as fallback
+  const message = body.message ? body.message.trim() : "";
+
+  // Log template data for debugging
+  if (isWhatsAppTemplate) {
+    console.log("📤 [API] Sending WhatsApp template message:", {
+      associateId,
+      contentSid: body.contentSid,
+      contentVariables: body.contentVariables,
+      channel,
+    });
+  }
+
+  let result;
+  try {
+    result = await messageService.sendMessageToAssociate(
+      associateId,
+      message,
+      channel,
+      companyId,
+      senderNumber,
+      twoWayPhoneNumber,
+      isWhatsAppTemplate,
+      isWhatsAppTemplate
+        ? {
+            contentSid: body.contentSid,
+            contentVariables: body.contentVariables,
+          }
+        : undefined
+    );
+  } catch (error) {
+    console.error("❌ [API] Exception in sendMessageToAssociate:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return NextResponse.json(
+      {
+        error: "Failed to send message",
+        details: errorMessage,
+        code: "EXCEPTION",
+      },
+      { status: 500 }
+    );
+  }
+
+  if (!result.success) {
+    const errorCode = result.code ? String(result.code) : null;
+    const errorMessage = result.error || "Unknown error";
+
+    // Handle specific Twilio error codes
     if (
-      !messageBody ||
-      typeof messageBody !== "string" ||
-      !messageBody.trim()
+      errorCode === "21610" ||
+      (typeof errorMessage === "string" &&
+        errorMessage.toLowerCase().includes("unsubscribed"))
     ) {
       return NextResponse.json(
         {
           error:
-            "body (message text) is required and must be a non-empty string",
+            "You cannot message this employee because they have unsubscribed from SMS notifications.",
+          code: errorCode || "21610",
+          userFriendly: true,
         },
         { status: 400 }
       );
     }
 
-    if (!sender || typeof sender !== "string") {
+    // Handle Twilio error 21656 - Invalid ContentVariables
+    if (errorCode === "21656" || String(errorCode) === "21656") {
+      console.error("❌ [API] Twilio error 21656 - Invalid ContentVariables");
+      console.error("❌ [API] Error details:", errorMessage);
+      console.error("❌ [API] Template data:", {
+        contentSid: body.contentSid,
+        contentVariables: body.contentVariables,
+      });
+
       return NextResponse.json(
-        { error: "sender is required and must be a string" },
+        {
+          error:
+            "Invalid template variables. Please check that all required variables are filled correctly.",
+          details: errorMessage,
+          code: errorCode,
+          userFriendly: true,
+        },
         { status: 400 }
       );
     }
 
-    // Send message via Twilio
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
-    const statusCallback = baseUrl
-      ? `${baseUrl}/api/twilio/status-callback`
-      : undefined;
+    // Handle other WhatsApp template errors
+    if (
+      isWhatsAppTemplate &&
+      typeof errorMessage === "string" &&
+      (errorMessage.toLowerCase().includes("template") ||
+        errorMessage.toLowerCase().includes("content") ||
+        errorMessage.toLowerCase().includes("variable"))
+    ) {
+      console.error("❌ [API] WhatsApp template error:", errorMessage);
+      console.error("❌ [API] Error code:", errorCode);
+      console.error("❌ [API] Template data:", {
+        contentSid: body.contentSid,
+        contentVariables: body.contentVariables,
+      });
 
-    console.log("📞 [PHONE DEBUG] About to send SMS via Twilio with:");
-    console.log("📞 [PHONE DEBUG]   FROM:", twoWayPhoneNumber);
-    console.log("📞 [PHONE DEBUG]   TO:", to);
-    console.log(
-      "📞 [PHONE DEBUG]   BODY:",
-      messageBody.trim().substring(0, 50) + "..."
-    );
+      return NextResponse.json(
+        {
+          error:
+            "Failed to send WhatsApp template message. Please verify the template and variables are correct.",
+          details: errorMessage,
+          code: errorCode,
+          userFriendly: true,
+        },
+        { status: 400 }
+      );
+    }
 
-    const message = await twilioClient.messages.create({
-      from: twoWayPhoneNumber,
-      to,
-      body: messageBody.trim(),
-      ...(statusCallback && { statusCallback }),
+    // Generic error response
+    console.error("❌ [API] Message send failed:", {
+      error: errorMessage,
+      code: errorCode,
+      channel,
+      isWhatsAppTemplate,
     });
 
-    console.log("📞 [PHONE DEBUG] SMS sent successfully:");
-    console.log("📞 [PHONE DEBUG]   Message SID:", message.sid);
-    console.log("📞 [PHONE DEBUG]   Status:", message.status);
-    console.log("📞 [PHONE DEBUG]   From (Twilio response):", message.from);
-    console.log("📞 [PHONE DEBUG]   To (Twilio response):", message.to);
-
-    // Save to Supabase messages table
-    const supabaseAdmin = createAdminClient();
-    const { error: insertError } = await supabaseAdmin.from("messages").insert([
+    return NextResponse.json(
       {
-        conversation_id,
-        sender_type: "company",
-        body: messageBody.trim(),
-        direction: "outbound",
-        status: message.status,
-        sent_at: message.dateCreated?.toISOString() || new Date().toISOString(),
-        // Store Twilio SID for status callback tracking
-        // Note: This requires twilio_sid field in messages table
-        // If migration hasn't been applied yet, this field will be ignored
-        twilio_sid: message.sid,
+        error: "Failed to send message",
+        details: errorMessage,
+        code: errorCode,
       },
-    ]);
-
-    if (insertError) {
-      console.error("Error saving message to Supabase:", insertError);
-      // Message was sent successfully via Twilio, but failed to save to DB
-      // Log the error but still return success since SMS was delivered
-      // In production, you might want to implement a retry mechanism here
-    }
-
-    return NextResponse.json({ sid: message.sid }, { status: 200 });
-  } catch (error) {
-    console.error("Error in send-message handler:", error);
-
-    // Handle Twilio-specific errors
-    if (error && typeof error === "object" && "code" in error) {
-      const twilioError = error as { code?: number; message?: string };
-      if (twilioError.code === 21211) {
-        return NextResponse.json(
-          { error: "Invalid phone number format" },
-          { status: 400 }
-        );
-      }
-      if (twilioError.code === 21610) {
-        return NextResponse.json(
-          { error: "Recipient has opted out of SMS messages" },
-          { status: 400 }
-        );
-      }
-    }
-
-    const errorMessage =
-      error instanceof Error ? error.message : "Failed to send message";
-
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+      { status: result.error === "Associate not found" ? 404 : 500 }
+    );
   }
+
+  return NextResponse.json({
+    success: true,
+    message_id: result.messageId,
+  });
+}
+
+/**
+ * Handle group message (multiple recipients)
+ */
+async function handleGroupMessage(
+  body: any,
+  companyId: string,
+  senderNumber: string,
+  twoWayPhoneNumber: string | undefined,
+  channel: "sms" | "whatsapp",
+  isWhatsAppTemplate: boolean,
+  messageService: any
+) {
+  const { id: groupId } = body;
+
+  if (!groupId || typeof groupId !== "string") {
+    return NextResponse.json(
+      { error: "id is required and must be a string for group type" },
+      { status: 400 }
+    );
+  }
+
+  // Send message via MessageService
+  // For WhatsApp templates, body.message may be undefined, so use empty string as fallback
+  const message = body.message ? body.message.trim() : "";
+  const result = await messageService.sendMessageToGroup(
+    groupId,
+    message,
+    channel,
+    companyId,
+    senderNumber,
+    twoWayPhoneNumber,
+    isWhatsAppTemplate,
+    isWhatsAppTemplate
+      ? {
+          contentSid: body.contentSid,
+          contentVariables: body.contentVariables,
+        }
+      : undefined
+  );
+
+  if (!result.success) {
+    return NextResponse.json(
+      {
+        error: "Failed to send group message",
+        total_members: result.total_members,
+        eligible_members: result.eligible_members,
+        unsubscribed_members: result.unsubscribed_members,
+      },
+      { status: 400 }
+    );
+  }
+
+  return NextResponse.json({
+    success: true,
+    total_members: result.total_members,
+    eligible_members: result.eligible_members,
+    messages_sent: result.messages_sent,
+    messages_failed: result.messages_failed,
+    errors: result.errors,
+    unsubscribed_members: result.unsubscribed_members,
+  });
 }
