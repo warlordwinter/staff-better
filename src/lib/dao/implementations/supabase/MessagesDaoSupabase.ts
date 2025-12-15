@@ -119,4 +119,54 @@ export class MessagesDaoSupabase implements IMessages {
 
     return data || [];
   }
+
+  /**
+   * Check if there's an inbound message in the last 24 hours for a conversation
+   * Returns the channel of the most recent inbound message if found, null otherwise
+   */
+  async hasRecentInboundMessage(
+    conversationId: string,
+    hoursAgo: number = 24
+  ): Promise<"sms" | "whatsapp" | null> {
+    const supabaseAdmin = createAdminClient();
+
+    // Calculate the timestamp for 24 hours ago
+    const hoursAgoDate = new Date();
+    hoursAgoDate.setHours(hoursAgoDate.getHours() - hoursAgo);
+
+    // Get the conversation to determine its channel
+    const { data: conversation, error: convError } = await supabaseAdmin
+      .from("conversations")
+      .select("channel")
+      .eq("id", conversationId)
+      .single();
+
+    if (convError || !conversation) {
+      console.error("Error fetching conversation:", convError);
+      return null;
+    }
+
+    // Check for inbound messages in the last 24 hours
+    const { data: messages, error } = await supabaseAdmin
+      .from("messages")
+      .select("sent_at, direction")
+      .eq("conversation_id", conversationId)
+      .eq("direction", "inbound")
+      .gte("sent_at", hoursAgoDate.toISOString())
+      .order("sent_at", { ascending: false })
+      .limit(1);
+
+    if (error) {
+      console.error("Error checking for recent inbound messages:", error);
+      return null;
+    }
+
+    // If we found an inbound message in the last 24 hours, return the conversation's channel
+    if (messages && messages.length > 0) {
+      // Return the conversation's channel (which should match the message channel)
+      return conversation.channel === "whatsapp" ? "whatsapp" : "sms";
+    }
+
+    return null;
+  }
 }

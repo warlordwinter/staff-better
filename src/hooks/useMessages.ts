@@ -530,12 +530,17 @@ export function useMessages(
     setMessageText("");
 
     try {
+      // Determine channel: if conversation is WhatsApp, use WhatsApp
+      // Otherwise default to SMS (the API will auto-switch if needed based on 24h rule)
+      const channel = selectedConversation.channel === "whatsapp" ? "whatsapp" : "sms";
+
       // Send message via API
       // The message will be added to the UI via real-time subscription
       // when it's saved to the database, preventing duplicates
       await MessagesDataService.sendMessage(
         selectedConversation.associateId,
-        messageToSend
+        messageToSend,
+        channel
       );
 
       // Scroll to bottom after sending message

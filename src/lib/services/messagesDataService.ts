@@ -168,11 +168,15 @@ export class MessagesDataService {
   }
 
   /**
-   * Send a message to an associate via SMS
+   * Send a message to an associate
+   * @param associateId - The associate ID
+   * @param message - The message text
+   * @param channel - Optional channel type. If not provided, defaults to "sms"
    */
   static async sendMessage(
     associateId: string,
-    message: string
+    message: string,
+    channel: "sms" | "whatsapp" = "sms"
   ): Promise<SendMessageResponse> {
     const response = await fetch(`/api/send-message`, {
       method: "POST",
@@ -183,7 +187,7 @@ export class MessagesDataService {
         type: "associate",
         id: associateId,
         message: message.trim(),
-        channel: "sms",
+        channel: channel,
       }),
     });
 

@@ -5,6 +5,7 @@ import {
   requireCompanyWhatsAppNumber,
 } from "@/lib/auth/getCompanyId";
 import { serviceContainer } from "@/lib/services/ServiceContainer";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
  * POST /api/send-message
@@ -179,6 +180,45 @@ async function handleDirectMessage(
     );
   }
 
+  // Check if we received a message in the last 24 hours
+  const messagesDao = serviceContainer.getMessagesDao();
+  const recentChannel = await messagesDao.hasRecentInboundMessage(
+    conversation_id,
+    24
+  );
+
+  // If trying to send WhatsApp and no recent inbound message, enforce 24-hour rule
+  if (channel === "whatsapp" && !recentChannel) {
+    return NextResponse.json(
+      {
+        error:
+          "You can only send WhatsApp messages to users who have messaged you in the last 24 hours. Please use a WhatsApp template for messages outside the 24-hour window.",
+      },
+      { status: 400 }
+    );
+  }
+
+  // If the recent message was via WhatsApp, force WhatsApp channel
+  // This ensures we respond on the same channel they used
+  if (recentChannel === "whatsapp" && channel !== "whatsapp") {
+    console.log(
+      `🔄 Auto-switching to WhatsApp channel (user messaged via WhatsApp in last 24h)`
+    );
+    channel = "whatsapp";
+    // If switching to WhatsApp, we need to use WhatsApp sender number
+    try {
+      senderNumber = await requireCompanyWhatsAppNumber(companyId);
+    } catch {
+      return NextResponse.json(
+        {
+          error:
+            "WhatsApp Business number is not configured. Please set TWILIO_WHATSAPP_NUMBER environment variable.",
+        },
+        { status: 400 }
+      );
+    }
+  }
+
   // Send message via MessageService
   // For WhatsApp templates, body.message may be undefined, so use empty string as fallback
   const message = body.message ? body.message.trim() : "";
@@ -242,6 +282,66 @@ async function handleAssociateMessage(
       { error: "id is required and must be a string for associate type" },
       { status: 400 }
     );
+  }
+
+  // Find the conversation(s) for this associate to check for recent inbound messages
+  const supabaseAdmin = createAdminClient();
+  const { data: conversations, error: convError } = await supabaseAdmin
+    .from("conversations")
+    .select("id, channel")
+    .eq("associate_id", associateId)
+    .eq("company_id", companyId)
+    .order("updated_at", { ascending: false });
+
+  if (convError) {
+    console.error("Error fetching conversations:", convError);
+  }
+
+  // Check for recent inbound messages in any conversation for this associate
+  const messagesDao = serviceContainer.getMessagesDao();
+  let recentChannel: "sms" | "whatsapp" | null = null;
+
+  if (conversations && conversations.length > 0) {
+    // Check all conversations for recent inbound messages
+    for (const conv of conversations) {
+      const channel = await messagesDao.hasRecentInboundMessage(conv.id, 24);
+      if (channel) {
+        recentChannel = channel;
+        break; // Use the first one we find
+      }
+    }
+  }
+
+  // If trying to send WhatsApp and no recent inbound message, enforce 24-hour rule
+  if (channel === "whatsapp" && !recentChannel) {
+    return NextResponse.json(
+      {
+        error:
+          "You can only send WhatsApp messages to users who have messaged you in the last 24 hours. Please use a WhatsApp template for messages outside the 24-hour window.",
+      },
+      { status: 400 }
+    );
+  }
+
+  // If the recent message was via WhatsApp, force WhatsApp channel
+  // This ensures we respond on the same channel they used
+  if (recentChannel === "whatsapp" && channel !== "whatsapp") {
+    console.log(
+      `🔄 Auto-switching to WhatsApp channel (user messaged via WhatsApp in last 24h)`
+    );
+    channel = "whatsapp";
+    // If switching to WhatsApp, we need to use WhatsApp sender number
+    try {
+      senderNumber = await requireCompanyWhatsAppNumber(companyId);
+    } catch {
+      return NextResponse.json(
+        {
+          error:
+            "WhatsApp Business number is not configured. Please set TWILIO_WHATSAPP_NUMBER environment variable.",
+        },
+        { status: 400 }
+      );
+    }
   }
 
   // Send message via MessageService
