@@ -162,7 +162,6 @@ export default function ComposeMessageModal({
     }));
   };
 
-
   // Filter associates based on search query
   const filteredAssociates = useMemo(() => {
     if (!searchQuery.trim()) {
@@ -180,7 +179,9 @@ export default function ComposeMessageModal({
 
   // Only show associates with phone numbers
   const associatesWithPhones = useMemo(() => {
-    return filteredAssociates.filter((a) => a.phoneNumber && a.phoneNumber.trim() !== "");
+    return filteredAssociates.filter(
+      (a) => a.phoneNumber && a.phoneNumber.trim() !== ""
+    );
   }, [filteredAssociates]);
 
   const toggleAssociateSelection = (associateId: string) => {
@@ -437,10 +438,13 @@ export default function ComposeMessageModal({
                 {!selectedTemplate ? (
                   <div className="space-y-2">
                     <select
-                      value={selectedTemplate?.sid || ""}
+                      value=""
                       onChange={(e) => {
+                        const selectedSid = e.target.value;
+                        if (!selectedSid) return;
+
                         const template = templates.find(
-                          (t) => t.sid === e.target.value
+                          (t) => t.sid === selectedSid
                         );
                         if (template) {
                           handleTemplateSelect(template);
@@ -586,12 +590,15 @@ export default function ComposeMessageModal({
             className="px-6 py-2 bg-orange-500 text-white rounded-lg font-medium hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {sendLoading
-              ? `Sending to ${selectedAssociateIds.size} recipient${selectedAssociateIds.size !== 1 ? "s" : ""}...`
-              : `Send to ${selectedAssociateIds.size} recipient${selectedAssociateIds.size !== 1 ? "s" : ""}`}
+              ? `Sending to ${selectedAssociateIds.size} recipient${
+                  selectedAssociateIds.size !== 1 ? "s" : ""
+                }...`
+              : `Send to ${selectedAssociateIds.size} recipient${
+                  selectedAssociateIds.size !== 1 ? "s" : ""
+                }`}
           </button>
         </div>
       </div>
     </div>
   );
 }
-

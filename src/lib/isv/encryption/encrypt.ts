@@ -8,7 +8,6 @@ import { ISV_CONFIG } from '../config';
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
 const SALT_LENGTH = 64;
-const TAG_LENGTH = 16;
 
 /**
  * Derive encryption key from environment variable
@@ -55,7 +54,8 @@ export function decrypt(encryptedData: string): string {
     throw new Error('Invalid encrypted data format');
   }
   
-  const [saltHex, ivHex, tagHex, encrypted] = parts;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_saltHex, ivHex, tagHex, encrypted] = parts;
   const iv = Buffer.from(ivHex, 'hex');
   const tag = Buffer.from(tagHex, 'hex');
   

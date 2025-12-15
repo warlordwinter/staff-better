@@ -240,9 +240,10 @@ export default function AssociatesPageView({
   isAuthenticated,
   associates,
   loading,
-  messageText,
-  messageType,
-  selectedAssociate,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  messageText: _messageText,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  messageType: _messageType,
   showMassMessageModal,
   showIndividualMessageModal,
   showAddNewModal,
@@ -254,7 +255,6 @@ export default function AssociatesPageView({
   showToast,
   sendLoading,
   sendSuccess,
-  sendError,
   isSubmitting,
   onMessageTextChange,
   onMessageTypeChange,
@@ -492,7 +492,6 @@ export default function AssociatesPageView({
       {/* Modals */}
       <ComposeMessageModal
         isOpen={showIndividualMessageModal}
-        associate={selectedAssociate}
         onSend={async (data) => {
           // Update message text and type state
           if (data.message) {
@@ -506,7 +505,6 @@ export default function AssociatesPageView({
         }}
         sendLoading={sendLoading}
         sendSuccess={sendSuccess}
-        error={sendError}
         onCancel={onCancelMessage}
       />
 
@@ -521,11 +519,11 @@ export default function AssociatesPageView({
           if (onMessageTypeChange) {
             onMessageTypeChange(data.messageType);
           }
-          
+
           // Send messages directly to selected associates
           // This matches the pattern used in the messages page
           try {
-            const results = await Promise.allSettled(
+            await Promise.allSettled(
               data.associateIds.map((associateId) =>
                 fetch("/api/send-message", {
                   method: "POST",

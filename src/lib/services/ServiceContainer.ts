@@ -26,7 +26,6 @@ import { TemplateDao } from "../isv/dao/TemplateDao";
 import { ISVCustomerDao } from "../isv/dao/ISVCustomerDao";
 import { ISVNumberDao } from "../isv/dao/ISVNumberDao";
 import { CampaignDao } from "../isv/dao/CampaignDao";
-import { ScheduleConfig } from "./types";
 
 export class ServiceContainer {
   private static instance: ServiceContainer;
@@ -127,7 +126,10 @@ export class ServiceContainer {
     this.services.set("groupsDao", groupsDao);
     this.services.set("conversationsDao", conversationsDao);
     this.services.set("messagesDao", messagesDao);
-    this.services.set("twilioWhatsAppTemplateService", twilioWhatsAppTemplateService);
+    this.services.set(
+      "twilioWhatsAppTemplateService",
+      twilioWhatsAppTemplateService
+    );
     this.services.set("twilioPhoneNumberService", twilioPhoneNumberService);
     this.services.set("reminderService", reminderService);
     this.services.set("incomingMessageService", incomingMessageService);

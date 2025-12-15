@@ -15,8 +15,15 @@ export interface UseAssociateMessagingReturn {
   setShowIndividualMessageModal: (show: boolean) => void;
   setSelectedAssociate: (associate: AssociateGroup | null) => void;
   sendMessage: (
-    associates: AssociateGroup[],
-    onUnsubscribed?: (names: string[]) => void
+    associatesOrTemplateData?:
+      | AssociateGroup[]
+      | {
+          contentSid: string;
+          contentVariables?: Record<string, string>;
+        },
+    onUnsubscribed?: (names: string[]) => void,
+    channel?: "sms" | "whatsapp",
+    allAssociates?: AssociateGroup[]
   ) => Promise<void>;
   cancelMessage: () => void;
   messageAssociate: (associate: AssociateGroup) => void;

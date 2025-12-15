@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, use, useCallback } from "react";
+import React, { useState, useEffect, use } from "react";
 import Link from "next/link";
 import Navbar from "@/components/ui/navBar";
 import Footer from "@/components/ui/footer";
@@ -46,7 +46,6 @@ export default function GroupPage({ params }: GroupPageProps) {
   const [loadingAssociates, setLoadingAssociates] = useState(false);
   const [sendSuccess, setSendSuccess] = useState(false);
   const [sendLoading, setSendLoading] = useState(false);
-  const [sendError, setSendError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState("");
   const [toastType, setToastType] = useState<"error" | "success" | "info">(
     "info"
@@ -264,7 +263,6 @@ export default function GroupPage({ params }: GroupPageProps) {
     console.log("Setting loading state and sending message...");
     setSendLoading(true);
     setSendSuccess(false);
-    setSendError(null);
     setShowToast(false);
 
     try {
@@ -320,7 +318,6 @@ export default function GroupPage({ params }: GroupPageProps) {
         setShowMassMessageModal(false);
         setShowIndividualMessageModal(false);
         setSelectedAssociate(null);
-        setSendError(null);
       }, 1000);
     } catch (error) {
       console.error("Error sending message:", error);
@@ -328,7 +325,9 @@ export default function GroupPage({ params }: GroupPageProps) {
         error instanceof Error
           ? error.message
           : "Failed to send message. Please try again.";
-      setSendError(errorMessage);
+      setToastMessage(errorMessage);
+      setToastType("error");
+      setShowToast(true);
     } finally {
       setSendLoading(false);
     }
@@ -340,25 +339,7 @@ export default function GroupPage({ params }: GroupPageProps) {
     setShowMassMessageModal(false);
     setShowIndividualMessageModal(false);
     setSelectedAssociate(null);
-    setSendError(null);
   };
-
-  // Memoize the send handler to ensure stable reference
-  const memoizedHandleSend = useCallback(
-    (templateData?: {
-      contentSid: string;
-      contentVariables?: Record<string, string>;
-    }) => {
-      console.log(
-        "🔵🔵🔵 GROUP PAGE Wrapper function called with:",
-        templateData
-      );
-      console.log("🔵🔵🔵 GROUP PAGE About to call handleSendMessage");
-      console.log("🔵🔵🔵 GROUP PAGE groupId:", groupId);
-      return handleSendMessage(templateData);
-    },
-    [groupId, messageType, messageText, selectedAssociate]
-  );
 
   // Show loading spinner while checking authentication
   if (authLoading) {
@@ -435,12 +416,12 @@ export default function GroupPage({ params }: GroupPageProps) {
             setMessageText(data.message);
           }
           setMessageType(data.messageType);
-          
+
           // For groups page, we want to send to all group members
           // So we'll send to the selected associates from the modal
           // If they selected all group members, it will work as expected
           // Otherwise, they can select specific ones
-          
+
           // Send messages directly to selected associates
           try {
             const results = await Promise.allSettled(
@@ -469,17 +450,12 @@ export default function GroupPage({ params }: GroupPageProps) {
               )
             );
 
-            const successful = results.filter(
-              (r) => r.status === "fulfilled"
-            ).length;
-            const failed = results.filter((r) => r.status === "rejected").length;
-
             // Check for unsubscribed members
             const unsubscribedAssociates: Array<{
               firstName: string;
               lastName: string;
             }> = [];
-            
+
             results.forEach((result, index) => {
               if (result.status === "rejected") {
                 const associate = associates.find(
@@ -543,7 +519,6 @@ export default function GroupPage({ params }: GroupPageProps) {
 
       <ComposeMessageModal
         isOpen={showIndividualMessageModal}
-        associate={selectedAssociate}
         onSend={async (data) => {
           // Update message text and type state
           setMessageText(data.message || "");
@@ -553,7 +528,6 @@ export default function GroupPage({ params }: GroupPageProps) {
         }}
         sendLoading={sendLoading}
         sendSuccess={sendSuccess}
-        error={sendError}
         onCancel={handleCancelMessage}
       />
 

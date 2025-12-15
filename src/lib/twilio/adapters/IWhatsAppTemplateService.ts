@@ -1,5 +1,4 @@
 // Interface for WhatsApp template service
-import { Template } from "../../isv/types";
 
 export interface IWhatsAppTemplateService {
   /**
@@ -22,4 +21,3 @@ export interface IWhatsAppTemplateService {
     templateSid: string
   ): Promise<{ status: string }>;
 }
-

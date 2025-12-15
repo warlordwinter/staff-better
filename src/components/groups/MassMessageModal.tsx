@@ -75,7 +75,7 @@ export default function MassMessageModal({
     ) {
       fetchTemplates();
     }
-  }, [isOpen, messageType]);
+  }, [isOpen, messageType, loadingTemplates, templates.length]);
 
   // Reset template selection when switching message types
   useEffect(() => {
@@ -100,7 +100,7 @@ export default function MassMessageModal({
     setLoadingTemplates(true);
     try {
       // First try to get approved templates
-      let response = await fetch("/api/twilio/templates");
+      const response = await fetch("/api/twilio/templates");
       if (response.ok) {
         const data = await response.json();
         console.log("📋 Template fetch response:", data);

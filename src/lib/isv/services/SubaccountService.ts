@@ -7,7 +7,6 @@ import {
 import { TwilioSubaccountDao } from "../dao/TwilioSubaccountDao";
 import { ISVCustomerDao } from "../dao/ISVCustomerDao";
 import { getSubaccountClient } from "../twilio/master-client";
-import { decrypt } from "../encryption/encrypt";
 import { TwilioSubaccount } from "../types";
 
 export class SubaccountService {

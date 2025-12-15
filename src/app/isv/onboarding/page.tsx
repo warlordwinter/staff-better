@@ -82,7 +82,7 @@ export default function ISVOnboardingPage() {
         throw new Error(errorData.error || "Failed to create customer");
       }
 
-      const customer = await response.json();
+      await response.json();
       router.push(`/settings`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");

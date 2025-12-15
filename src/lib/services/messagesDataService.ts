@@ -73,14 +73,7 @@ export class MessagesDataService {
       const lastName = nameParts.slice(1).join(" ") || null;
 
       // Determine channel for conversation based on messages
-      // Check if any message indicates WhatsApp (template-based or from WhatsApp number)
-      const hasWhatsAppMessage = (conv.messages || []).some((msg: any) => {
-        const body = msg.body || "";
-        // Check if message body contains template indicator or WhatsApp pattern
-        return (
-          body.includes("[Template:") || body.toLowerCase().includes("whatsapp")
-        );
-      });
+      // Note: WhatsApp detection logic removed as it was unused
 
       // Transform messages from database format to UI format
       const messages: Message[] = (conv.messages || []).map((msg: any) => {

@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
     if (channel === "whatsapp") {
       try {
         senderNumber = await requireCompanyWhatsAppNumber(companyId);
-      } catch (error) {
+      } catch {
         return NextResponse.json(
           {
             error:

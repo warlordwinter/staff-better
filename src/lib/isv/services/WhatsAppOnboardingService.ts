@@ -26,7 +26,7 @@ export class WhatsAppOnboardingService {
       throw new Error('Customer not found');
     }
 
-    const twilioClient = await this.subaccountService.getCustomerTwilioClient(customerId);
+    await this.subaccountService.getCustomerTwilioClient(customerId);
 
     try {
       // Initiate WABA linking via Twilio API

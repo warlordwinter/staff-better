@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Navbar from "@/components/ui/navBar";
 import Footer from "@/components/ui/footer";
 import LoadingSpinner from "@/components/ui/loadingSpinner";
@@ -30,14 +30,7 @@ export default function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Load templates on mount
-  useEffect(() => {
-    if (isAuthenticated && !authLoading) {
-      loadTemplates();
-    }
-  }, [isAuthenticated, authLoading]);
-
-  const loadTemplates = async () => {
+  const loadTemplates = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch("/api/twilio/templates?includePending=true");
@@ -82,7 +75,14 @@ export default function TemplatesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
+
+  // Load templates on mount
+  useEffect(() => {
+    if (isAuthenticated && !authLoading) {
+      loadTemplates();
+    }
+  }, [isAuthenticated, authLoading, loadTemplates]);
 
   const getStatusColor = (status: Template["status"]) => {
     switch (status) {

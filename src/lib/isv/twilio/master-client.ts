@@ -107,7 +107,10 @@ export async function createSubaccountApiKey(
  * Create auth token for a subaccount
  * @deprecated Use createSubaccountApiKey instead
  */
-export async function createSubaccountToken(subaccountSid: string) {
+export async function createSubaccountToken(
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _subaccountSid: string
+) {
   try {
     // Note: Twilio doesn't have a direct API to create tokens for subaccounts
     // You need to use the subaccount's own credentials

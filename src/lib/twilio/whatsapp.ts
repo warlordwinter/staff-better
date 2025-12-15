@@ -269,12 +269,13 @@ export async function sendWhatsAppTemplate(
       } else {
         // Already an object - use directly
         variablesObject = {};
-        const sortedKeys = Object.keys(message.contentVariables).sort(
+        const contentVars = message.contentVariables as Record<string, string>;
+        const sortedKeys = Object.keys(contentVars).sort(
           (a, b) => parseInt(a) - parseInt(b)
         );
 
         sortedKeys.forEach((key) => {
-          const value = message.contentVariables![key];
+          const value = contentVars[key];
           if (!value || typeof value !== "string" || !value.trim()) {
             throw new Error(
               `Template variable ${key} is required but is empty`

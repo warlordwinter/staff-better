@@ -8,11 +8,11 @@ import { fetchTemplateBySid } from "@/lib/twilio/templates";
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { sid: string } }
+  { params }: { params: Promise<{ sid: string }> }
 ) {
   try {
     const companyId = await requireCompanyId();
-    const templateSid = params.sid;
+    const { sid: templateSid } = await params;
 
     if (!templateSid) {
       return NextResponse.json(

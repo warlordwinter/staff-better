@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
  * GET /api/isv/customers
  * List all ISV customers
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Require authentication
     const user = await requireAuthWithSetup();

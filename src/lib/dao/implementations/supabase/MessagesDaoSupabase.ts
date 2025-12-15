@@ -47,7 +47,8 @@ export class MessagesDaoSupabase implements IMessages {
         );
 
         // Remove twilio_sid and try again
-        const { twilio_sid, ...insertDataWithoutSid } = insertData;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { twilio_sid: _twilio_sid, ...insertDataWithoutSid } = insertData;
         const retryResult = await supabaseAdmin
           .from("messages")
           .insert([insertDataWithoutSid])

@@ -44,7 +44,10 @@ export interface UseAssociatesPageReturn {
   loadAssociates: () => Promise<void>;
   saveAssociate: (updatedAssociate: AssociateGroup) => Promise<void>;
   deleteAssociate: (associateId: string) => Promise<void>;
-  sendMessage: (templateData?: { contentSid: string; contentVariables?: Record<string, string> }) => Promise<void>;
+  sendMessage: (templateData?: {
+    contentSid: string;
+    contentVariables?: Record<string, string>;
+  }) => Promise<void>;
   cancelMessage: () => void;
   addNew: () => void;
   cancelAddNew: () => void;
@@ -70,7 +73,7 @@ export function useAssociatesPage(
   const messaging = useAssociateMessaging((message, type) => {
     toast.showToastMessage(message, type);
   });
-  
+
   // Message type state (SMS or WhatsApp)
   const [messageType, setMessageType] = useState<"sms" | "whatsapp">("sms");
 
@@ -84,15 +87,26 @@ export function useAssociatesPage(
 
   // Wrapper for sendMessage that uses associates list
   // Now accepts template data for WhatsApp templates
-  const sendMessage = async (
-    templateData?: { contentSid: string; contentVariables?: Record<string, string> }
-  ) => {
-    await messaging.sendMessage(
-      templateData || associates.associates,
-      undefined, // onUnsubscribed callback
-      messageType,
-      associates.associates // Always pass associates list for template data case
-    );
+  const sendMessage = async (templateData?: {
+    contentSid: string;
+    contentVariables?: Record<string, string>;
+  }) => {
+    if (templateData) {
+      // When template data is provided, pass it as first arg and associates as 4th arg
+      await messaging.sendMessage(
+        templateData,
+        undefined, // onUnsubscribed callback
+        messageType,
+        associates.associates
+      );
+    } else {
+      // When no template data, pass associates as first arg (legacy behavior)
+      await messaging.sendMessage(
+        associates.associates,
+        undefined, // onUnsubscribed callback
+        messageType
+      );
+    }
   };
 
   // Wrapper for submitNewAssociate that uses createAssociate

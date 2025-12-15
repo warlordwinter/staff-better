@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireCompanyId } from "@/lib/auth/getCompanyId";
-import { createTemplate } from "@/lib/twilio/templates";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -95,10 +94,15 @@ export async function POST(request: NextRequest) {
 
     // Validate category
     if (
-      !["MARKETING", "UTILITY", "AUTHENTICATION"].includes(templateData.category)
+      !["MARKETING", "UTILITY", "AUTHENTICATION"].includes(
+        templateData.category
+      )
     ) {
       return NextResponse.json(
-        { error: "Invalid category. Must be MARKETING, UTILITY, or AUTHENTICATION" },
+        {
+          error:
+            "Invalid category. Must be MARKETING, UTILITY, or AUTHENTICATION",
+        },
         { status: 400 }
       );
     }
@@ -143,7 +147,7 @@ export async function POST(request: NextRequest) {
       // If table doesn't exist, we'll need to create it
       // For now, return a mock response
       console.warn("Database error (table may not exist):", dbError);
-      
+
       // Return a mock template for now
       return NextResponse.json({
         template: {
@@ -189,4 +193,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
-

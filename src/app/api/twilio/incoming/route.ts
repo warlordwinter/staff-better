@@ -254,13 +254,14 @@ export async function POST(request: NextRequest) {
     );
 
     // First, try to find conversation with exact channel match
-    let { data: conversations, error: conversationError } = await supabaseAdmin
-      .from("conversations")
-      .select("*")
-      .eq("associate_id", associate.id)
-      .eq("company_id", associate.company_id)
-      .eq("channel", channel)
-      .limit(1);
+    const { data: conversations, error: conversationError } =
+      await supabaseAdmin
+        .from("conversations")
+        .select("*")
+        .eq("associate_id", associate.id)
+        .eq("company_id", associate.company_id)
+        .eq("channel", channel)
+        .limit(1);
 
     let conversation_id: string | undefined;
 

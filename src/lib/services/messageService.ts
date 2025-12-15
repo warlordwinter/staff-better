@@ -5,11 +5,7 @@ import { IAssociates } from "../dao/interfaces/IAssociates";
 import { IGroups } from "../dao/interfaces/IGroups";
 import { IConversations } from "../dao/interfaces/IConversations";
 import { IMessages } from "../dao/interfaces/IMessages";
-import {
-  SMSResult,
-  WhatsAppResult,
-  WhatsAppTemplateMessage,
-} from "../twilio/types";
+import { SMSResult, WhatsAppResult } from "../twilio/types";
 import { sendSMSOptOutIfNeeded } from "../utils/optOutUtils";
 
 export interface SendMessageResult {

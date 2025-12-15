@@ -181,7 +181,8 @@ export async function requireCompanyPhoneNumber(
  * @returns The WhatsApp number or null if not found
  */
 export async function getCompanyWhatsAppNumber(
-  companyId?: string
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _companyId?: string
 ): Promise<string | null> {
   // First check environment variable
   if (TWILIO_WHATSAPP_NUMBER) {
