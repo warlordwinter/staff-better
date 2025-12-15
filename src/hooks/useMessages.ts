@@ -80,25 +80,24 @@ export function useMessages(
       }
 
       const isSelected = selectedConversation?.id === conversation.id;
-      
-      // Update conversation channel based on new messages
+
+      // Add message to conversation
       const updatedMessages = [...conversation.messages, message];
-      const channelCounts = updatedMessages.reduce((acc, msg) => {
-        const ch = msg.channel || "sms";
-        acc[ch] = (acc[ch] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
-      
-      const updatedChannel: "sms" | "whatsapp" = 
-        (channelCounts.whatsapp || 0) > (channelCounts.sms || 0) ? "whatsapp" : "sms";
-      
+
+      // IMPORTANT: Preserve the conversation's channel from the database
+      // Don't recalculate based on message counts - the channel is set when
+      // the conversation is created and should remain consistent.
+      // The channel represents which channel the conversation is on, not
+      // which channel has more messages.
+      const conversationChannel = conversation.channel || "sms";
+
       return {
         ...conversation,
         messages: updatedMessages,
         lastMessage: message.text,
         timestamp: message.timestamp,
         unread: direction === "inbound" ? !isSelected : conversation.unread,
-        channel: updatedChannel,
+        channel: conversationChannel, // Preserve existing channel, don't recalculate
       };
     },
     [selectedConversation]
@@ -184,6 +183,7 @@ export function useMessages(
             sender_type: string;
             sent_at: string | null;
             status: string | null;
+            delivered_at: string | null;
           };
 
           console.log("New message received:", newMessage);
@@ -200,16 +200,19 @@ export function useMessages(
 
           const body = newMessage.body || "";
           // Determine channel for individual message
-          const messageChannel: "sms" | "whatsapp" = 
-            body.includes("[Template:") || 
+          const messageChannel: "sms" | "whatsapp" =
+            body.includes("[Template:") ||
             body.toLowerCase().includes("whatsapp") ||
-            (newMessage.sender_type && newMessage.sender_type.toLowerCase().includes("whatsapp"))
+            (newMessage.sender_type &&
+              newMessage.sender_type.toLowerCase().includes("whatsapp"))
               ? "whatsapp"
               : "sms";
 
           // Extract template SID if this is a template message
           const templateSidMatch = body.match(/\[Template:\s*([^\]]+)\]/);
-          const templateSid = templateSidMatch ? templateSidMatch[1].trim() : null;
+          const templateSid = templateSidMatch
+            ? templateSidMatch[1].trim()
+            : null;
 
           // Extract template variables if present
           const variablesMatch = body.match(/\[Variables:\s*({[^}]+})\]/);
@@ -223,20 +226,32 @@ export function useMessages(
           }
 
           // Helper function to substitute variables in template content
-          const substituteVariables = (content: string, vars: Record<string, string> | null): string => {
+          const substituteVariables = (
+            content: string,
+            vars: Record<string, string> | null
+          ): string => {
             if (!vars || Object.keys(vars).length === 0) return content;
             let substituted = content;
-            const sortedKeys = Object.keys(vars).sort((a, b) => parseInt(a) - parseInt(b));
+            const sortedKeys = Object.keys(vars).sort(
+              (a, b) => parseInt(a) - parseInt(b)
+            );
             for (const key of sortedKeys) {
               const placeholder = `{{${key}}}`;
               const value = vars[key];
-              substituted = substituted.replace(new RegExp(placeholder.replace(/[{}]/g, '\\$&'), 'g'), value);
+              substituted = substituted.replace(
+                new RegExp(placeholder.replace(/[{}]/g, "\\$&"), "g"),
+                value
+              );
             }
             return substituted;
           };
 
           // Handle template messages - fetch template details asynchronously
-          let displayText: string = body.replace(/\[Template: [^\]]+\]\s*/g, "").replace(/\[Variables: [^\]]+\]\s*/g, "").trim() || body;
+          let displayText: string =
+            body
+              .replace(/\[Template: [^\]]+\]\s*/g, "")
+              .replace(/\[Variables: [^\]]+\]\s*/g, "")
+              .trim() || body;
           let templateName: string | undefined;
           let templateContent: string | undefined;
 
@@ -250,9 +265,12 @@ export function useMessages(
                   // Substitute variables in template content if available
                   let finalContent = templateData.content || "";
                   if (finalContent && templateVariables) {
-                    finalContent = substituteVariables(finalContent, templateVariables);
+                    finalContent = substituteVariables(
+                      finalContent,
+                      templateVariables
+                    );
                   }
-                  
+
                   // Update the message with template details
                   setConversations((prev) => {
                     return prev.map((conv) => {
@@ -263,7 +281,8 @@ export function useMessages(
                             if (msg.id === newMessage.id) {
                               // Show template content with substituted variables if available, otherwise show template name
                               // The template name will be shown separately in the UI header
-                              const templateDisplayText = finalContent || templateData.friendlyName;
+                              const templateDisplayText =
+                                finalContent || templateData.friendlyName;
                               return {
                                 ...msg,
                                 text: templateDisplayText,
@@ -285,7 +304,7 @@ export function useMessages(
                 console.error("Failed to fetch template details:", error);
                 // Keep the original display text if fetch fails
               });
-            
+
             // Show placeholder while fetching
             displayText = `[Template: ${templateSid}]`;
           }
@@ -300,6 +319,8 @@ export function useMessages(
             templateSid: templateSid || undefined,
             templateName,
             templateContent,
+            status: newMessage.status || null,
+            deliveredAt: newMessage.delivered_at || null,
           };
 
           // Add message to conversation
@@ -348,6 +369,60 @@ export function useMessages(
               });
 
             return prev;
+          });
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "messages",
+        },
+        (payload) => {
+          const updatedMessage = payload.new as {
+            id: string;
+            conversation_id: string;
+            status: string | null;
+            delivered_at: string | null;
+          };
+
+          console.log("📨 [REALTIME] Message UPDATE event received:", {
+            messageId: updatedMessage.id,
+            conversationId: updatedMessage.conversation_id,
+            newStatus: updatedMessage.status,
+            deliveredAt: updatedMessage.delivered_at,
+          });
+
+          // Update message status in the UI
+          setConversations((prev) => {
+            const updated = prev.map((conv) => {
+              if (conv.id === updatedMessage.conversation_id) {
+                const messageUpdated = conv.messages.some(
+                  (msg) => msg.id === updatedMessage.id
+                );
+                if (messageUpdated) {
+                  console.log(
+                    `✅ [REALTIME] Updating message ${updatedMessage.id} status to ${updatedMessage.status}`
+                  );
+                }
+                return {
+                  ...conv,
+                  messages: conv.messages.map((msg) => {
+                    if (msg.id === updatedMessage.id) {
+                      return {
+                        ...msg,
+                        status: updatedMessage.status || undefined,
+                        deliveredAt: updatedMessage.delivered_at || undefined,
+                      };
+                    }
+                    return msg;
+                  }),
+                };
+              }
+              return conv;
+            });
+            return updated;
           });
         }
       )
@@ -532,7 +607,8 @@ export function useMessages(
     try {
       // Determine channel: if conversation is WhatsApp, use WhatsApp
       // Otherwise default to SMS (the API will auto-switch if needed based on 24h rule)
-      const channel = selectedConversation.channel === "whatsapp" ? "whatsapp" : "sms";
+      const channel =
+        selectedConversation.channel === "whatsapp" ? "whatsapp" : "sms";
 
       // Send message via API
       // The message will be added to the UI via real-time subscription

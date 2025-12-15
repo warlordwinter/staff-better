@@ -188,7 +188,8 @@ async function handleDirectMessage(
   );
 
   // If trying to send WhatsApp and no recent inbound message, enforce 24-hour rule
-  if (channel === "whatsapp" && !recentChannel) {
+  // EXCEPTION: WhatsApp templates can be sent outside the 24-hour window
+  if (channel === "whatsapp" && !recentChannel && !isWhatsAppTemplate) {
     return NextResponse.json(
       {
         error:
@@ -313,7 +314,8 @@ async function handleAssociateMessage(
   }
 
   // If trying to send WhatsApp and no recent inbound message, enforce 24-hour rule
-  if (channel === "whatsapp" && !recentChannel) {
+  // EXCEPTION: WhatsApp templates can be sent outside the 24-hour window
+  if (channel === "whatsapp" && !recentChannel && !isWhatsAppTemplate) {
     return NextResponse.json(
       {
         error:

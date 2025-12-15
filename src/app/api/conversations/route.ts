@@ -225,6 +225,7 @@ export async function GET() {
               sender_type: msg.sender_type,
               sent_at: msg.sent_at,
               status: msg.status,
+              delivered_at: msg.delivered_at,
               template_sid: templateSid || undefined,
               template_name: templateInfo?.friendlyName || undefined,
               template_content: templateContent,
