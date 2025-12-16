@@ -14,6 +14,10 @@ import {
   Message,
 } from "@/lib/services/messagesDataService";
 import { createClient } from "@/lib/supabase/client";
+import {
+  computeAutoScrollKey,
+  shouldSyncSelectedConversation,
+} from "@/hooks/useMessages.logic";
 
 export interface UseMessagesReturn {
   conversations: Conversation[];
@@ -45,6 +49,8 @@ export function useMessages(
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  // Track when we last auto-scrolled so we don't scroll on status-only updates
+  const lastAutoScrollKeyRef = useRef<string | null>(null);
 
   // Debug: Log component mount and auth state
   useEffect(() => {
@@ -552,40 +558,57 @@ export function useMessages(
     }
   }, []);
 
-  // Auto-scroll to bottom when messages change or conversation changes
+  /**
+   * Auto-scroll behavior:
+   * - Scroll when a new message arrives (message count or last message id changes)
+   * - Scroll when switching conversations
+   * - Do NOT scroll for status-only updates (e.g., delivered -> read)
+   */
+  const selectedMessageCount = selectedConversation?.messages?.length ?? 0;
+  const selectedLastMessageId =
+    selectedConversation && selectedMessageCount > 0
+      ? selectedConversation.messages[selectedMessageCount - 1]?.id ?? null
+      : null;
+
   useEffect(() => {
-    if (selectedConversation?.messages) {
-      // Small delay to ensure DOM is updated
-      const timeoutId = setTimeout(() => {
-        scrollToBottom(true);
-      }, 100);
-      return () => clearTimeout(timeoutId);
-    }
+    if (!selectedConversation) return;
+
+    const key = computeAutoScrollKey(selectedConversation);
+    if (!key) return;
+
+    // If nothing that affects scroll position changed, skip auto-scroll.
+    if (lastAutoScrollKeyRef.current === key) return;
+    lastAutoScrollKeyRef.current = key;
+
+    // Small delay to ensure DOM is updated
+    const timeoutId = setTimeout(() => {
+      scrollToBottom(true);
+    }, 100);
+
+    return () => clearTimeout(timeoutId);
   }, [
-    selectedConversation?.messages,
     selectedConversation?.id,
+    selectedMessageCount,
+    selectedLastMessageId,
     scrollToBottom,
   ]);
 
-  // Sync selected conversation when conversations change
+  /**
+   * Keep `selectedConversation` in sync with the canonical `conversations` array.
+   *
+   * Important: message status updates (delivered/read) do NOT change message count
+   * or last message id. If we only sync on those fields, the UI can lag behind.
+   *
+   * We sync whenever the conversation object reference changes in `conversations`.
+   */
   useEffect(() => {
     if (!selectedConversation || conversations.length === 0) return;
 
-    const updated = conversations.find((c) => c.id === selectedConversation.id);
-    if (updated) {
-      // Only update if messages changed
-      const lastMessageId = updated.messages[updated.messages.length - 1]?.id;
-      const prevLastMessageId =
-        selectedConversation.messages[selectedConversation.messages.length - 1]
-          ?.id;
-
-      if (
-        updated.messages.length !== selectedConversation.messages.length ||
-        lastMessageId !== prevLastMessageId
-      ) {
-        setSelectedConversation(updated);
-      }
-    }
+    const nextSelected = shouldSyncSelectedConversation(
+      selectedConversation,
+      conversations
+    );
+    if (nextSelected) setSelectedConversation(nextSelected);
   }, [conversations, selectedConversation]);
 
   const handleSendMessage = useCallback(async () => {
