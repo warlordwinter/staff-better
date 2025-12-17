@@ -56,11 +56,18 @@ export async function POST(
     let twilioTemplateId = template.twilio_template_id;
     if (!twilioTemplateId) {
       try {
-        const twilioResult = await createTemplate({
-          friendlyName: template.template_name,
-          body: template.body,
-          language: template.language || "en",
-        });
+        const twilioResult = await createTemplate(
+          {
+            friendlyName: template.template_name,
+            language: template.language || "en",
+            types: {
+              "twilio/text": {
+                body: template.body,
+              },
+            },
+          },
+          companyId
+        );
         twilioTemplateId = twilioResult.sid;
       } catch (error) {
         console.error("Error creating template in Twilio:", error);
@@ -81,7 +88,8 @@ export async function POST(
       await submitTemplateForApproval(
         twilioTemplateId,
         (template.category as "MARKETING" | "UTILITY" | "AUTHENTICATION") ||
-          "UTILITY"
+          "UTILITY",
+        companyId
       );
     } catch (error) {
       console.error("Error submitting template for approval:", error);

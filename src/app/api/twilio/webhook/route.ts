@@ -84,10 +84,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Detect channel: WhatsApp messages have "whatsapp:" prefix in From or To
+    const isWhatsApp =
+      fromNumber.toLowerCase().startsWith("whatsapp:") ||
+      (toNumber && toNumber.toLowerCase().startsWith("whatsapp:"));
+    const channel: "sms" | "whatsapp" = isWhatsApp ? "whatsapp" : "sms";
+    console.log(`📱 Detected channel: ${channel} (From: ${fromNumber}, To: ${toNumber})`);
+
+    // Strip whatsapp: prefix from phone numbers for lookup
+    const normalizedFromForLookup = fromNumber.replace(/^whatsapp:/i, "");
+
     // Find the associate first to get company_id for message processing
     const supabaseAdmin = createAdminClient();
     const { normalizePhoneForLookup } = await import("@/utils/phoneUtils");
-    const normalizedFrom = normalizePhoneForLookup(fromNumber);
+    const normalizedFrom = normalizePhoneForLookup(normalizedFromForLookup);
 
     console.log(
       `🔍 Looking up associate: ${fromNumber} → normalized: ${normalizedFrom}`
@@ -152,27 +162,111 @@ export async function POST(request: NextRequest) {
           console.log(
             `✅ Found associate: ${associate.id} (company: ${associate.company_id}, stored phone: ${associate.phone_number})`
           );
-          // Find or create conversation using associate_id and company_id
+          // Find or create conversation using associate_id, company_id, and channel
+          // This ensures SMS and WhatsApp conversations are kept separate
           console.log(
-            `🔍 Looking for conversation: associate_id=${associate.id}, company_id=${associate.company_id}`
+            `🔍 Looking for conversation: associate_id=${associate.id}, company_id=${associate.company_id}, channel=${channel}`
           );
+
+          // First, try to find conversation with exact channel match
           const { data: conversations, error: conversationError } =
             await supabaseAdmin
               .from("conversations")
               .select("*")
               .eq("associate_id", associate.id)
               .eq("company_id", associate.company_id)
+              .eq("channel", channel)
               .limit(1);
 
           let conversation_id: string | undefined;
 
-          if (
-            conversationError ||
-            !conversations ||
-            conversations.length === 0
-          ) {
-            // Create new conversation
-            console.log("📝 Creating new conversation...");
+          // If no conversation found with exact channel match, check for NULL channel (legacy conversations)
+          if (!conversationError && (!conversations || conversations.length === 0)) {
+            console.log(
+              `⚠️ No conversation found with channel=${channel}, checking for legacy conversations (NULL channel)...`
+            );
+            const { data: legacyConversations, error: legacyError } =
+              await supabaseAdmin
+                .from("conversations")
+                .select("*")
+                .eq("associate_id", associate.id)
+                .eq("company_id", associate.company_id)
+                .is("channel", null)
+                .order("updated_at", { ascending: false, nullsFirst: false })
+                .order("created_at", { ascending: false, nullsFirst: false });
+
+            if (
+              !legacyError &&
+              legacyConversations &&
+              legacyConversations.length > 0
+            ) {
+              // If there's exactly one legacy conversation, we can safely update it
+              // If there are multiple, we should create a new one to avoid misclassifying
+              if (legacyConversations.length === 1) {
+                const legacyConversation = legacyConversations[0];
+                console.log(
+                  `🔄 Found single legacy conversation (NULL channel), updating to channel=${channel}...`
+                );
+                const { data: updatedConversation, error: updateError } =
+                  await supabaseAdmin
+                    .from("conversations")
+                    .update({ channel: channel })
+                    .eq("id", legacyConversation.id)
+                    .select()
+                    .single();
+
+                if (updateError || !updatedConversation) {
+                  console.error("❌ Error updating legacy conversation:", updateError);
+                  console.log(
+                    `📝 Creating new conversation (update failed) for channel: ${channel}...`
+                  );
+                } else {
+                  conversation_id = updatedConversation.id;
+                  console.log(
+                    `✅ Updated legacy conversation to channel=${channel}:`,
+                    conversation_id
+                  );
+                }
+              } else {
+                console.log(
+                  `⚠️ Found ${legacyConversations.length} legacy conversations with NULL channel. Creating a new conversation for channel=${channel} to avoid misclassification.`
+                );
+              }
+            }
+
+            // If still no conversation_id, create a new one
+            if (!conversation_id) {
+              console.log(
+                `📝 Creating new conversation (none found) for channel: ${channel}...`
+              );
+              const { data: newConversation, error: createError } =
+                await supabaseAdmin
+                  .from("conversations")
+                  .insert([
+                    {
+                      associate_id: associate.id,
+                      company_id: associate.company_id,
+                      channel: channel,
+                    },
+                  ])
+                  .select()
+                  .single();
+
+              if (createError || !newConversation) {
+                console.error("❌ Error creating conversation:", createError);
+                console.error(
+                  "❌ Failed to save message - conversation creation failed"
+                );
+              } else {
+                conversation_id = newConversation.id;
+                console.log("✅ Created new conversation:", conversation_id);
+              }
+            }
+          } else if (conversationError) {
+            console.error("❌ Error finding conversation:", conversationError);
+            console.log(
+              `📝 Creating new conversation (fetch failed) for channel: ${channel}...`
+            );
             const { data: newConversation, error: createError } =
               await supabaseAdmin
                 .from("conversations")
@@ -180,6 +274,7 @@ export async function POST(request: NextRequest) {
                   {
                     associate_id: associate.id,
                     company_id: associate.company_id,
+                    channel: channel,
                   },
                 ])
                 .select()
@@ -195,6 +290,7 @@ export async function POST(request: NextRequest) {
               console.log("✅ Created new conversation:", conversation_id);
             }
           } else {
+            // Conversation exists with exact channel match
             conversation_id = conversations[0].id;
             console.log("✅ Found existing conversation:", conversation_id);
           }

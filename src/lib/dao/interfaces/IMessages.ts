@@ -41,5 +41,14 @@ export interface IMessages {
    * Get all messages for a conversation
    */
   getMessagesByConversation(conversationId: string): Promise<Message[]>;
+
+  /**
+   * Check if there's an inbound message in the last 24 hours for a conversation
+   * Returns the channel of the most recent inbound message if found, null otherwise
+   */
+  hasRecentInboundMessage(
+    conversationId: string,
+    hoursAgo?: number
+  ): Promise<"sms" | "whatsapp" | null>;
 }
 

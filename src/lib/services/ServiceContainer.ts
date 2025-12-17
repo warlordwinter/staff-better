@@ -167,6 +167,10 @@ export class ServiceContainer {
     return this.services.get("logger");
   }
 
+  getMessagesDao(): MessagesDaoSupabase {
+    return this.services.get("messagesDao");
+  }
+
   // Method to update scheduler configuration
   updateSchedulerConfig(config: Partial<ScheduleConfig>): void {
     const schedulerService = this.getSchedulerService();

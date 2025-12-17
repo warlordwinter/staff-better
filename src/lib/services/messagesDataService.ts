@@ -27,6 +27,8 @@ export interface Message {
   templateName?: string; // Template friendly name if this is a template message
   templateContent?: string; // Template content if this is a template message
   templateSid?: string; // Template SID if this is a template message
+  status?: string | null; // Message delivery status (queued, sent, delivered, failed, undelivered, read)
+  deliveredAt?: string | null; // Timestamp when message was delivered
 }
 
 interface SendMessageResponse {
@@ -96,16 +98,18 @@ export class MessagesDataService {
             : "sms";
 
         // Handle template messages - use template name/content if available
-        const isTemplateMessage = !!msg.template_sid || body.includes("[Template:");
+        const isTemplateMessage =
+          !!msg.template_sid || body.includes("[Template:");
         let displayText: string;
-        
+
         if (isTemplateMessage && msg.template_name) {
           // Show template content if available, otherwise show template name
           // The template name will be shown separately in the UI header
           displayText = msg.template_content || msg.template_name;
         } else {
           // Clean up template indicators from display text for regular messages
-          displayText = body.replace(/\[Template: [^\]]+\]\s*/g, "").trim() || body;
+          displayText =
+            body.replace(/\[Template: [^\]]+\]\s*/g, "").trim() || body;
         }
 
         return {
@@ -117,13 +121,15 @@ export class MessagesDataService {
           templateName: msg.template_name,
           templateContent: msg.template_content,
           templateSid: msg.template_sid,
+          status: msg.status || null,
+          deliveredAt: msg.delivered_at || null,
         };
       });
 
       // Use the channel from the conversation (set by the API based on the conversation's channel field)
       // Fall back to determining from messages if channel is not provided (for backwards compatibility)
       let conversationChannel: "sms" | "whatsapp" = conv.channel || "sms";
-      
+
       // If channel is not provided in API response, determine from messages (legacy behavior)
       if (!conv.channel) {
         const channelCounts = messages.reduce((acc, msg) => {
@@ -141,7 +147,7 @@ export class MessagesDataService {
       // Get last message info
       const lastMessage =
         messages.length > 0 ? messages[messages.length - 1] : null;
-      
+
       // Format last message preview - show template name if it's a template
       let lastMessagePreview = "";
       if (lastMessage) {
@@ -168,11 +174,15 @@ export class MessagesDataService {
   }
 
   /**
-   * Send a message to an associate via SMS
+   * Send a message to an associate
+   * @param associateId - The associate ID
+   * @param message - The message text
+   * @param channel - Optional channel type. If not provided, defaults to "sms"
    */
   static async sendMessage(
     associateId: string,
-    message: string
+    message: string,
+    channel: "sms" | "whatsapp" = "sms"
   ): Promise<SendMessageResponse> {
     const response = await fetch(`/api/send-message`, {
       method: "POST",
@@ -183,7 +193,7 @@ export class MessagesDataService {
         type: "associate",
         id: associateId,
         message: message.trim(),
-        channel: "sms",
+        channel: channel,
       }),
     });
 
