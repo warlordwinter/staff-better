@@ -418,8 +418,9 @@ function extractContentFromTypes(types: any): string | null {
 export async function createTemplate(
   templateData: {
     friendlyName: string;
-    body: string;
     language?: string;
+    types: Record<string, any>; // Content type-specific structure
+    variables?: Record<string, string>; // Default variable values
   },
   companyId?: string
 ): Promise<{ sid: string; status: string }> {
@@ -449,25 +450,23 @@ export async function createTemplate(
     console.log("📋 [TEMPLATE DEBUG] Creating template in Twilio:", {
       friendlyName: templateData.friendlyName,
       language: templateData.language || "en",
+      types: Object.keys(templateData.types),
     });
 
-    // Create content template using REST API
+    // Create content template using REST API with JSON body (per Twilio docs)
     const response = await fetch("https://content.twilio.com/v1/Content", {
       method: "POST",
       headers: {
         Authorization: `Basic ${Buffer.from(
           `${accountSid}:${authToken}`
         ).toString("base64")}`,
-        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Type": "application/json",
       },
-      body: new URLSearchParams({
-        FriendlyName: templateData.friendlyName,
-        Language: templateData.language || "en",
-        Types: JSON.stringify({
-          "twilio/text": {
-            body: templateData.body,
-          },
-        }),
+      body: JSON.stringify({
+        friendly_name: templateData.friendlyName,
+        language: templateData.language || "en",
+        types: templateData.types,
+        ...(templateData.variables && { variables: templateData.variables }),
       }),
     });
 
@@ -497,13 +496,15 @@ export async function createTemplate(
  *
  * @param contentSid - The Twilio Content SID
  * @param category - Template category (MARKETING, UTILITY, AUTHENTICATION)
+ * @param name - Template name for approval (optional, defaults to contentSid)
  * @returns Promise resolving to approval request SID
  */
 export async function submitTemplateForApproval(
   contentSid: string,
   category: "MARKETING" | "UTILITY" | "AUTHENTICATION",
-  companyId?: string
-): Promise<{ approvalRequestSid: string }> {
+  companyId?: string,
+  name?: string
+): Promise<{ approvalRequestSid: string; status: string }> {
   try {
     // Get Twilio credentials - try company-specific first, fall back to env vars
     let accountSid: string | undefined;
@@ -530,22 +531,23 @@ export async function submitTemplateForApproval(
     console.log("📋 [TEMPLATE DEBUG] Submitting template for approval:", {
       contentSid,
       category,
+      name: name || contentSid,
     });
 
-    // Create approval request using REST API
+    // Create approval request using REST API with correct endpoint (per Twilio docs)
     const response = await fetch(
-      `https://content.twilio.com/v1/Content/${contentSid}/ApprovalRequests`,
+      `https://content.twilio.com/v1/Content/${contentSid}/ApprovalRequests/whatsapp`,
       {
         method: "POST",
         headers: {
           Authorization: `Basic ${Buffer.from(
             `${accountSid}:${authToken}`
           ).toString("base64")}`,
-          "Content-Type": "application/x-www-form-urlencoded",
+          "Content-Type": "application/json",
         },
-        body: new URLSearchParams({
-          Name: contentSid, // Use content SID as name
-          Category: category,
+        body: JSON.stringify({
+          name: name || contentSid,
+          category: category,
         }),
       }
     );
@@ -561,11 +563,14 @@ export async function submitTemplateForApproval(
     const data = await response.json();
     console.log(
       "📋 [TEMPLATE DEBUG] Approval request created:",
-      data.sid || data.approval_request_sid
+      data.sid || data.approval_request_sid,
+      "Status:",
+      data.status
     );
 
     return {
       approvalRequestSid: data.sid || data.approval_request_sid || "",
+      status: data.status || "received",
     };
   } catch (error) {
     console.error(
