@@ -587,7 +587,7 @@ export function useMessages(
 
     return () => clearTimeout(timeoutId);
   }, [
-    selectedConversation?.id,
+    selectedConversation,
     selectedMessageCount,
     selectedLastMessageId,
     scrollToBottom,

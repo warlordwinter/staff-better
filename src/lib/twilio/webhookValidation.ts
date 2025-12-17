@@ -131,6 +131,8 @@ export async function validateTwilioWebhook(
     // Twilio signs the request using the exact URL it calls (including protocol, host, path, query)
 
     let fullUrl: string;
+    let host: string | null = null;
+    let protocol: string | null = null;
 
     // Allow override via environment variable for local development (e.g., ngrok URL)
     const webhookBaseUrl = process.env.TWILIO_WEBHOOK_BASE_URL;
@@ -140,6 +142,14 @@ export async function validateTwilioWebhook(
         ? request.url
         : new URL(request.url).pathname + new URL(request.url).search;
       fullUrl = `${webhookBaseUrl}${pathAndQuery}`;
+      // Extract host and protocol from the webhook base URL for debugging
+      try {
+        const url = new URL(webhookBaseUrl);
+        host = url.host;
+        protocol = url.protocol.replace(":", "");
+      } catch {
+        // If parsing fails, leave as null
+      }
       console.log(
         "📞 [TWILIO VALIDATION] Using TWILIO_WEBHOOK_BASE_URL:",
         fullUrl
@@ -150,6 +160,14 @@ export async function validateTwilioWebhook(
     ) {
       // Already a full URL - use it directly
       fullUrl = request.url;
+      // Extract host and protocol from the full URL for debugging
+      try {
+        const url = new URL(request.url);
+        host = url.host;
+        protocol = url.protocol.replace(":", "");
+      } catch {
+        // If parsing fails, leave as null
+      }
     } else {
       // Need to reconstruct from headers
       // IMPORTANT: Use x-forwarded-* headers first (set by reverse proxies/load balancers)
@@ -158,8 +176,8 @@ export async function validateTwilioWebhook(
       const forwardedProto = request.headers.get("x-forwarded-proto");
 
       // Fall back to regular headers if forwarded headers not present
-      const host = forwardedHost || request.headers.get("host");
-      const protocol =
+      host = forwardedHost || request.headers.get("host");
+      protocol =
         forwardedProto ||
         (request.headers.get("x-forwarded-ssl") === "on" ? "https" : "http");
 

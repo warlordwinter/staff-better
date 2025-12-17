@@ -385,7 +385,7 @@ describe("Send Message API - WhatsApp Behavior", () => {
 
       const request = createMockRequest(requestBody);
       const response = await POST(request);
-      const data = await response.json();
+      await response.json(); // Parse response but don't use it
 
       // Template messages should bypass 24-hour check (handled by Twilio)
       // But our code still checks - let's verify the behavior

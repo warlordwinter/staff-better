@@ -108,7 +108,7 @@ async function sendSMSFallback(
     );
     if (templateMatch) {
       try {
-        const variables = JSON.parse(templateMatch[1]);
+        JSON.parse(templateMatch[1]); // Parse to validate, but we don't use the variables for SMS fallback
         // For SMS fallback, we'll use a simple text version
         // In production, you might want to reconstruct the message from the template
         messageBody = messageBody.replace(
@@ -229,7 +229,6 @@ async function processWebhookAsync(request: NextRequest): Promise<void> {
       );
     } else {
       // Log request details for debugging signature issues
-      const allHeaders = Object.fromEntries(request.headers.entries());
       console.log("📞 [WEBHOOK] Request details:", {
         url: request.url,
         method: request.method,
