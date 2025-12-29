@@ -48,10 +48,10 @@ export default function GroupHeader({
       </div>
 
       <div className="flex items-center gap-3">
-        {/* Add New Associate Button */}
+        {/* Add New Associate Button - Primary Action with Gradient */}
         <button
           onClick={onAddNew}
-          className="px-3 py-2 bg-green-600 rounded-xl inline-flex justify-center items-center gap-1 text-white cursor-pointer hover:bg-green-700 transition-colors"
+          className="px-3 py-2 bg-gradient-to-r from-[#ffb877] to-[#ff8a42] rounded-xl inline-flex justify-center items-center gap-1 text-white cursor-pointer hover:brightness-110 transition-all"
         >
           <span className="text-sm font-normal font-['Inter']">Add New</span>
           <svg
@@ -69,11 +69,11 @@ export default function GroupHeader({
           </svg>
         </button>
 
-        {/* Add Existing Associate Button */}
+        {/* Add Existing Associate Button - Secondary Action */}
         <button
           onClick={onAddExisting}
           disabled={loadingAssociates}
-          className="px-3 py-2 bg-blue-600 rounded-xl inline-flex justify-center items-center gap-1 text-white cursor-pointer hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-3 py-2 bg-white rounded-xl inline-flex justify-center items-center gap-1 border-2 border-[#F59144] text-[#F59144] cursor-pointer hover:bg-[#FFF5ED] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <span className="text-sm font-normal font-['Inter']">
             {loadingAssociates ? "Loading..." : "Add Existing"}
@@ -93,10 +93,10 @@ export default function GroupHeader({
           </svg>
         </button>
 
-        {/* Mass Message Button */}
+        {/* Mass Message Button - Secondary Action */}
         <button
           onClick={onMassMessage}
-          className="px-3 py-2 bg-blue-600 rounded-xl inline-flex justify-center items-center gap-1 text-white cursor-pointer hover:bg-blue-700 transition-colors"
+          className="px-3 py-2 bg-white rounded-xl inline-flex justify-center items-center gap-1 border-2 border-[#F59144] text-[#F59144] cursor-pointer hover:bg-[#FFF5ED] transition-colors"
         >
           <span className="text-sm font-normal font-['Inter']">
             Message All

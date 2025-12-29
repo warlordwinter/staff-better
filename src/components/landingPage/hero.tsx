@@ -47,6 +47,7 @@ export default function Hero() {
                   width={400}
                   height={300}
                   className="w-full h-48 object-cover"
+                  priority
                 />
               </div>
               <div className="rounded-xl overflow-hidden shadow-lg">
@@ -56,6 +57,7 @@ export default function Hero() {
                   width={400}
                   height={300}
                   className="w-full h-48 object-cover"
+                  priority
                 />
               </div>
             </div>
@@ -67,6 +69,7 @@ export default function Hero() {
                   width={400}
                   height={300}
                   className="w-full h-48 object-cover"
+                  priority
                 />
               </div>
               <div className="rounded-xl overflow-hidden shadow-lg">
@@ -76,6 +79,7 @@ export default function Hero() {
                   width={400}
                   height={300}
                   className="w-full h-48 object-cover"
+                  priority
                 />
               </div>
             </div>

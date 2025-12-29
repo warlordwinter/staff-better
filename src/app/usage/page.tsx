@@ -53,27 +53,23 @@ async function fetchUsageData(
   };
 }
 
-// Placeholder function for future Twilio API integration
+// Fetch daily activity data from Twilio API
 async function fetchActivityData(
   month: string,
   year: string
 ): Promise<ActivityData[]> {
-  // This will be replaced with actual Twilio API integration
-  // Example: const response = await fetch(`/api/twilio/activity?month=${month}&year=${year}`);
-  // return await response.json();
-  
-  // Suppress unused variable warnings - these will be used when API is integrated
-  void month;
-  void year;
-  
-  // Mock data for now
-  return [
-    { date: "Dec 2, 2024", sms: 23, whatsapp: 18, credits: (23 * 7) + (18 * 5) },
-    { date: "Dec 1, 2024", sms: 31, whatsapp: 22, credits: (31 * 7) + (22 * 5) },
-    { date: "Nov 30, 2024", sms: 28, whatsapp: 19, credits: (28 * 7) + (19 * 5) },
-    { date: "Nov 29, 2024", sms: 25, whatsapp: 21, credits: (25 * 7) + (21 * 5) },
-    { date: "Nov 28, 2024", sms: 29, whatsapp: 17, credits: (29 * 7) + (17 * 5) },
-  ];
+  const response = await fetch(
+    `/api/twilio/activity?month=${encodeURIComponent(month)}&year=${encodeURIComponent(year)}`
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(
+      errorData.error || `Failed to fetch activity data: ${response.statusText}`
+    );
+  }
+
+  return await response.json();
 }
 
 const months = [
@@ -100,6 +96,7 @@ export default function UsagePage() {
   const [usageData, setUsageData] = useState<UsageData | null>(null);
   const [activityData, setActivityData] = useState<ActivityData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activityError, setActivityError] = useState<string | null>(null);
 
   // Fetch usage data when month/year changes
   useEffect(() => {
@@ -110,6 +107,7 @@ export default function UsagePage() {
     const loadData = async () => {
       try {
         setLoading(true);
+        setActivityError(null);
         const [usage, activity] = await Promise.all([
           fetchUsageData(selectedMonth.toLowerCase(), selectedYear),
           fetchActivityData(selectedMonth.toLowerCase(), selectedYear),
@@ -118,10 +116,13 @@ export default function UsagePage() {
         setActivityData(activity);
       } catch (error) {
         console.error("Error fetching usage data:", error);
-        // Set error state - you might want to add an error state variable
-        // For now, we'll just log it and keep loading false
         setUsageData(null);
         setActivityData([]);
+        setActivityError(
+          error instanceof Error
+            ? error.message
+            : "Failed to load activity data"
+        );
       } finally {
         setLoading(false);
       }
@@ -375,6 +376,12 @@ export default function UsagePage() {
                       <LoadingSpinner />
                     </td>
                   </tr>
+                ) : activityError ? (
+                  <tr>
+                    <td colSpan={4} className="text-center py-8 text-red-500">
+                      {activityError}
+                    </td>
+                  </tr>
                 ) : activityData.length > 0 ? (
                   activityData.map((activity, index) => (
                     <tr
@@ -396,7 +403,7 @@ export default function UsagePage() {
                 ) : (
                   <tr>
                     <td colSpan={4} className="text-center py-8 text-gray-500">
-                      No activity data available
+                      No activity data available for this period
                     </td>
                   </tr>
                 )}
