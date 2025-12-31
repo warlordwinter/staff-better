@@ -144,7 +144,12 @@ export async function GET(request: NextRequest) {
         })
         .sort((a, b) => b.rawDate.getTime() - a.rawDate.getTime()) // Sort by date descending
         .slice(0, 30) // Limit to most recent 30 days
-        .map(({ rawDate, ...rest }) => rest); // Remove rawDate from final output
+        .map((item) => ({
+          date: item.date,
+          sms: item.sms,
+          whatsapp: item.whatsapp,
+          credits: item.credits,
+        })); // Remove rawDate from final output
 
       return NextResponse.json(activityData);
     } catch (twilioError: any) {

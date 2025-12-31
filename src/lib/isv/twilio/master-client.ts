@@ -4,13 +4,26 @@
 import twilio from "twilio";
 import { ISV_CONFIG, validateISVConfig } from "../config";
 
-// Validate config on module load
-validateISVConfig();
+// Lazy initialization - only validate and create client when needed
+let _masterTwilioClient: ReturnType<typeof twilio> | null = null;
 
-export const masterTwilioClient = twilio(
-  ISV_CONFIG.twilio.masterAccountSid,
-  ISV_CONFIG.twilio.masterAuthToken
-);
+function getMasterTwilioClient() {
+  if (!_masterTwilioClient) {
+    validateISVConfig();
+    _masterTwilioClient = twilio(
+      ISV_CONFIG.twilio.masterAccountSid,
+      ISV_CONFIG.twilio.masterAuthToken
+    );
+  }
+  return _masterTwilioClient;
+}
+
+export const masterTwilioClient = new Proxy({} as ReturnType<typeof twilio>, {
+  get(_target, prop) {
+    const client = getMasterTwilioClient();
+    return (client as any)[prop];
+  }
+});
 
 /**
  * Create a Twilio subaccount for a customer
